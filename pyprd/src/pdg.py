@@ -36,7 +36,7 @@ def generate_mock_pdg(hbg: HBG, threshold=10):
     for tid in hbg.tids:
         read_instruction_nodes = []
         
-        for n in nx.topological_sort(hbg.get_thread_subgraph(tid)):
+        for n in hbg.get_thread_nodes(tid):
             n: nodes.AbstractNode
             
             if n.itype == nodes.NodeType.READ:

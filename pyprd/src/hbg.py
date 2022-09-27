@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Dict, List, Set
 import networkx as nx
 from enum import Enum
 import nodes
@@ -10,15 +10,12 @@ class EdgeType(Enum):
 
 
 class HBG(nx.DiGraph):
-    def __post_init__(self):
-        self._node_by_type = {itype: nx.get_node_attributes(self, itype) for itype in nodes.NodeType}
-        assert sum(map(len, self._node_by_type.values())) == len(self)
+    def __post_init__(self, nodes_by_tid: Dict[int, List[nodes.AbstractNode]], nodes_by_type: Dict[nodes.NodeType, Set[nodes.AbstractNode]]):
+        self._threads = nodes_by_tid
+        self._nodes = nodes_by_type
         
         self._inter_graph = nx.subgraph_view(self, filter_edge=lambda u, v: self[u][v]['type'] == EdgeType.INTER_THREAD)
         self._intra_graph = nx.subgraph_view(self, filter_edge=lambda u, v: self[u][v]['type'] == EdgeType.INTRA_THREAD)
-        
-        self._tids = list(nx.get_node_attributes(self, 'tid').values())
-        self._thread_graphs = {tid: nx.get_node_attributes(self, f'tid_{tid}') for tid in self._tids}
         
         return self
         
@@ -32,13 +29,13 @@ class HBG(nx.DiGraph):
     
     @property
     def tids(self):
-        return self._tids
+        return self._threads.keys()
     
-    def get_thread_subgraph(self, tid):
-        return self._thread_graphs[tid]
+    def get_thread_nodes(self, tid):
+        return self._threads[tid]
     
     def get_nodes_by_type(self, itype: nodes.NodeType):
-        return self._node_by_type[itype]
+        return self._nodes[itype]
     
     def get_write_nodes(self):
         return self.get_nodes_by_type(nodes.NodeType.WRITE)
