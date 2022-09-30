@@ -54,6 +54,30 @@ class HBG(nx.DiGraph):
     def get_nodes_by_type(self, itype: nodes.NodeType) -> Set[nodes.AbstractNode]:
         return self._nodes_by_type[itype]
     
+    def get_inter_children(self, node: nodes.AbstractNode) -> Iterable[nodes.AbstractNode]:
+        return self.inter.neighbors(node)
+
+    def get_inter_parents(self, node: nodes.AbstractNode) -> Iterable[nodes.AbstractNode]:
+        return self.inter.predecessors(node)
+
+    def get_intra_child(self, node: nodes.AbstractNode) -> nodes.AbstractNode:
+        children = list(self.intra.neighbors(node))
+
+        if not children:
+            return None
+        
+        child, = children
+        return child
+
+    def get_intra_parent(self, node) -> nodes.AbstractNode:
+        parents = list(self.intra.predecessors(node))
+        
+        if not parents:
+            return None
+        
+        parent, = parents
+        return parent
+    
     @property
     def write_nodes(self):
         return self.get_nodes_by_type(nodes.NodeType.WRITE)
