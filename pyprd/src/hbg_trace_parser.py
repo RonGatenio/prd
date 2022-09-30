@@ -1,4 +1,6 @@
-from hbg_builder import HBGBuilder, nodes
+from typing import Set, Tuple
+from hbg import HBG, HBGBuilder
+import nodes
 
 
 _any_int = lambda x: int(x, 0)

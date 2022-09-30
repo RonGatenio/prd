@@ -45,3 +45,46 @@ class HBG(nx.DiGraph):
     
     def get_flush_nodes(self):
         return self.get_nodes_by_type(nodes.NodeType.FLUSH)
+
+class HBGBuilder:
+    def __init__(self):
+        self._hbg = HBG()
+        self._thread_tails: Dict[int, nodes.AbstractNode] = {}
+        self._nodes_by_thread: Dict[int, List[nodes.AbstractNode]] = {}
+        self._nodes_by_type: Dict[nodes.NodeType, Set[nodes.AbstractNode]] = {}
+        self._nodes_location: Dict[nodes.AbstractNode, NodeLocation] = {}
+        
+    @classmethod
+    def from_elements(cls, inodes: Collection[nodes.AbstractNode], hbedges: Collection[Tuple[nodes.AbstractNode, nodes.AbstractNode]]):
+        builder = cls()
+        
+        for n in inodes:
+            builder.add_node(n)
+            
+        for e in hbedges:
+            builder.add_happens_before_edge(*e)
+            
+        return builder
+        
+    def add_node(self, node: nodes.AbstractNode):
+        self._hbg.add_node(node)
+        
+        self._hbg.nodes[node]['itype'] = node.itype
+        self._hbg.nodes[node][node.itype] = True
+        
+        self._nodes_by_thread.setdefault(node.tid, [])
+        self._nodes_location[node] = NodeLocation(node.tid, len(self._nodes_by_thread[node.tid]))
+        self._nodes_by_thread[node.tid].append(node)
+        self._nodes_by_type.setdefault(node.itype, set()).add(node)
+        
+        if node.tid in self._thread_tails:
+            self._hbg.add_edge(self._thread_tails[node.tid], node, type=EdgeType.INTRA_THREAD)
+        
+        self._thread_tails[node.tid] = node
+        
+    def add_happens_before_edge(self, src: nodes.EpochNode, dst: nodes.EpochNode):
+        assert src.tid != dst.tid, 'TIDs must be different'
+        self._hbg.add_edge(src, dst, type=EdgeType.INTER_THREAD)
+        
+    def build(self) -> HBG:
+        return self._hbg.__post_init__(self._nodes_by_thread, self._nodes_by_type, self._nodes_location)
