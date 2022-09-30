@@ -25,6 +25,8 @@ class HBG(nx.DiGraph):
         self._inter_graph = nx.subgraph_view(self, filter_edge=lambda u, v: self[u][v]['type'] == EdgeType.INTER_THREAD)
         self._intra_graph = nx.subgraph_view(self, filter_edge=lambda u, v: self[u][v]['type'] == EdgeType.INTRA_THREAD)
         
+        assert nx.is_directed_acyclic_graph(self), 'HBG is not a DAG'
+        
         return self
         
     @property
