@@ -1,4 +1,4 @@
-from typing import Set, Tuple
+from typing import Set, Tuple, List
 from hbg import HBG, HBGBuilder
 import nodes
 
@@ -9,7 +9,7 @@ _any_int = lambda x: int(x, 0)
 class TraceParser:
     def __init__(self, trace_lines):
         self._trace = map(str.strip, trace_lines)
-        self._nodes: Set[nodes.AbstractNode] = set()
+        self._nodes: List[nodes.AbstractNode] = []
         self._edges: Set[Tuple[nodes.AbstractNode, nodes.AbstractNode]] = set()
 
     @classmethod
@@ -27,13 +27,13 @@ class TraceParser:
         elif key == 'EPOC_INC':
             from_epoch, to_epoch = tuple(map(_any_int, args))
             if from_epoch != to_epoch:
-                self._nodes.add(nodes.EpochNode(tid, to_epoch))
+                self._nodes.append(nodes.EpochNode(tid, to_epoch))
         else:
             pc, address, size, *info = args
             pc = _any_int(pc)
             address = _any_int(address)
             size = _any_int(size)
-            self._nodes.add(nodes.InstructionNode(tid, key, pc, address, size, ':'.join(info) if info else ''))
+            self._nodes.append(nodes.InstructionNode(tid, key, pc, address, size, ':'.join(info) if info else ''))
 
     @staticmethod
     def _is_comment_line(line):
@@ -77,7 +77,7 @@ class TraceParser:
             return False
 
         print(f'Total nodes before filter {len(self._nodes)}')
-        self._nodes = set(filter(should_keep, self._nodes))
+        self._nodes = list(filter(should_keep, self._nodes))
         print(f'Total nodes after filter  {len(self._nodes)}')
 
         return self
