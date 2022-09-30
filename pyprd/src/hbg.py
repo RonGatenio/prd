@@ -6,8 +6,9 @@ import nodes
 
 
 class EdgeType(Enum):
-    INTER_THREAD = 'inter-thread'
-    INTRA_THREAD = 'intra-thread'
+    INTER_THREAD        = 'inter-thread'
+    INTRA_THREAD        = 'intra-thread'
+    TRAVERSAL_POSTORDER = 'traversal-postorder'
 
 
 NodeLocation = namedtuple('NodeLocation', ['tid', 'tindex'])
@@ -25,9 +26,19 @@ class HBG(nx.DiGraph):
         self._inter_graph = nx.subgraph_view(self, filter_edge=lambda u, v: self[u][v]['type'] == EdgeType.INTER_THREAD)
         self._intra_graph = nx.subgraph_view(self, filter_edge=lambda u, v: self[u][v]['type'] == EdgeType.INTRA_THREAD)
         
+        self._add_traversal_postorder_edges()
+        
         assert nx.is_directed_acyclic_graph(self), 'HBG is not a DAG'
         
         return self
+    
+    def _add_traversal_postorder_edges(self):
+        """Adds edges that cause a postorder to visit an epoch node before all intra-parents of its intra-children"""
+        for epoch_node in self.epoch_nodes:
+            for inter_child in self.get_inter_children(epoch_node):
+                intra_parent = self.get_intra_parent(inter_child)
+                if intra_parent:
+                    self.add_edge(intra_parent, epoch_node, type=EdgeType.TRAVERSAL_POSTORDER)
         
     @property
     def inter(self) -> nx.DiGraph:
