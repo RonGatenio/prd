@@ -1,6 +1,7 @@
-from typing import Dict, List, Set
-import networkx as nx
+from typing import Collection, Dict, List, Set, Tuple
+from collections import namedtuple
 from enum import Enum
+import networkx as nx
 import nodes
 
 
@@ -9,10 +10,17 @@ class EdgeType(Enum):
     INTRA_THREAD = 'intra-thread'
 
 
+NodeLocation = namedtuple('NodeLocation', ['tid', 'tindex'])
+
+
 class HBG(nx.DiGraph):
-    def __post_init__(self, nodes_by_tid: Dict[int, List[nodes.AbstractNode]], nodes_by_type: Dict[nodes.NodeType, Set[nodes.AbstractNode]]):
-        self._threads = nodes_by_tid
-        self._nodes = nodes_by_type
+    def __post_init__(self,
+                      nodes_by_thread: Dict[int, List[nodes.AbstractNode]],
+                      nodes_by_type: Dict[nodes.NodeType, Set[nodes.AbstractNode]],
+                      nodes_location: Dict[nodes.AbstractNode, NodeLocation]):
+        self._nodes_by_thread = nodes_by_thread
+        self._nodes_by_type = nodes_by_type
+        self._nodes_location = nodes_location
         
         self._inter_graph = nx.subgraph_view(self, filter_edge=lambda u, v: self[u][v]['type'] == EdgeType.INTER_THREAD)
         self._intra_graph = nx.subgraph_view(self, filter_edge=lambda u, v: self[u][v]['type'] == EdgeType.INTRA_THREAD)
@@ -29,22 +37,45 @@ class HBG(nx.DiGraph):
     
     @property
     def tids(self):
-        return self._threads.keys()
+        return self._nodes_by_thread.keys()
+    
+    def get_node_by_location(self, location: NodeLocation | Tuple[int, int]):
+        location = NodeLocation(*location)
+        return self._nodes_by_thread[location.tid][location.tindex]
+    
+    def get_node_location(self, node: nodes.AbstractNode) -> NodeLocation:
+        return self._nodes_location[node]
     
     def get_thread_nodes(self, tid):
-        return self._threads[tid]
+        return self._nodes_by_thread[tid]
     
     def get_nodes_by_type(self, itype: nodes.NodeType):
-        return self._nodes[itype]
+        return self._nodes_by_type[itype]
     
-    def get_write_nodes(self):
+    @property
+    def write_nodes(self):
         return self.get_nodes_by_type(nodes.NodeType.WRITE)
     
-    def get_read_nodes(self):
+    @property
+    def read_nodes(self):
         return self.get_nodes_by_type(nodes.NodeType.READ)
     
-    def get_flush_nodes(self):
+    @property
+    def flush_nodes(self):
         return self.get_nodes_by_type(nodes.NodeType.FLUSH)
+    
+    @property
+    def epoch_nodes(self):
+        return self.get_nodes_by_type(nodes.NodeType.EPOCH)
+    
+    @property
+    def read_write_nodes(self):
+        return self.read_nodes | self.write_nodes
+    
+    @property
+    def instruction_nodes(self):
+        return self.read_nodes | self.write_nodes | self.flush_nodes
+
 
 class HBGBuilder:
     def __init__(self):

@@ -7,25 +7,39 @@ class NodeType(str, Enum):
     WRITE = 'WRITE'
     FLUSH = 'FLUSH'
     EPOCH = 'EPOCH'
+    
+    @classmethod
+    def is_instruction_type(cls, itype: 'NodeType'):
+        return itype in (cls.READ, cls.WRITE, cls.FLUSH)
 
 
 class AbstractNode(ABC):
     def __init__(self, itype: NodeType, tid: int):
         super().__init__()
+        self._itype = NodeType(itype)
         self._tid = int(tid)
-        self._itype = itype
-
-    @property
-    def tid(self):
-        return self._tid
+        # self._tindex = int(tindex)
     
     @property
     def itype(self):
+        """Return the instruction type"""
         return self._itype
 
+    @property
+    def tid(self):
+        """Return the thread ID"""
+        return self._tid
+    
+    # @property
+    # def tindex(self):
+    #     """Return the index of the node in the thread"""
+    #     return self._tindex
+
     def __repr__(self) -> str:
-        tid = self.tid
         itype = self.itype
+        tid = self.tid
+        # tindex = self.tindex
+        # return f'{self.__class__.__name__}({itype=}, {tid=}, {tindex=})'
         return f'{self.__class__.__name__}({itype=}, {tid=})'
 
 
@@ -53,9 +67,8 @@ class EpochNode(AbstractNode):
 
 
 class InstructionNode(AbstractNode):
-    def __init__(self, tid: int, instruction: NodeType, pc: int, address: int, size: int, info):
-        super().__init__(instruction, tid)
-        self._instruction = instruction
+    def __init__(self, tid: int, itype: NodeType, pc: int, address: int, size: int, info):
+        super().__init__(itype, tid)
         self._pc = pc
         self._address = address
         self._size = size
@@ -63,7 +76,7 @@ class InstructionNode(AbstractNode):
 
     @property
     def instruction(self):
-        return self._instruction
+        return self.itype
 
     @property
     def pc(self):
@@ -87,7 +100,7 @@ class InstructionNode(AbstractNode):
 
     def __repr__(self) -> str:
         tid = self.tid
-        instruction = self.instruction
+        instruction = self.instruction.name
         pc = self.pc
         address = self.address
         size = self.size
