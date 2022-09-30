@@ -1,4 +1,4 @@
-from typing import Collection, Dict, List, Set, Tuple
+from typing import Dict, Iterable, List, Set, Tuple
 from collections import namedtuple
 from enum import Enum
 import networkx as nx
@@ -28,28 +28,28 @@ class HBG(nx.DiGraph):
         return self
         
     @property
-    def inter(self):
+    def inter(self) -> nx.DiGraph:
         return self._inter_graph
     
     @property
-    def intra(self):
+    def intra(self) -> nx.DiGraph:
         return self._intra_graph
     
     @property
-    def tids(self):
+    def tids(self) -> Iterable[int]:
         return self._nodes_by_thread.keys()
     
-    def get_node_by_location(self, location: NodeLocation | Tuple[int, int]):
+    def get_node_by_location(self, location: NodeLocation | Tuple[int, int]) -> nodes.AbstractNode:
         location = NodeLocation(*location)
         return self._nodes_by_thread[location.tid][location.tindex]
     
     def get_node_location(self, node: nodes.AbstractNode) -> NodeLocation:
         return self._nodes_location[node]
     
-    def get_thread_nodes(self, tid):
+    def get_thread_nodes(self, tid: int) -> List[nodes.AbstractNode]:
         return self._nodes_by_thread[tid]
     
-    def get_nodes_by_type(self, itype: nodes.NodeType):
+    def get_nodes_by_type(self, itype: nodes.NodeType) -> Set[nodes.AbstractNode]:
         return self._nodes_by_type[itype]
     
     @property
@@ -86,7 +86,7 @@ class HBGBuilder:
         self._nodes_location: Dict[nodes.AbstractNode, NodeLocation] = {}
         
     @classmethod
-    def from_elements(cls, inodes: Collection[nodes.AbstractNode], hbedges: Collection[Tuple[nodes.AbstractNode, nodes.AbstractNode]]):
+    def from_elements(cls, inodes: Iterable[nodes.AbstractNode], hbedges: Iterable[Tuple[nodes.AbstractNode, nodes.AbstractNode]]):
         builder = cls()
         
         for n in inodes:
