@@ -120,4 +120,5 @@ class HBGBuilder:
         self._hbg.add_edge(src, dst, type=EdgeType.INTER_THREAD)
         
     def build(self) -> HBG:
-        return self._hbg.__post_init__(self._nodes_by_thread, self._nodes_by_type, self._nodes_location)
+        self._hbg.__post_init__(self._nodes_by_thread, self._nodes_by_type, self._nodes_location)
+        return nx.freeze(self._hbg)
