@@ -90,27 +90,27 @@ class HBG(nx.DiGraph):
         return parent
     
     @property
-    def write_nodes(self):
+    def write_nodes(self) -> Set[nodes.InstructionNode]:
         return self.get_nodes_by_type(nodes.NodeType.WRITE)
     
     @property
-    def read_nodes(self):
+    def read_nodes(self) -> Set[nodes.InstructionNode]:
         return self.get_nodes_by_type(nodes.NodeType.READ)
     
     @property
-    def flush_nodes(self):
+    def flush_nodes(self) -> Set[nodes.InstructionNode]:
         return self.get_nodes_by_type(nodes.NodeType.FLUSH)
     
     @property
-    def epoch_nodes(self):
+    def epoch_nodes(self) -> Set[nodes.EpochNode]:
         return self.get_nodes_by_type(nodes.NodeType.EPOCH)
     
     @property
-    def read_write_nodes(self):
+    def read_write_nodes(self) -> Set[nodes.InstructionNode]:
         return self.read_nodes | self.write_nodes
     
     @property
-    def instruction_nodes(self):
+    def instruction_nodes(self) -> Set[nodes.InstructionNode]:
         return self.read_nodes | self.write_nodes | self.flush_nodes
 
 
