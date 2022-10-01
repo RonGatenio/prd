@@ -29,6 +29,20 @@ class HBG(nx.DiGraph):
         self._add_traversal_postorder_edges()
         
         assert nx.is_directed_acyclic_graph(self), 'HBG is not a DAG'
+        self._vars: Set[Tuple[int, int]] = set()
+        self._cache_lines: Dict[Tuple[int, int], Set[Tuple[int, int]]] = {}
+        
+        CACHELINE_SIZE = 64
+        
+        mask = 0xffffffffffffffff * CACHELINE_SIZE 
+        
+        for n in self.read_write_nodes:
+            # TODO: assert vars are contained in cache lines
+            if n.interval in self._vars:
+                continue
+            self._vars.add(n.interval)
+            cache_line_address = n.address & mask
+            self._cache_lines.setdefault((cache_line_address, cache_line_address+CACHELINE_SIZE), set()).add(n.interval)
         
         return self
     
@@ -51,6 +65,13 @@ class HBG(nx.DiGraph):
     @property
     def tids(self) -> Iterable[int]:
         return self._nodes_by_thread.keys()
+    
+    @property
+    def vars(self) -> Set[Tuple[int, int]]:
+        return self._vars
+    
+    def get_vars_in_cache_line(self, cache_line):
+        return self._cache_lines[cache_line]
     
     def get_node_by_location(self, location: NodeLocation | Tuple[int, int]) -> nodes.AbstractNode:
         location = NodeLocation(*location)
