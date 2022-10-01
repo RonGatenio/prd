@@ -18,6 +18,7 @@ class TraceParser:
             return cls(f.readlines())
 
     def _parse_line(self, line):
+        line = line.split('#')[0].strip()
         tid, key, *args = line.split(':')
         tid = int(tid)
 
