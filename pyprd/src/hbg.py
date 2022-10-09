@@ -1,14 +1,19 @@
-from typing import Dict, Iterable, List, Set, Tuple
+from typing import Dict, Generator, Iterable, List, Set, Tuple
 from collections import namedtuple
 from enum import Enum
 import networkx as nx
+import intervaltree
 import nodes
 
 
+CACHELINE_SIZE = 64
+
+
 class EdgeType(Enum):
-    INTER_THREAD        = 'inter-thread'
-    INTRA_THREAD        = 'intra-thread'
-    TRAVERSAL_POSTORDER = 'traversal-postorder'
+    INTER_THREAD                = 'inter-thread'
+    INTRA_THREAD                = 'intra-thread'
+    TRAVERSAL_POSTORDER         = 'traversal-postorder'
+    TRAVERSAL_REVERSE_POSTORDER = 'traversal-reverse-postorder'
 
 
 NodeLocation = namedtuple('NodeLocation', ['tid', 'tindex'])
@@ -28,13 +33,11 @@ class HBG(nx.DiGraph):
         
         self._add_traversal_postorder_edges()
         
-        assert nx.is_directed_acyclic_graph(self), 'HBG is not a DAG'
         self._vars: Set[Tuple[int, int]] = set()
         self._cache_lines: Dict[Tuple[int, int], Set[Tuple[int, int]]] = {}
         
-        CACHELINE_SIZE = 64
         
-        mask = 0xffffffffffffffff * CACHELINE_SIZE 
+        mask = ((1 << 64) - 1) * CACHELINE_SIZE
         
         for n in self.read_write_nodes:
             # TODO: assert vars are contained in cache lines
@@ -43,6 +46,8 @@ class HBG(nx.DiGraph):
             self._vars.add(n.interval)
             cache_line_address = n.address & mask
             self._cache_lines.setdefault((cache_line_address, cache_line_address+CACHELINE_SIZE), set()).add(n.interval)
+        
+        assert nx.is_directed_acyclic_graph(self), 'HBG is not a DAG'
         
         return self
     
