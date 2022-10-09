@@ -40,10 +40,12 @@ class TraceParser:
     def _is_comment_line(line):
         return line.startswith('#')
 
-    def parse(self, debug=False):
+    def parse(self, debug=False, max_lines=None):
         dbg_print = print if debug else lambda x: None
 
-        for line in self._trace:
+        for i, line in enumerate(self._trace):
+            if max_lines and i > max_lines:
+                break
             # dbg_print(line)
 
             if not self._is_comment_line(line):
