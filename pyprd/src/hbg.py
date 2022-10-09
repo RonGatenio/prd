@@ -77,6 +77,10 @@ class HBG(nx.DiGraph):
     
     def get_vars_in_cache_line(self, cache_line):
         return self._cache_lines[cache_line]
+    # def get_vars_in_range(self, begin: int, end: int) -> Generator[Tuple[int, int], None, None]:
+    #     for i in self._vars_tree.envelop(begin, end):
+    #         i: intervaltree.Interval
+    #         yield (i.begin, i.end)
     
     def get_node_by_location(self, location: NodeLocation | Tuple[int, int]) -> nodes.AbstractNode:
         location = NodeLocation(*location)

@@ -34,7 +34,54 @@ class PersistencyRace:
 ThreadId = int
 Var = Tuple[int, int]
 
+import intervaltree
 
+
+# class VarTree:
+#     def __init__(self):
+#         self._itree = intervaltree.IntervalTree()
+#         self._vars = {}
+        
+#     # def __get__(self, var):
+#     #     # self._itree.
+#     #     pass
+    
+#     # def __set__(self, var, node):
+    
+#     @property
+#     def vars(self):
+#         return self._vars.keys()
+    
+#     def range(self, var: Var):
+#         for i in self._itree.envelop(*var):
+#             yield (i.begin, i.end)
+    
+#     def set(self, var: Var, data: Any):
+#         self._vars[var] = data
+#         self._itree.addi(*var)
+        
+#     def get(self, var: Var, default=None):
+#         return self._vars.get(var, default)
+        
+#     def set_all(self, var: Var, data: Any):
+#         for v in self.range(var):
+#             self._vars[v] = data
+    
+#     # def add(self, var: Var, data: Any):
+#     #     if var not in self._vars:
+#     #         self._vars[var] = intervaltree.Interval(*var, data=set())
+#     #         self._itree.add(self._vars[var])
+#     #     self._vars[var].data.add(data)
+        
+#     # def get(self, var: Var):
+#     #     a = set()
+#     #     for i in self._itree[var[0]:var[1]]:
+#     #         i: intervaltree.Interval
+#     #         a |= i.data
+#     #     return a
+
+
+# @dataclass
 class ThreadContext:
     def __init__(self):
         self.lfw: Dict[ThreadId, nodes.InstructionNode] = {}  # last found write instruction node in the thread
@@ -49,6 +96,18 @@ class PersistencyRaceDetector:
         self._delta_flushed_read_nodes: Dict[nodes.InstructionNode, Dict[Var, Set[nodes.InstructionNode]]] = {}
         self._delta_flushed_write_nodes: Dict[nodes.InstructionNode, Dict[Var, Set[nodes.InstructionNode]]] = {}
         self._thread_contexts: Dict[ThreadId, ThreadContext] = {}
+        
+    def build_delta_ha_groups_opt1(self):
+        pass
+
+    def build_delta_ha_groups_opt2(self):
+        pass
+    
+    def build_delta_fw_groups_opt1(self):
+        pass
+    
+    def build_delta_fw_groups_opt2(self):
+        pass
 
     def part_1(self):
         """Find delta groups"""
@@ -106,3 +165,7 @@ class PersistencyRaceDetector:
                             if is_before(n1, n2):
                                 thread_contexts[tid].lpw[t][var] = thread_contexts[c.tid].lpw[t].get(var)
     
+    # def run(self):
+    #     self._first_iteration()
+    #     self._second_iteration()
+    #     return self._third_iteration()
