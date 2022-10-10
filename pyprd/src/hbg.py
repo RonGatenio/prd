@@ -2,11 +2,10 @@ from typing import Dict, Generator, Iterable, List, Set, Tuple
 from collections import namedtuple
 from enum import Enum
 import networkx as nx
-import intervaltree
 import nodes
 
 
-CACHELINE_SIZE = 64
+DEFAULT_CACHELINE_SIZE = 64
 
 
 class EdgeType(Enum):
@@ -19,46 +18,76 @@ class EdgeType(Enum):
 NodeLocation = namedtuple('NodeLocation', ['tid', 'tindex'])
 
 
-class HBG(nx.DiGraph):
-    def __post_init__(self,
-                      nodes_by_thread: Dict[int, List[nodes.AbstractNode]],
-                      nodes_by_type: Dict[nodes.NodeType, Set[nodes.AbstractNode]],
-                      nodes_location: Dict[nodes.AbstractNode, NodeLocation]):
+class HBG:
+    def __init__(self,
+                 base_graph: nx.DiGraph,
+                 nodes_by_thread: Dict[int, List[nodes.AbstractNode]],
+                 nodes_by_type: Dict[nodes.NodeType, Set[nodes.AbstractNode]],
+                 nodes_location: Dict[nodes.AbstractNode, NodeLocation],
+                 cacheline_size=DEFAULT_CACHELINE_SIZE):
+
+        self._graph = base_graph
         self._nodes_by_thread = nodes_by_thread
         self._nodes_by_type = nodes_by_type
         self._nodes_location = nodes_location
-        
-        self._inter_graph = nx.subgraph_view(self, filter_edge=lambda u, v: self[u][v]['type'] == EdgeType.INTER_THREAD)
-        self._intra_graph = nx.subgraph_view(self, filter_edge=lambda u, v: self[u][v]['type'] == EdgeType.INTRA_THREAD)
+        self._cacheline_size = cacheline_size
+
+        self._original_graph            = nx.subgraph_view(self._graph, filter_edge=lambda u, v: self._graph[u][v]['type'] in (EdgeType.INTER_THREAD, EdgeType.INTRA_THREAD))
+        self._inter_graph               = nx.subgraph_view(self._graph, filter_edge=lambda u, v: self._graph[u][v]['type'] == EdgeType.INTER_THREAD)
+        self._intra_graph               = nx.subgraph_view(self._graph, filter_edge=lambda u, v: self._graph[u][v]['type'] == EdgeType.INTRA_THREAD)
         
         self._add_traversal_postorder_edges()
-        
+        self._add_traversal_reverse_postorder_edges()
+
+        self._postorder_graph           = nx.subgraph_view(self._graph, filter_edge=lambda u, v: self._graph[u][v]['type'] != EdgeType.TRAVERSAL_REVERSE_POSTORDER)
+        self._reverse_postorder_graph   = nx.subgraph_view(self._graph, filter_edge=lambda u, v: self._graph[u][v]['type'] != EdgeType.TRAVERSAL_POSTORDER)
+
         self._vars: Set[Tuple[int, int]] = set()
         self._cache_lines: Dict[Tuple[int, int], Set[Tuple[int, int]]] = {}
-        
-        
-        mask = ((1 << 64) - 1) * CACHELINE_SIZE
-        
-        for n in self.read_write_nodes:
-            # TODO: assert vars are contained in cache lines
-            if n.interval in self._vars:
-                continue
-            self._vars.add(n.interval)
-            cache_line_address = n.address & mask
-            self._cache_lines.setdefault((cache_line_address, cache_line_address+CACHELINE_SIZE), set()).add(n.interval)
-        
-        assert nx.is_directed_acyclic_graph(self), 'HBG is not a DAG'
-        
-        return self
-    
+
+        self._find_vars()
+
+        nx.freeze(self._graph)
+
+        cc = nx.find_cycle(self._postorder_graph)
+        z = '\n'.join(map(str, ((n1.itype.name, self._nodes_location[n1], n2.itype.name, self._nodes_location[n2], self._graph[n1][n2]['type'].name) for n1, n2 in cc)))
+        print(z)
+        # return
+        import ipdb; ipdb.set_trace()
+        # assert nx.is_directed_acyclic_graph(self._graph), 'HBG given graph is not a DAG'
+        assert nx.is_directed_acyclic_graph(self._inter_graph), 'HBG inter graph is not a DAG'
+        assert nx.is_directed_acyclic_graph(self._intra_graph), 'HBG intra graph is not a DAG'
+        assert nx.is_directed_acyclic_graph(self._original_graph), 'HBG original graph is not a DAG'
+        assert nx.is_directed_acyclic_graph(self._postorder_graph), 'HBG postorder graph is not a DAG'
+        assert nx.is_directed_acyclic_graph(self._reverse_postorder_graph), 'HBG reversed postorder graph is not a DAG'
+
     def _add_traversal_postorder_edges(self):
-        """Adds edges that cause a postorder to visit an epoch node before all intra-parents of its intra-children"""
+        """Adds edges that cause a postorder to visit an epoch node before all intra-parents of its inter-children"""
         for epoch_node in self.epoch_nodes:
             for inter_child in self.get_inter_children(epoch_node):
                 intra_parent = self.get_intra_parent(inter_child)
                 if intra_parent:
-                    self.add_edge(intra_parent, epoch_node, type=EdgeType.TRAVERSAL_POSTORDER)
-        
+                    self._graph.add_edge(intra_parent, epoch_node, type=EdgeType.TRAVERSAL_POSTORDER)
+
+    def _add_traversal_reverse_postorder_edges(self):
+        """Adds edges that cause a reversed postorder to visit an epoch node before all intra-children of its inter-parents"""
+        for epoch_node in self.epoch_nodes:
+            for inter_parent in self.get_inter_parents(epoch_node):
+                intra_child = self.get_intra_child(inter_parent)
+                if intra_child:
+                    self._graph.add_edge(epoch_node, intra_child, type=EdgeType.TRAVERSAL_REVERSE_POSTORDER)
+
+    def _find_vars(self):
+        mask = ((1 << 64) - 1) * self._cacheline_size
+
+        for n in self.read_write_nodes:
+            # TODO: assert vars are fully contained in a cacheline
+            if n.interval in self._vars:
+                continue
+            self._vars.add(n.interval)
+            cache_line_address = n.address & mask
+            self._cache_lines.setdefault((cache_line_address, cache_line_address+self._cacheline_size), set()).add(n.interval)
+
     @property
     def inter(self) -> nx.DiGraph:
         return self._inter_graph
@@ -93,8 +122,8 @@ class HBG(nx.DiGraph):
         return self._nodes_by_thread[tid]
     
     def get_nodes_by_type(self, itype: nodes.NodeType) -> Set[nodes.AbstractNode]:
-        return self._nodes_by_type[itype]
-    
+        return self._nodes_by_type.setdefault(itype, set())
+
     def get_inter_children(self, node: nodes.AbstractNode) -> Iterable[nodes.AbstractNode]:
         return self.inter.neighbors(node)
 
@@ -142,6 +171,18 @@ class HBG(nx.DiGraph):
     @property
     def instruction_nodes(self) -> Set[nodes.InstructionNode]:
         return self.read_nodes | self.write_nodes | self.flush_nodes
+
+    def is_before_in_thread(self, n1: nodes.AbstractNode, n2: nodes.AbstractNode):
+        if not n1 or not n2:
+            return False
+        assert n1.tid == n2.tid
+        return self.get_node_location(n1).tindex < self.get_node_location(n2).tindex
+
+    def postorder(self) -> Generator[nodes.AbstractNode, None, None]:
+        return nx.dfs_postorder_nodes(self._postorder_graph)
+
+    def reverse_postorder(self) -> Generator[nodes.AbstractNode, None, None]:
+        return nx.topological_sort(self._reverse_postorder_graph)
 
 
 class HBGBuilder:

@@ -67,7 +67,7 @@ class EpochNode(AbstractNode):
 
 
 class InstructionNode(AbstractNode):
-    def __init__(self, tid: int, itype: NodeType, pc: int, address: int, size: int, info):
+    def __init__(self, itype: NodeType, tid: int, pc: int, address: int, size: int, info):
         super().__init__(itype, tid)
         self._pc = pc
         self._address = address
