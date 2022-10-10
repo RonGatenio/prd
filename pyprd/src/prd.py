@@ -191,6 +191,28 @@ class PersistencyRaceDetector:
                 
         return delta_ha_groups
     
+    def build_delta_ha_groups_opt4(self):
+        ReadNode = nodes.InstructionNode
+        WriteNode = nodes.InstructionNode
+        ha_groups: Dict[ReadNode, Dict[Var, Set[WriteNode]]] = {}
+        delta_ha_groups: Dict[ReadNode, Dict[Var, Set[WriteNode]]] = {}
+        
+        for r in self._hbg.read_nodes:
+            ha_groups[r] = {}
+            for n in nx.dfs_postorder_nodes(self._hbg._graph, r):
+                if n.itype != nodes.NodeType.WRITE:
+                    continue
+                
+                ha_groups[r].setdefault(n.interval, set()).add(n)
+                
+        # for tid in self._hbg.tids:
+        #     thread_nodes = self._hbg.get_thread_nodes(tid)
+        #     for i, n in enumerate(thread_nodes[:-1]):
+        #         delta_ha_groups[n] = ha_groups[]
+        
+        return ha_groups
+                
+    
     def build_delta_fw_groups_opt1(self):
         pass
     
