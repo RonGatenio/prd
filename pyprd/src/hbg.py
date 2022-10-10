@@ -67,7 +67,7 @@ class HBG:
     def vars(self) -> Set[Tuple[int, int]]:
         return self._vars
 
-    def get_vars_in_cache_line(self, cache_line):
+    def get_vars_in_cache_line(self, cache_line: Tuple[int, int]):
         return self._cache_lines[cache_line]
 
     def get_node_by_location(self, location: NodeLocation | Tuple[int, int]) -> nodes.AbstractNode:
@@ -158,10 +158,14 @@ class HBGBuilder:
         self._nodes_location: Dict[nodes.AbstractNode, NodeLocation] = {}
 
     def add_epoch_node(self, tid: int, epoch: int):
-        self._nodes.append(nodes.EpochNode(tid, epoch))
+        n = nodes.EpochNode(tid, epoch)
+        self._nodes.append(n)
+        return n
 
     def add_instruction_node(self, itype: nodes.NodeType, tid: int, pc: int, address: int, size: int, info=None):
-        self._nodes.append(nodes.InstructionNode(itype, tid, pc, address, size, info))
+        n = nodes.InstructionNode(itype, tid, pc, address, size, info)
+        self._nodes.append(n)
+        return n
 
     def add_happens_before_edge(self, src_tid, src_epoch, dst_tid, dst_epoch):
         self._edges.add((nodes.EpochNode(src_tid, src_epoch), nodes.EpochNode(dst_tid, dst_epoch)))
