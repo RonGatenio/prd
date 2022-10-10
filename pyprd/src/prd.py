@@ -115,7 +115,7 @@ class PersistencyRaceDetector:
                     if last_read_node:
                         delta_ha_groups[last_read_node].setdefault(n.interval, set()).add(n)
                         
-            elif n.itype == nodes.EpochNode:
+            elif n.itype == nodes.NodeType.EPOCH:
                 n: nodes.EpochNode
                 for parent in self._hbg.get_inter_parents(n):
                     for tid in self._hbg.tids:
