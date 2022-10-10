@@ -1,7 +1,7 @@
 from typing import Any, Dict, Set, Tuple
 from hbg_trace_parser import TraceParser
 from pdg import generate_mock_pdg
-from hbg import HBG
+from hbg import HBG, HBGBuilder
 import time
 import networkx as nx
 import nodes
@@ -129,19 +129,31 @@ def main():
     # trace = TraceParser.from_file(r'H:\Projects\LLVM\llvm-project\py_persistency_race_detector\tests\traces\real\test_out_small.txt')
     # trace = TraceParser.from_file(r'H:\Home\Technion\Projects\Repos\RECIPE\P-CLHT\build\test_recipe_4.txt')
     
-    # b = HBGBuilder()
-    # b.add_epoch_node(0, 0)
-    # b.add_instruction_node('WRITE', 0, 0, 0, 0)
-    # b.add_instruction_node('WRITE', 0, 0, 0, 0)
-    # b.add_instruction_node('WRITE', 0, 0, 0, 0)
-    # b.add_instruction_node('WRITE', 0, 0, 0, 0)
-    # b.add_instruction_node('WRITE', 0, 0, 0, 0)
-    # b.add_instruction_node('WRITE', 0, 0, 0, 0)
-    # b.add_instruction_node('WRITE', 0, 0, 0, 0)
-    # b.add_instruction_node('WRITE', 0, 0, 0, 0)
-    # b.add_epoch_node(0, 1)
+    b = HBGBuilder()
+    r00 = b.add_instruction_node('READ', 0, 0, 0x1000, 8)
+    f01 = b.add_instruction_node('FLUSH', 0, 0, 0x1000, 64)
+    b.add_epoch_node(0, 0)
+    w02 = b.add_instruction_node('WRITE', 0, 0, 0x2000, 8)
+    b.add_epoch_node(1, 0)
+    f10 = b.add_instruction_node('FLUSH', 1, 0, 0x1000, 64)
+    w11 = b.add_instruction_node('WRITE', 1, 0, 0x1000, 8)
+    b.add_epoch_node(1, 1)
+    w20 = b.add_instruction_node('WRITE', 2, 0, 0x1000, 8)
+    b.add_epoch_node(2, 0)
+    b.add_happens_before_edge(2, 0, 1, 0)
+    b.add_happens_before_edge(1, 1, 0, 0)
     
-    # hbg = b.build(False)
+    hbg = b.build(False)
+    pdg = generate_mock_pdg(hbg)
+    p = prd.PersistencyRaceDetector(hbg, pdg)
+    fw, fr = p.build_fw_groups_opt2()
+    
+    assert w11 not in fw[w02][w11.interval]
+    assert w20 in fw[w02][w11.interval]
+    assert r00 in fr[w02][w11.interval]
+    
+    # import ipdb; ipdb.set_trace()
+    
     # assert nx.is_directed_acyclic_graph(hbg._intra_graph)
     # import ipdb; ipdb.set_trace()
     
@@ -149,7 +161,8 @@ def main():
     
     # HBG
     s = time.time()
-    hbg = trace.to_hbg(filter=True, max_lines=10000)
+    # hbg = trace.to_hbg(filter=True, max_lines=10000)
+    hbg = trace.to_hbg(filter=True)
     print(f'hbg {time.time() - s} sec')
     
     for t in nodes.NodeType:
@@ -166,6 +179,25 @@ def main():
     # PRD    
     p = prd.PersistencyRaceDetector(hbg, pdg)
     
+    # delta fw fr op0
+    s = time.time()
+    delta_fw_op0, delta_fr_op0 = p.build_delta_fw_groups_opt0()
+    print(f'build_delta_fw_groups_opt0 {time.time() - s} sec')
+    import ipdb; ipdb.set_trace()
+    
+    # delta fw fr op1
+    s = time.time()
+    delta_fw_op1, delta_fr_op1 = p.build_delta_fw_groups_opt1()
+    print(f'build_delta_fw_groups_opt1 {time.time() - s} sec')
+    import ipdb; ipdb.set_trace()
+    
+    # fw fr op2
+    s = time.time()
+    fw_op2, fr_op2 = p.build_fw_groups_opt2()
+    print(f'build_fw_groups_opt2 {time.time() - s} sec')
+    import ipdb; ipdb.set_trace()
+
+    
     ## op1
     s = time.time()
     dop1 = p.build_delta_ha_groups_opt1()
@@ -178,6 +210,8 @@ def main():
     s = time.time()
     top1 = build_ha_groups_per_thread(hbg, dop1)
     print(f'build_ha_groups_per_thread {time.time() - s} sec')
+    
+    import ipdb; ipdb.set_trace()
     
     for tid in hbg.tids:
         for n in hbg.get_thread_nodes(tid):
