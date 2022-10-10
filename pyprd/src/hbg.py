@@ -69,10 +69,6 @@ class HBG:
 
     def get_vars_in_cache_line(self, cache_line):
         return self._cache_lines[cache_line]
-    # def get_vars_in_range(self, begin: int, end: int) -> Generator[Tuple[int, int], None, None]:
-    #     for i in self._vars_tree.envelop(begin, end):
-    #         i: intervaltree.Interval
-    #         yield (i.begin, i.end)
 
     def get_node_by_location(self, location: NodeLocation | Tuple[int, int]) -> nodes.AbstractNode:
         location = NodeLocation(*location)
@@ -208,7 +204,7 @@ class HBGBuilder:
         self._nodes_location[node] = NodeLocation(node.tid, len(self._nodes_by_thread[node.tid]))
         self._nodes_by_thread[node.tid].append(node)
         self._nodes_by_type.setdefault(node.itype, set()).add(node)
-        
+
         if node.tid in self._thread_tails:
             self._graph.add_edge(self._thread_tails[node.tid], node, type=EdgeType.INTRA_THREAD)
 
@@ -221,7 +217,7 @@ class HBGBuilder:
     def build(self, filter_volatile_nodes=True) -> HBG:
         if filter_volatile_nodes:
             self._filter_volatile_nodes()
-            
+
         for n in self._nodes:
             self._add_node(n)
 
