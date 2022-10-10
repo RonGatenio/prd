@@ -98,31 +98,40 @@ class PersistencyRaceDetector:
         self._thread_contexts: Dict[ThreadId, ThreadContext] = {}
         
     def build_delta_ha_groups_opt1(self):
-        last_read_nodes: Dict[ThreadId, Dict[ThreadId, nodes.InstructionNode]] = {}
-        delta_ha_groups: Dict[nodes.InstructionNode, Dict[Var, Set[nodes.InstructionNode]]] = {}
-        
-        for t in self._hbg.tids:
-            last_read_nodes.setdefault(t, {})
+        ReadNode = nodes.InstructionNode
+        WriteNode = nodes.InstructionNode
+        NodeContextType = Dict[ThreadId, ReadNode]
+        last_read_nodes_storage: Dict[nodes.EpochNode, NodeContextType] = {}
+        last_read_nodes_current: Dict[ThreadId, NodeContextType] = {}
+        delta_ha_groups: Dict[ReadNode, Dict[Var, Set[WriteNode]]] = {}
         
         for n in self._hbg.reverse_postorder():
             if n.itype == nodes.NodeType.READ:
-                last_read_nodes[n.tid][n.tid] = n
+                last_read_nodes_current.setdefault(n.tid, {})[n.tid] = n
                 
             elif n.itype == nodes.NodeType.WRITE:
                 n: nodes.InstructionNode
+                
                 for tid in self._hbg.tids:
-                    last_read_node = last_read_nodes[n.tid].get(tid)
+                    last_read_node = last_read_nodes_current.setdefault(n.tid, {}).get(tid)
                     if last_read_node:
-                        delta_ha_groups[last_read_node].setdefault(n.interval, set()).add(n)
+                        delta_ha_groups.setdefault(last_read_node, {}).setdefault(n.interval, set()).add(n)
                         
             elif n.itype == nodes.NodeType.EPOCH:
                 n: nodes.EpochNode
+                
                 for parent in self._hbg.get_inter_parents(n):
+                    assert isinstance(parent, nodes.EpochNode)
+                    
+                    parent: nodes.EpochNode
+                    
                     for tid in self._hbg.tids:
-                        n1 = last_read_nodes[n.tid].get(tid)
-                        n2 = last_read_nodes[parent.tid].get(tid)
-                        if self._hbg.is_before_in_thread(n1, n2):
-                            last_read_nodes[n.tid][tid] = last_read_nodes[parent.tid][tid]
+                        n1 = last_read_nodes_current.setdefault(n.tid, {}).get(tid)
+                        n2 = last_read_nodes_storage[parent].get(tid)
+                        if n2 and ((not n1) or self._hbg.is_before_in_thread(n1, n2)):
+                            last_read_nodes_current[n.tid][tid] = n2
+                
+                last_read_nodes_storage[n] = last_read_nodes_current.get(n.tid, {}).copy()
                             
         return delta_ha_groups
 
