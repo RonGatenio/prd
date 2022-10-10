@@ -134,68 +134,96 @@ class PersistencyRaceDetector:
                 last_read_nodes_storage[n] = last_read_nodes_current.get(n.tid, {}).copy()
                             
         return delta_ha_groups
-
+    
     def build_delta_ha_groups_opt2(self):
-        found_writes: Dict[ThreadId, Dict[ThreadId, Dict[Var, Set[nodes.InstructionNode]]]] = {}
-        delta_ha_groups: Dict[nodes.InstructionNode, Dict[Var, Set[nodes.InstructionNode]]] = {}
+        ReadNode = nodes.InstructionNode
+        WriteNode = nodes.InstructionNode
+        NodeContextType = Dict[Var, Set[WriteNode]]
+        found_writes_storage: Dict[nodes.EpochNode, NodeContextType] = {}
+        found_writes_prev: Dict[ThreadId, NodeContextType] = {}
+        found_writes_current: Dict[ThreadId, NodeContextType] = {}
+        delta_ha_groups: Dict[ReadNode, Dict[Var, Set[WriteNode]]] = {}
         
-        for t in self._hbg.tids:
-            found_writes.setdefault(t, {})
-            for _t in self._hbg.tids:
-                found_writes[t].setdefault(_t, set())
+        def copy(d1: Dict[Any, Set[Any]]):
+            d = {}
+            for k, v in d1.items():
+                d[k] = v.copy()
+            return d
+        
+        def merge(d1: Dict[Any, Set[Any]], d2: Dict[Any, Set[Any]]):
+            for k, v in d2.items():
+                d1.setdefault(k, set()).update(v)
+                
+        def diff(d1: Dict[Any, Set[Any]], d2: Dict[Any, Set[Any]]) -> Dict[Any, Set[Any]]:
+            d = {}
+            for k, v in d1.items():
+                d[k] = v - d2.get(k, set())
+            return d
         
         for n in self._hbg.postorder():
-            if n.itype == nodes.NodeType.READ:
-                delta_ha_groups.setdefault(n, {})
+            found_writes_current.setdefault(n.tid, {})
+            
+            if n.itype == nodes.NodeType.WRITE:
+                n: WriteNode
+                found_writes_current[n.tid].setdefault(n.interval, set()).add(n)
+            
+            elif n.itype == nodes.NodeType.READ:
+                n: ReadNode
                 
-                for var in found_writes[n.tid][n.tid]:
-                    delta_ha_groups[n].setdefault(var, set()).update(found_writes[n.tid][n.tid])
+                delta_ha_groups[n] = diff(found_writes_current[n.tid], found_writes_prev.get(n.tid, {}))
+                found_writes_prev[n.tid] = copy(found_writes_current[n.tid])
                 
-                found_writes[n.tid][n.tid].clear()
-                
-            elif n.itype == nodes.NodeType.WRITE:
-                n: nodes.InstructionNode
-                
-                for tid in self._hbg.tids:
-                    found_writes[n.tid][tid].add(n)
-
-            elif n.itype == nodes.EpochNode:
+            elif n.itype == nodes.NodeType.EPOCH:
                 n: nodes.EpochNode
-                
                 for child in self._hbg.get_inter_children(n):
-                    for tid in self._hbg.tids:
-                        
-                        n1 = last_read_nodes[n.tid].get(tid)
-                        n2 = last_read_nodes[parent.tid].get(tid)
-                        if self._hbg.is_before_in_thread(n1, n2):
-                            last_read_nodes[n.tid][tid] = last_read_nodes[parent.tid][tid]
-                            
-    def build_delta_ha_groups_opt3(self):
-        found_writes_total: Dict[Var, Set[nodes.InstructionNode]] = {}
-        last_read: Dict[ThreadId, nodes.InstructionNode] = {}
-        delta_ha_groups: Dict[nodes.InstructionNode, Dict[Var, Set[nodes.InstructionNode]]] = {}
-        
-        for n in self._hbg.postorder():
-            if n.itype == nodes.NodeType.READ:
-                my_delta: Dict[Var, Set[nodes.InstructionNode]] = {}
-                for var, writes in found_writes_total.items():
-                    my_delta.setdefault(var, set()).update(writes)
-                    my_delta[var].difference_update(delta_ha_groups[last_read[n.tid]][var])
+                    merge(found_writes_current[n.tid], found_writes_storage[child])
                     
-                delta_ha_groups[n] = my_delta
-                
-            elif n.itype == nodes.NodeType.WRITE:
-                n: nodes.InstructionNode
-                
-                found_writes_total.setdefault(n.interval, set()).add(n)
-                
+                found_writes_storage[n] = copy(found_writes_current[n.tid])
+        
         return delta_ha_groups
     
-    def build_delta_ha_groups_opt4(self):
+    def build_ha_groups_opt3(self):
+        ReadNode = nodes.InstructionNode
+        WriteNode = nodes.InstructionNode
+        NodeContextType = Dict[Var, Set[WriteNode]]
+        found_writes_storage: Dict[nodes.EpochNode, NodeContextType] = {}
+        found_writes_current: Dict[ThreadId, NodeContextType] = {}
+        ha_groups: Dict[ReadNode, Dict[Var, Set[WriteNode]]] = {}
+        
+        def copy(d1: Dict[Any, Set[Any]]):
+            d = {}
+            for k, v in d1.items():
+                d[k] = v.copy()
+            return d
+        
+        def merge(d1: Dict[Any, Set[Any]], d2: Dict[Any, Set[Any]]):
+            for k, v in d2.items():
+                d1.setdefault(k, set()).update(v)
+        
+        for n in self._hbg.postorder():
+            found_writes_current.setdefault(n.tid, {})
+            
+            if n.itype == nodes.NodeType.WRITE:
+                n: WriteNode
+                found_writes_current[n.tid].setdefault(n.interval, set()).add(n)
+            
+            elif n.itype == nodes.NodeType.READ:
+                n: ReadNode
+                ha_groups[n] = copy(found_writes_current[n.tid])
+                
+            elif n.itype == nodes.NodeType.EPOCH:
+                n: nodes.EpochNode
+                for child in self._hbg.get_inter_children(n):
+                    merge(found_writes_current[n.tid], found_writes_storage[child])
+                    
+                found_writes_storage[n] = copy(found_writes_current[n.tid])
+        
+        return ha_groups
+    
+    def build_ha_groups_opt4(self):
         ReadNode = nodes.InstructionNode
         WriteNode = nodes.InstructionNode
         ha_groups: Dict[ReadNode, Dict[Var, Set[WriteNode]]] = {}
-        delta_ha_groups: Dict[ReadNode, Dict[Var, Set[WriteNode]]] = {}
         
         for r in self._hbg.read_nodes:
             ha_groups[r] = {}
@@ -204,11 +232,6 @@ class PersistencyRaceDetector:
                     continue
                 
                 ha_groups[r].setdefault(n.interval, set()).add(n)
-                
-        # for tid in self._hbg.tids:
-        #     thread_nodes = self._hbg.get_thread_nodes(tid)
-        #     for i, n in enumerate(thread_nodes[:-1]):
-        #         delta_ha_groups[n] = ha_groups[]
         
         return ha_groups
                 
