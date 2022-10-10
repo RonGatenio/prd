@@ -145,45 +145,83 @@ class HBG(nx.DiGraph):
 
 
 class HBGBuilder:
-    def __init__(self):
-        self._hbg = HBG()
+    def __init__(self, verbose=True):
+        self._log = print if verbose else lambda x: None
+
+        self._nodes: List[nodes.AbstractNode] = []
+        self._edges: Set[Tuple[nodes.AbstractNode, nodes.AbstractNode]] = set()
+
+        self._graph = nx.DiGraph()
         self._thread_tails: Dict[int, nodes.AbstractNode] = {}
         self._nodes_by_thread: Dict[int, List[nodes.AbstractNode]] = {}
         self._nodes_by_type: Dict[nodes.NodeType, Set[nodes.AbstractNode]] = {}
         self._nodes_location: Dict[nodes.AbstractNode, NodeLocation] = {}
-        
-    @classmethod
-    def from_elements(cls, inodes: Iterable[nodes.AbstractNode], hbedges: Iterable[Tuple[nodes.AbstractNode, nodes.AbstractNode]]):
-        builder = cls()
-        
-        for n in inodes:
-            builder.add_node(n)
-            
-        for e in hbedges:
-            builder.add_happens_before_edge(*e)
-            
-        return builder
-        
-    def add_node(self, node: nodes.AbstractNode):
-        self._hbg.add_node(node)
-        
-        self._hbg.nodes[node]['itype'] = node.itype
-        self._hbg.nodes[node][node.itype] = True
-        
+
+    def add_epoch_node(self, tid: int, epoch: int):
+        self._nodes.append(nodes.EpochNode(tid, epoch))
+
+    def add_instruction_node(self, itype: nodes.NodeType, tid: int, pc: int, address: int, size: int, info=None):
+        self._nodes.append(nodes.InstructionNode(itype, tid, pc, address, size, info))
+
+    def add_happens_before_edge(self, src_tid, src_epoch, dst_tid, dst_epoch):
+        self._edges.add((nodes.EpochNode(src_tid, src_epoch), nodes.EpochNode(dst_tid, dst_epoch)))
+
+    def _filter_volatile_nodes(self):
+        import intervaltree
+
+        t = intervaltree.IntervalTree()
+
+        for n in self._nodes:
+            if n.itype == nodes.NodeType.FLUSH:
+                n: nodes.InstructionNode
+                t.addi(*n.interval)
+
+        t.merge_overlaps(strict=False)
+
+        def should_keep(n: nodes.AbstractNode):
+            if n.itype not in (nodes.NodeType.READ, nodes.NodeType.WRITE):
+                return True
+
+            n: nodes.InstructionNode
+            if t.overlaps_range(*n.interval):
+                return True
+
+            return False
+
+        self._log(f'Total nodes before filter {len(self._nodes)}')
+        self._nodes = list(filter(should_keep, self._nodes))
+        self._log(f'Total nodes after filter  {len(self._nodes)}')
+
+        return self
+
+    def _add_node(self, node: nodes.AbstractNode):
+        self._graph.add_node(node)
+
+        self._graph.nodes[node]['itype'] = node.itype
+        self._graph.nodes[node][node.itype] = True
+
         self._nodes_by_thread.setdefault(node.tid, [])
         self._nodes_location[node] = NodeLocation(node.tid, len(self._nodes_by_thread[node.tid]))
         self._nodes_by_thread[node.tid].append(node)
         self._nodes_by_type.setdefault(node.itype, set()).add(node)
         
         if node.tid in self._thread_tails:
-            self._hbg.add_edge(self._thread_tails[node.tid], node, type=EdgeType.INTRA_THREAD)
-        
+            self._graph.add_edge(self._thread_tails[node.tid], node, type=EdgeType.INTRA_THREAD)
+
         self._thread_tails[node.tid] = node
-        
-    def add_happens_before_edge(self, src: nodes.EpochNode, dst: nodes.EpochNode):
+
+    def _add_happens_before_edge(self, src: nodes.EpochNode, dst: nodes.EpochNode):
         assert src.tid != dst.tid, 'TIDs must be different'
-        self._hbg.add_edge(src, dst, type=EdgeType.INTER_THREAD)
-        
-    def build(self) -> HBG:
-        self._hbg.__post_init__(self._nodes_by_thread, self._nodes_by_type, self._nodes_location)
-        return nx.freeze(self._hbg)
+        self._graph.add_edge(src, dst, type=EdgeType.INTER_THREAD)
+
+    def build(self, filter_volatile_nodes=True) -> HBG:
+        if filter_volatile_nodes:
+            self._filter_volatile_nodes()
+            
+        for n in self._nodes:
+            self._add_node(n)
+
+        for src, dst in self._edges:
+            self._add_happens_before_edge(src, dst)
+
+        return HBG(self._graph, self._nodes_by_thread, self._nodes_by_type, self._nodes_location)

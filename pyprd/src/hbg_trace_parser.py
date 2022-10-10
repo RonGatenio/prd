@@ -1,6 +1,4 @@
-from typing import Set, Tuple, List
 from hbg import HBG, HBGBuilder
-import nodes
 
 
 _any_int = lambda x: int(x, 0)
@@ -9,8 +7,7 @@ _any_int = lambda x: int(x, 0)
 class TraceParser:
     def __init__(self, trace_lines):
         self._trace = map(str.strip, trace_lines)
-        self._nodes: List[nodes.AbstractNode] = []
-        self._edges: Set[Tuple[nodes.AbstractNode, nodes.AbstractNode]] = set()
+        self._hbg_builder = HBGBuilder()
 
     @classmethod
     def from_file(cls, filename):
@@ -23,18 +20,18 @@ class TraceParser:
         tid = int(tid)
 
         if key == 'HB_EDGE':
-            src_tid, src_epoch, dest_tid, dest_epoch = tuple(map(_any_int, args))
-            self._edges.add((nodes.EpochNode(src_tid, src_epoch), nodes.EpochNode(dest_tid, dest_epoch)))
+            src_tid, src_epoch, dst_tid, dst_epoch = tuple(map(_any_int, args))
+            self._hbg_builder.add_happens_before_edge(src_tid, src_epoch, dst_tid, dst_epoch)
         elif key == 'EPOC_INC':
             from_epoch, to_epoch = tuple(map(_any_int, args))
             if from_epoch != to_epoch:
-                self._nodes.append(nodes.EpochNode(tid, to_epoch))
+                self._hbg_builder.add_epoch_node(tid, to_epoch)
         else:
             pc, address, size, *info = args
             pc = _any_int(pc)
             address = _any_int(address)
             size = _any_int(size)
-            self._nodes.append(nodes.InstructionNode(tid, key, pc, address, size, ':'.join(info) if info else ''))
+            self._hbg_builder.add_instruction_node(key, tid, pc, address, size, ':'.join(info) if info else '')
 
     @staticmethod
     def _is_comment_line(line):
@@ -57,36 +54,6 @@ class TraceParser:
 
         return self
 
-    def filter_volatile_nodes(self):
-        import intervaltree
-
-        t = intervaltree.IntervalTree()
-
-        for n in self._nodes:
-            if n.itype == nodes.NodeType.FLUSH:
-                n: nodes.InstructionNode
-                t.addi(*n.interval)
-
-        t.merge_overlaps(strict=False)
-
-        def should_keep(n: nodes.AbstractNode):
-            if n.itype not in (nodes.NodeType.READ, nodes.NodeType.WRITE):
-                return True
-
-            n: nodes.InstructionNode
-            if t.overlaps_range(*n.interval):
-                return True
-
-            return False
-
-        print(f'Total nodes before filter {len(self._nodes)}')
-        self._nodes = list(filter(should_keep, self._nodes))
-        print(f'Total nodes after filter  {len(self._nodes)}')
-
-        return self
-
-    def to_hbg(self, filter=True, debug=False) -> HBG:
-        self.parse(debug=debug)
-        if filter:
-            self.filter_volatile_nodes()
-        return HBGBuilder.from_elements(self._nodes, self._edges).build()
+    def to_hbg(self, filter=True, debug=False, max_lines=None) -> HBG:
+        self.parse(debug=debug, max_lines=max_lines)
+        return self._hbg_builder.build(filter)
