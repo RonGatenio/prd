@@ -1,7 +1,8 @@
 from genericpath import isfile
+from typing import Any, Dict, Set, Tuple
 from hbg_trace_parser import TraceParser
 from pdg import generate_mock_pdg
-from hbg import HBG
+from hbg import HBG, HBGBuilder
 from collections import namedtuple
 import networkx as nx
 import nodes
@@ -59,12 +60,75 @@ def analyze_vars(hbg: HBG):
             
     # print(f'')
 
+ReadNode = WriteNode = nodes.InstructionNode
+Var = Tuple[int, int]
+
+
+def merge(d1: Dict[Any, Set[Any]], d2: Dict[Any, Set[Any]]):
+    for k, v in d2.items():
+        d1.setdefault(k, set()).update(v)
+
+
+def compare(hbg: HBG, d1: Dict[ReadNode, Dict[Var, Set[WriteNode]]], d2: Dict[ReadNode, Dict[Var, Set[WriteNode]]], delta_d2: Dict[ReadNode, Dict[Var, Set[WriteNode]]]):
+    for r in hbg.read_nodes:
+        dd1 = d1.get(r, {})
+        dd2 = d2.get(r, {})
+        
+        for var in set(dd1.keys()) | set(dd2.keys()):
+            s1 = dd1.get(var, set())
+            s2 = dd2.get(var, set())
+            
+            if s1 != s2:
+                print(f'Failed in {r.tid}')
+                import ipdb; ipdb.set_trace()
+                return False
+            
+    return True
+
+def mycopy(d1: Dict[Var, Set[WriteNode]]):
+    d = {}
+    for k, v in d1.items():
+        d[k] = v.copy()
+    return d
+
+def build_ha_groups(hbg: HBG, delta_ha_groups: Dict[ReadNode, Dict[Var, Set[WriteNode]]]):
+    ha_groups: Dict[ReadNode, Dict[Var, Set[WriteNode]]] = {}
+    
+    for tid in hbg.tids:
+        thread_nodes = hbg.get_thread_nodes(tid)
+        prev: Dict[Var, Set[WriteNode]] = {}
+        
+        for n in reversed(thread_nodes):
+            if n.itype != 'READ':
+                continue
+            merge(prev, delta_ha_groups.get(n, {}))
+            ha_groups[n] = mycopy(prev)
+            
+    return ha_groups
+        
 
 def main():
     trace = TraceParser.from_file(r'H:\Projects\LLVM\llvm-project\py_persistency_race_detector\tests\traces\real\test_recipe.txt')
     # trace = TraceParser.from_file(r'H:\Projects\LLVM\llvm-project\py_persistency_race_detector\tests\traces\real\test_recipe_2.txt')
     trace = TraceParser.from_file(r'H:\Projects\LLVM\llvm-project\py_persistency_race_detector\tests\traces\real\test_recipe_3.txt')
+    # trace = TraceParser.from_file(r'H:\Projects\LLVM\llvm-project\py_persistency_race_detector\tests\traces\real\test_out_small.txt')
     # trace = TraceParser.from_file(r'H:\Home\Technion\Projects\Repos\RECIPE\P-CLHT\build\test_recipe_4.txt')
+    
+    # b = HBGBuilder()
+    # b.add_epoch_node(0, 0)
+    # b.add_instruction_node('WRITE', 0, 0, 0, 0)
+    # b.add_instruction_node('WRITE', 0, 0, 0, 0)
+    # b.add_instruction_node('WRITE', 0, 0, 0, 0)
+    # b.add_instruction_node('WRITE', 0, 0, 0, 0)
+    # b.add_instruction_node('WRITE', 0, 0, 0, 0)
+    # b.add_instruction_node('WRITE', 0, 0, 0, 0)
+    # b.add_instruction_node('WRITE', 0, 0, 0, 0)
+    # b.add_instruction_node('WRITE', 0, 0, 0, 0)
+    # b.add_epoch_node(0, 1)
+    
+    # hbg = b.build(False)
+    # assert nx.is_directed_acyclic_graph(hbg._intra_graph)
+    # import ipdb; ipdb.set_trace()
     
     import time
     import intervaltree
@@ -97,7 +161,7 @@ def main():
     
     if not hbg:
         s = time.time()
-        hbg = trace.to_hbg(filter=True)
+        hbg = trace.to_hbg(filter=True, max_lines=10000)
         print(f'hbg {time.time() - s} sec')
     
         
@@ -142,9 +206,22 @@ def main():
     p = prd.PersistencyRaceDetector(hbg, pdg)
     
     s = time.time()
-    p.part_1()
-    print(f'prd1 {time.time() - s} sec')
+    op1 = p.build_delta_ha_groups_opt1()
+    print(f'build_delta_ha_groups_opt1 {time.time() - s} sec')
     
+    s = time.time()
+    ha1 = build_ha_groups(hbg, op1)
+    print(f'build_ha_groups {time.time() - s} sec')
+    
+    # s = time.time()
+    # op3 = p.build_delta_ha_groups_opt3()
+    # print(f'build_delta_ha_groups_opt3 {time.time() - s} sec')
+    
+    s = time.time()
+    op4 = p.build_delta_ha_groups_opt4()
+    print(f'build_delta_ha_groups_opt4 {time.time() - s} sec')
+    
+    print(compare(hbg, op4, ha1, op1))
     
     import ipdb; ipdb.set_trace()
     
