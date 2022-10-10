@@ -89,6 +89,12 @@ class ThreadContext:
         # self.lpw: Dict[ThreadId, VarTree] = {}  # last write from thread i that was found before the last flush(Var)
 
 
+# class NodeContext:
+#     def __init__(self):
+#         self._last_read_node: Dict[ThreadId, nodes.InstructionNode] = {}
+
+
+
 class PersistencyRaceDetector:
     def __init__(self, hbg: HBG, ppdg: PDG):
         self._hbg = hbg
@@ -236,11 +242,275 @@ class PersistencyRaceDetector:
         return ha_groups
 
 
-    def build_delta_fw_groups_opt1(self):
-        pass
+    def build_delta_fw_groups_opt0(self):
+        ReadNode = nodes.InstructionNode
+        WriteNode = nodes.InstructionNode
+        
+        hbg = self._hbg
+        
+        def _copy(d1: Dict[Any, Dict[Any, Any]]):
+            d = {}
+            for k, v in d1.items():
+                d[k] = v.copy()
+            return d
+        
+        class SearchContext:
+            def __init__(self):
+                self._last_found_write: Dict[ThreadId, WriteNode] = {}  # last found write instruction node in the thread
+                self._last_found_write_before_flush: Dict[ThreadId, Dict[Var, WriteNode]] = {}  # last write from thread i that was found before the last flush(Var)
+                
+                for tid in hbg.tids:
+                    self._last_found_write_before_flush.setdefault(tid, {})
+            
+            def add_node(self,
+                         node: nodes.InstructionNode,
+                         delta_fw_group: Dict[WriteNode, Dict[Var, Set[WriteNode]]],
+                         delta_fr_group: Dict[WriteNode, Dict[Var, Set[ReadNode]]]):
+                if node.itype == nodes.NodeType.WRITE:
+                    self._last_found_write[node.tid] = node
+                    
+                if node.itype == nodes.NodeType.WRITE:
+                    for tid in hbg.tids:
+                        other_node = self._last_found_write_before_flush[tid].get(node.interval)
+                        if other_node:
+                            delta_fw_group.setdefault(other_node, {}).setdefault(node.interval, set()).add(node)
+                    
+                elif node.itype == nodes.NodeType.READ:
+                    for tid in hbg.tids:
+                        other_node = self._last_found_write_before_flush[tid].get(node.interval)
+                        if other_node:
+                            delta_fr_group.setdefault(other_node, {}).setdefault(node.interval, set()).add(node)
+                
+                elif node.itype == nodes.NodeType.FLUSH:
+                    for tid in hbg.tids:
+                        if tid not in self._last_found_write:
+                            continue
+                        for var in hbg.get_vars_in_cache_line(node.interval):
+                            self._last_found_write_before_flush[tid][var] = self._last_found_write[tid]
 
-    def build_delta_fw_groups_opt2(self):
-        pass
+            def merge(self, other: 'SearchContext'):
+                for tid in hbg.tids:
+                    n1 = self._last_found_write.get(tid)
+                    n2 = other._last_found_write.get(tid)
+                    if n2 and (not n1 or hbg.is_before_in_thread(n2, n1)):
+                        self._last_found_write[tid] = n2
+
+                    for var in other._last_found_write_before_flush[tid]:
+                        n1 = self._last_found_write_before_flush[tid].get(var)
+                        n2 = other._last_found_write_before_flush[tid][var]
+                        
+                        if n2 and (not n1 or hbg.is_before_in_thread(n2, n1)):
+                            self._last_found_write_before_flush[tid][var] = n2
+            
+            def copy(self) -> 'SearchContext':
+                s = SearchContext()
+                s._last_found_write = self._last_found_write.copy()
+                s._last_found_write_before_flush = _copy(self._last_found_write_before_flush)
+                return s
+        
+        thread_context: Dict[ThreadId, SearchContext] = {}
+        node_context: Dict[nodes.EpochNode, SearchContext] = {}
+        
+        delta_fw_groups: Dict[WriteNode, Dict[Var, Set[WriteNode]]] = {}
+        delta_fr_groups: Dict[WriteNode, Dict[Var, Set[ReadNode]]] = {}
+        
+        for tid in self._hbg.tids:
+            thread_context.setdefault(tid, SearchContext())
+        
+        for n in self._hbg.postorder():
+            if isinstance(n, nodes.InstructionNode):
+                thread_context[n.tid].add_node(n, delta_fw_groups, delta_fr_groups)
+                
+            elif isinstance(n, nodes.EpochNode):
+                if n in node_context:
+                    thread_context[n.tid].merge(node_context[n])
+                    del node_context[n]
+                    
+                for parent in self._hbg.get_inter_parents(n):
+                    if parent not in node_context:
+                        node_context[parent] = SearchContext()
+                    
+                    node_context[parent].merge(thread_context[n.tid])
+                
+        return delta_fw_groups, delta_fr_groups
+    
+    def build_delta_fw_groups_opt1(self):
+        ReadNode = nodes.InstructionNode
+        WriteNode = nodes.InstructionNode
+        
+        hbg = self._hbg
+        
+        def _copy(d1: Dict[Any, Dict[Any, Any]]):
+            d = {}
+            for k, v in d1.items():
+                d[k] = v.copy()
+            return d
+        
+        class SearchContext:
+            def __init__(self):
+                self._last_found_write: Dict[ThreadId, WriteNode] = {}  # last found write instruction node in the thread
+                self._last_found_write_before_flush: Dict[ThreadId, Dict[Var, WriteNode]] = {}  # last write from thread i that was found before the last flush(Var)
+                
+                for tid in hbg.tids:
+                    self._last_found_write_before_flush.setdefault(tid, {})
+            
+            def add_node(self,
+                         node: nodes.InstructionNode,
+                         delta_fw_group: Dict[WriteNode, Dict[Var, Set[WriteNode]]],
+                         delta_fr_group: Dict[WriteNode, Dict[Var, Set[ReadNode]]]):
+                if node.itype == nodes.NodeType.WRITE:
+                    self._last_found_write[node.tid] = node
+                    
+                if node.itype == nodes.NodeType.WRITE:
+                    for tid in hbg.tids:
+                        other_node = self._last_found_write_before_flush[tid].get(node.interval)
+                        if other_node:
+                            delta_fw_group.setdefault(other_node, {}).setdefault(node.interval, set()).add(node)
+                    
+                elif node.itype == nodes.NodeType.READ:
+                    for tid in hbg.tids:
+                        other_node = self._last_found_write_before_flush[tid].get(node.interval)
+                        if other_node:
+                            delta_fr_group.setdefault(other_node, {}).setdefault(node.interval, set()).add(node)
+                
+                elif node.itype == nodes.NodeType.FLUSH:
+                    for tid in hbg.tids:
+                        if tid not in self._last_found_write:
+                            continue
+                        for var in hbg.get_vars_in_cache_line(node.interval):
+                            self._last_found_write_before_flush[tid][var] = self._last_found_write[tid]
+
+            def merge(self, other: 'SearchContext'):
+                for tid in hbg.tids:
+                    n1 = self._last_found_write.get(tid)
+                    n2 = other._last_found_write.get(tid)
+                    if n2 and (not n1 or hbg.is_before_in_thread(n2, n1)):
+                        self._last_found_write[tid] = n2
+
+                    for var in other._last_found_write_before_flush[tid]:
+                        n1 = self._last_found_write_before_flush[tid].get(var)
+                        n2 = other._last_found_write_before_flush[tid][var]
+                        
+                        if n2 and (not n1 or hbg.is_before_in_thread(n2, n1)):
+                            self._last_found_write_before_flush[tid][var] = n2
+            
+            def copy(self) -> 'SearchContext':
+                s = SearchContext()
+                s._last_found_write = self._last_found_write.copy()
+                s._last_found_write_before_flush = _copy(self._last_found_write_before_flush)
+                return s
+        
+        thread_context: Dict[ThreadId, SearchContext] = {}
+        node_context: Dict[nodes.EpochNode, SearchContext] = {}
+        
+        delta_fw_groups: Dict[WriteNode, Dict[Var, Set[WriteNode]]] = {}
+        delta_fr_groups: Dict[WriteNode, Dict[Var, Set[ReadNode]]] = {}
+        
+        for tid in self._hbg.tids:
+            thread_context.setdefault(tid, SearchContext())
+        
+        for n in self._hbg.postorder():
+            if isinstance(n, nodes.InstructionNode):
+                thread_context[n.tid].add_node(n, delta_fw_groups, delta_fr_groups)
+                
+            elif isinstance(n, nodes.EpochNode):
+                for child in self._hbg.get_inter_children(n):
+                    thread_context[n.tid].merge(node_context[child])
+                    
+                node_context[n] = thread_context[n.tid].copy()
+                
+        return delta_fw_groups, delta_fr_groups
+
+    def build_fw_groups_opt2(self):
+        ReadNode = nodes.InstructionNode
+        WriteNode = nodes.InstructionNode
+        
+        hbg = self._hbg
+        
+        def _copy(d1: Dict[Any, Set[Any]]):
+            d = {}
+            for k, v in d1.items():
+                d[k] = v.copy()
+            return d
+        
+        class SearchContext:
+            def __init__(self):
+                self._unflushed_writes: Dict[Var, Set[WriteNode]] = {}
+                self._flushed_writes: Dict[Var, Set[WriteNode]] = {}
+                self._unflushed_reads: Dict[Var, Set[ReadNode]] = {}
+                self._flushed_reads: Dict[Var, Set[ReadNode]] = {}
+                
+            def copy_flushed_reads(self):
+                return _copy(self._flushed_reads)
+            
+            def copy_flushed_writes(self):
+                return _copy(self._flushed_writes)
+                
+            def add_node(self, node: nodes.InstructionNode):
+                if node.itype == nodes.NodeType.READ:
+                    self._unflushed_reads.setdefault(node.interval, set()).add(node)
+                elif node.itype == nodes.NodeType.WRITE:
+                    self._unflushed_writes.setdefault(node.interval, set()).add(node)
+                elif node.itype == nodes.NodeType.FLUSH:
+                    for var in hbg.get_vars_in_cache_line(node.interval):
+                        if var in self._unflushed_reads:
+                            self._flushed_reads[var] = self._unflushed_reads[var]
+                            self._unflushed_reads[var] = set()
+                        if var in self._unflushed_writes:
+                            self._flushed_writes[var] = self._unflushed_writes[var]
+                            self._unflushed_writes[var] = set()
+                            
+            def copy(self) -> 'SearchContext':
+                s = SearchContext()
+                s._unflushed_reads = _copy(self._unflushed_reads)
+                s._flushed_reads = _copy(self._flushed_reads)
+                s._unflushed_writes = _copy(self._unflushed_writes)
+                s._flushed_writes = _copy(self._flushed_writes)
+                return s
+            
+            def merge(self, other: 'SearchContext'):
+                def _merge(d1: Dict[Any, Set[Any]], d2: Dict[Any, Set[Any]]):
+                    for k, v in d2.items():
+                        d1.setdefault(k, set()).update(v)
+                
+                def _sub(d1: Dict[Any, Set[Any]], d2: Dict[Any, Set[Any]]):
+                    for k, v in d2.items():
+                        d1.setdefault(k, set()).difference_update(v)
+                
+                _merge(self._unflushed_writes, other._unflushed_writes)
+                _sub(self._unflushed_writes, other._flushed_writes)
+                
+                _merge(self._flushed_writes, other._flushed_writes)
+                
+                _merge(self._unflushed_reads, other._unflushed_reads)
+                _sub(self._unflushed_reads, other._flushed_reads)
+                
+                _merge(self._flushed_reads, other._flushed_reads)
+                
+        thread_context: Dict[ThreadId, SearchContext] = {}
+        node_context: Dict[nodes.EpochNode, SearchContext] = {}
+        
+        fw_groups: Dict[WriteNode, Dict[Var, Set[WriteNode]]] = {}
+        fr_groups: Dict[WriteNode, Dict[Var, Set[ReadNode]]] = {}
+        
+        for tid in self._hbg.tids:
+            thread_context.setdefault(tid, SearchContext())
+        
+        for n in self._hbg.reverse_postorder():
+            if isinstance(n, nodes.InstructionNode):
+                thread_context[n.tid].add_node(n)
+                
+                if n.itype == nodes.NodeType.WRITE:
+                    fw_groups[n] = thread_context[n.tid].copy_flushed_writes()
+                    fr_groups[n] = thread_context[n.tid].copy_flushed_reads()
+            
+            elif isinstance(n, nodes.EpochNode):
+                for parent in self._hbg.get_inter_parents(n):
+                    thread_context[n.tid].merge(node_context[parent])
+                    
+                node_context[n] = thread_context[n.tid].copy()
+                
+        return fw_groups, fr_groups
 
     def part_1(self):
         """Find delta groups"""
