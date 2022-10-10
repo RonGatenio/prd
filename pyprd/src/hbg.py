@@ -91,36 +91,36 @@ class HBG:
     @property
     def inter(self) -> nx.DiGraph:
         return self._inter_graph
-    
+
     @property
     def intra(self) -> nx.DiGraph:
         return self._intra_graph
-    
+
     @property
     def tids(self) -> Iterable[int]:
         return self._nodes_by_thread.keys()
-    
+
     @property
     def vars(self) -> Set[Tuple[int, int]]:
         return self._vars
-    
+
     def get_vars_in_cache_line(self, cache_line):
         return self._cache_lines[cache_line]
     # def get_vars_in_range(self, begin: int, end: int) -> Generator[Tuple[int, int], None, None]:
     #     for i in self._vars_tree.envelop(begin, end):
     #         i: intervaltree.Interval
     #         yield (i.begin, i.end)
-    
+
     def get_node_by_location(self, location: NodeLocation | Tuple[int, int]) -> nodes.AbstractNode:
         location = NodeLocation(*location)
         return self._nodes_by_thread[location.tid][location.tindex]
-    
+
     def get_node_location(self, node: nodes.AbstractNode) -> NodeLocation:
         return self._nodes_location[node]
-    
+
     def get_thread_nodes(self, tid: int) -> List[nodes.AbstractNode]:
         return self._nodes_by_thread[tid]
-    
+
     def get_nodes_by_type(self, itype: nodes.NodeType) -> Set[nodes.AbstractNode]:
         return self._nodes_by_type.setdefault(itype, set())
 
@@ -135,39 +135,39 @@ class HBG:
 
         if not children:
             return None
-        
+
         child, = children
         return child
 
     def get_intra_parent(self, node) -> nodes.AbstractNode:
         parents = list(self.intra.predecessors(node))
-        
+
         if not parents:
             return None
-        
+
         parent, = parents
         return parent
-    
+
     @property
     def write_nodes(self) -> Set[nodes.InstructionNode]:
         return self.get_nodes_by_type(nodes.NodeType.WRITE)
-    
+
     @property
     def read_nodes(self) -> Set[nodes.InstructionNode]:
         return self.get_nodes_by_type(nodes.NodeType.READ)
-    
+
     @property
     def flush_nodes(self) -> Set[nodes.InstructionNode]:
         return self.get_nodes_by_type(nodes.NodeType.FLUSH)
-    
+
     @property
     def epoch_nodes(self) -> Set[nodes.EpochNode]:
         return self.get_nodes_by_type(nodes.NodeType.EPOCH)
-    
+
     @property
     def read_write_nodes(self) -> Set[nodes.InstructionNode]:
         return self.read_nodes | self.write_nodes
-    
+
     @property
     def instruction_nodes(self) -> Set[nodes.InstructionNode]:
         return self.read_nodes | self.write_nodes | self.flush_nodes
