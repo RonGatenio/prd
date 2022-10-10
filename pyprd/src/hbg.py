@@ -219,13 +219,21 @@ class HBGBuilder:
         self._graph.add_edge(src, dst, type=EdgeType.INTER_THREAD)
 
     def build(self, filter_volatile_nodes=True) -> HBG:
+        cacheline_size = None
+        
         if filter_volatile_nodes:
             self._filter_volatile_nodes()
 
         for n in self._nodes:
             self._add_node(n)
+            if not cacheline_size and n.itype == nodes.NodeType.FLUSH:
+                n: nodes.InstructionNode
+                cacheline_size = n.size
 
         for src, dst in self._edges:
             self._add_happens_before_edge(src, dst)
 
-        return HBG(self._graph, self._nodes_by_thread, self._nodes_by_type, self._nodes_location)
+        if not cacheline_size:
+            cacheline_size = DEFAULT_CACHELINE_SIZE
+            
+        return HBG(self._graph, self._nodes_by_thread, self._nodes_by_type, self._nodes_location, cacheline_size=cacheline_size)
