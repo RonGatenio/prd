@@ -98,10 +98,89 @@ class PersistencyRaceDetector:
         self._thread_contexts: Dict[ThreadId, ThreadContext] = {}
         
     def build_delta_ha_groups_opt1(self):
-        pass
+        last_read_nodes: Dict[ThreadId, Dict[ThreadId, nodes.InstructionNode]] = {}
+        delta_ha_groups: Dict[nodes.InstructionNode, Dict[Var, Set[nodes.InstructionNode]]] = {}
+        
+        for t in self._hbg.tids:
+            last_read_nodes.setdefault(t, {})
+        
+        for n in self._hbg.reverse_postorder():
+            if n.itype == nodes.NodeType.READ:
+                last_read_nodes[n.tid][n.tid] = n
+                
+            elif n.itype == nodes.NodeType.WRITE:
+                n: nodes.InstructionNode
+                for tid in self._hbg.tids:
+                    last_read_node = last_read_nodes[n.tid].get(tid)
+                    if last_read_node:
+                        delta_ha_groups[last_read_node].setdefault(n.interval, set()).add(n)
+                        
+            elif n.itype == nodes.EpochNode:
+                n: nodes.EpochNode
+                for parent in self._hbg.get_inter_parents(n):
+                    for tid in self._hbg.tids:
+                        n1 = last_read_nodes[n.tid].get(tid)
+                        n2 = last_read_nodes[parent.tid].get(tid)
+                        if self._hbg.is_before_in_thread(n1, n2):
+                            last_read_nodes[n.tid][tid] = last_read_nodes[parent.tid][tid]
+                            
+        return delta_ha_groups
 
     def build_delta_ha_groups_opt2(self):
-        pass
+        found_writes: Dict[ThreadId, Dict[ThreadId, Dict[Var, Set[nodes.InstructionNode]]]] = {}
+        delta_ha_groups: Dict[nodes.InstructionNode, Dict[Var, Set[nodes.InstructionNode]]] = {}
+        
+        for t in self._hbg.tids:
+            found_writes.setdefault(t, {})
+            for _t in self._hbg.tids:
+                found_writes[t].setdefault(_t, set())
+        
+        for n in self._hbg.postorder():
+            if n.itype == nodes.NodeType.READ:
+                delta_ha_groups.setdefault(n, {})
+                
+                for var in found_writes[n.tid][n.tid]:
+                    delta_ha_groups[n].setdefault(var, set()).update(found_writes[n.tid][n.tid])
+                
+                found_writes[n.tid][n.tid].clear()
+                
+            elif n.itype == nodes.NodeType.WRITE:
+                n: nodes.InstructionNode
+                
+                for tid in self._hbg.tids:
+                    found_writes[n.tid][tid].add(n)
+
+            elif n.itype == nodes.EpochNode:
+                n: nodes.EpochNode
+                
+                for child in self._hbg.get_inter_children(n):
+                    for tid in self._hbg.tids:
+                        
+                        n1 = last_read_nodes[n.tid].get(tid)
+                        n2 = last_read_nodes[parent.tid].get(tid)
+                        if self._hbg.is_before_in_thread(n1, n2):
+                            last_read_nodes[n.tid][tid] = last_read_nodes[parent.tid][tid]
+                            
+    def build_delta_ha_groups_opt3(self):
+        found_writes_total: Dict[Var, Set[nodes.InstructionNode]] = {}
+        last_read: Dict[ThreadId, nodes.InstructionNode] = {}
+        delta_ha_groups: Dict[nodes.InstructionNode, Dict[Var, Set[nodes.InstructionNode]]] = {}
+        
+        for n in self._hbg.postorder():
+            if n.itype == nodes.NodeType.READ:
+                my_delta: Dict[Var, Set[nodes.InstructionNode]] = {}
+                for var, writes in found_writes_total.items():
+                    my_delta.setdefault(var, set()).update(writes)
+                    my_delta[var].difference_update(delta_ha_groups[last_read[n.tid]][var])
+                    
+                delta_ha_groups[n] = my_delta
+                
+            elif n.itype == nodes.NodeType.WRITE:
+                n: nodes.InstructionNode
+                
+                found_writes_total.setdefault(n.interval, set()).add(n)
+                
+        return delta_ha_groups
     
     def build_delta_fw_groups_opt1(self):
         pass
