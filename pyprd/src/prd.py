@@ -644,11 +644,8 @@ class PersistencyRaceDetector:
                 if n.itype == nodes.NodeType.READ:
                     n: ReadNode
                     
-                    temp_fw_groups:   Dict[Var, Set[WriteNode]] = copy(fw_groups)
-                    temp_fr_groups:   Dict[Var, Set[ReadNode]]  = copy(fr_groups)
-                    temp_safe_groups: Dict[Var, Set[WriteNode]] = copy(ha_groups)
-                    
-                    merge(temp_safe_groups, temp_fw_groups)
+                    temp_fr_group:   Set[ReadNode]  = fr_groups[n.interval].copy()
+                    temp_safe_group: Set[WriteNode] = ha_groups[n.interval] | fw_groups[n.interval]
                     
                     dependant_writes = list(self._ppdg.get_dependants(n))
                     locations = list(map(self._hbg.get_node_location, dependant_writes))
@@ -661,9 +658,8 @@ class PersistencyRaceDetector:
                         
                         temp_n: WriteNode
                         
-                        merge(temp_fw_groups, delta_fw_groups.get(n, {}))        # TODO: not needed
-                        merge(temp_fr_groups, delta_fr_groups.get(n, {}))
-                        merge(temp_safe_groups, delta_fw_groups.get(n, {}))
+                        temp_fr_group |= delta_fr_groups.get(temp_n, {}).get(n.interval, set())
+                        temp_safe_group |= delta_fw_groups.get(temp_n, {}).get(n.interval, set())
                         
                         if temp_n.interval == n.interval:
                             continue
