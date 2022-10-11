@@ -1,6 +1,6 @@
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Any, Dict, List, Set, Tuple
+from typing import Any, Dict, Generator, List, Set, Tuple
 import nodes
 from hbg import HBG
 from pdg import PDG
@@ -35,6 +35,8 @@ class PersistencyRace:
 
 ThreadId = int
 Var = Tuple[int, int]
+ReadNode = nodes.InstructionNode
+WriteNode = nodes.InstructionNode
 
 import intervaltree
 
@@ -101,9 +103,9 @@ class PersistencyRaceDetector:
     def __init__(self, hbg: HBG, ppdg: PDG):
         self._hbg = hbg
         self._ppdg = ppdg
-        self._delta_flushed_read_nodes: Dict[nodes.InstructionNode, Dict[Var, Set[nodes.InstructionNode]]] = {}
-        self._delta_flushed_write_nodes: Dict[nodes.InstructionNode, Dict[Var, Set[nodes.InstructionNode]]] = {}
-        self._thread_contexts: Dict[ThreadId, ThreadContext] = {}
+        # self._delta_flushed_read_nodes: Dict[nodes.InstructionNode, Dict[Var, Set[nodes.InstructionNode]]] = {}
+        # self._delta_flushed_write_nodes: Dict[nodes.InstructionNode, Dict[Var, Set[nodes.InstructionNode]]] = {}
+        # self._thread_contexts: Dict[ThreadId, ThreadContext] = {}
         
     @property
     def hbg(self):
