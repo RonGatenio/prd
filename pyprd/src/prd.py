@@ -103,6 +103,14 @@ class PersistencyRaceDetector:
         self._delta_flushed_read_nodes: Dict[nodes.InstructionNode, Dict[Var, Set[nodes.InstructionNode]]] = {}
         self._delta_flushed_write_nodes: Dict[nodes.InstructionNode, Dict[Var, Set[nodes.InstructionNode]]] = {}
         self._thread_contexts: Dict[ThreadId, ThreadContext] = {}
+        
+    @property
+    def hbg(self):
+        return self._hbg
+    
+    @property
+    def ppdg(self):
+        return self._ppdg
 
     def build_delta_ha_groups_opt1(self):
         ReadNode = nodes.InstructionNode
