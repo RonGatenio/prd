@@ -648,7 +648,16 @@ class PersistencyRaceDetector:
                     temp_safe_group: Set[WriteNode] = ha_groups[n.interval] | fw_groups[n.interval]
                     
                     dependant_writes = list(self._ppdg.get_dependants(n))
+                    
+                    # if no depandant writes, no possible races with this read
+                    if not dependant_writes:
+                        # Update ha_groups
+                        discard(ha_groups, delta_ha_groups.get(n, {}))
+                        continue
+                    
                     locations = list(map(self._hbg.get_node_location, dependant_writes))
+                    
+                    total_write_nodes_of_var = len(self._hbg.get_write_nodes_by_var(n.interval))
                     
                     for j in range(i, max(locations).tindex + 1):
                         temp_n = thread_nodes[j]
@@ -658,26 +667,33 @@ class PersistencyRaceDetector:
                         
                         temp_n: WriteNode
                         
+                        # Update fr and safe group
                         temp_fr_group |= delta_fr_groups.get(temp_n, {}).get(n.interval, set())
                         temp_safe_group |= delta_fw_groups.get(temp_n, {}).get(n.interval, set())
                         
+                        # if not a depandent node, continue, no race here
+                        if temp_n not in dependant_writes:
+                            continue
+                        
+                        # if var(W) == var(R), continue, there is no race here
                         if temp_n.interval == n.interval:
                             continue
                         
-                        if n in temp_fr_groups[n.interval]:
-                            # Read node is flushed from this point. No need to continue.
+                        # if the Read node is flushed from this point. No need to continue. No possible races from here
+                        if n in temp_fr_group:
                             break
                         
-                        # TODO: simplify complexity of next part! Check sizes instead
+                        # if the safe group contains all possible W(var)s, no need to continue. No possible races from here
+                        if len(temp_safe_group) == total_write_nodes_of_var:
+                            break
                         
-                        
-                        
-                        
-                        
+                        yield PersistencyRace(temp_n, n)
                 
+                    # Update ha_groups
                     discard(ha_groups, delta_ha_groups.get(n, {}))
                 
                 elif n.itype == nodes.NodeType.WRITE:
+                    # Update fw fr groups
                     merge(fw_groups, delta_fw_groups.get(n, {}))
                     merge(fr_groups, delta_fr_groups.get(n, {}))
             
