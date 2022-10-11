@@ -51,6 +51,28 @@ class HBG:
             cache_line_address = n.address & mask
             self._cache_lines.setdefault((cache_line_address, cache_line_address+self._cacheline_size), set()).add(n.interval)
 
+    def stats(self) -> str:
+        lines = []
+        
+        lines.append(f'Number of Threads     {len(self.tids)}')
+        lines.append(f'Number of Nodes       {self._graph.number_of_nodes()}')
+        lines.append(f'Number of Edges       {self._graph.number_of_edges()}')
+        lines.append(f'Number of Inter Edges {self.inter.number_of_edges()}')
+        lines.append(f'Number of Intra Edges {self.intra.number_of_edges()}')
+        lines.append(f'Number of Vars        {len(self._vars)}')
+        lines.append(f'Number of Cachelines  {len(self._cache_lines)}')
+        lines.append(f'Cacheline size        {self._cacheline_size}')
+        
+        lines.append('Node types')
+        for t in nodes.NodeType:
+            lines.append(f'\t{t.name:6} {len(self.get_nodes_by_type(t))}')
+        
+        max_line_size = max(map(len, lines))
+        lines.insert(0, f'{" HBG Stats ":#^{max_line_size}}')
+        lines.append(f'{"":#^{max_line_size}}')
+        
+        return '\n'.join(lines)
+    
     @property
     def inter(self) -> nx.DiGraph:
         return self._inter_graph
