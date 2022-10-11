@@ -288,7 +288,10 @@ def main():
         delta_fw_groups, delta_fr_groups = p.build_delta_fw_groups_opt0()
 
     with timeit('finale'):
-        p.finale(delta_ha_groups, delta_fw_groups, delta_fr_groups)
+        races = list(p.finale(delta_ha_groups, delta_fw_groups, delta_fr_groups))
+        
+    with open('races.txt', 'w') as f:
+        f.write('\n----------\n'.join(map(str, races)))
         
     print()
     fw_fr_tests(p)
