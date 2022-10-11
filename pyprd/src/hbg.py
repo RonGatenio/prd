@@ -130,6 +130,10 @@ class HBG:
         return parent
 
     @property
+    def nodes(self) -> Set[nodes.AbstractNode]:
+        return self._graph.nodes()
+    
+    @property
     def write_nodes(self) -> Set[nodes.InstructionNode]:
         return self.get_nodes_by_type(nodes.NodeType.WRITE)
 
