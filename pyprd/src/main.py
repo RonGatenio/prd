@@ -287,6 +287,9 @@ def main():
     with timeit('fw fr delta groups'):
         delta_fw_groups, delta_fr_groups = p.build_delta_fw_groups_opt0()
 
+    with timeit('finale'):
+        p.finale(delta_ha_groups, delta_fw_groups, delta_fr_groups)
+        
     print()
     fw_fr_tests(p)
 

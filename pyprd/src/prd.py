@@ -605,6 +605,88 @@ class PersistencyRaceDetector:
                 
         return fw_groups, fr_groups
 
+    def finale(self,
+               delta_ha_groups: Dict[ReadNode,  Dict[Var, Set[WriteNode]]],
+               delta_fw_groups: Dict[WriteNode, Dict[Var, Set[WriteNode]]],
+               delta_fr_groups: Dict[WriteNode, Dict[Var, Set[ReadNode]]]) -> Generator[PersistencyRace, None, None]:
+        
+        def merge(d1: Dict[Any, Set[Any]], d2: Dict[Any, Set[Any]]):
+            for k, v in d2.items():
+                d1.setdefault(k, set()).update(v)
+                
+        def discard(d1: Dict[Any, Set[Any]], d2: Dict[Any, Set[Any]]):
+            for k, v in d2.items():
+                d1.setdefault(k, set()).difference_update(v)
+                
+        def copy(d: Dict[Any, Set[Any]]):
+            _d = defaultdict(set)
+            for k, v in d.items():
+                _d[k] = v.copy()
+            return _d
+                
+        for tid in self._hbg.tids:
+            ha_groups: Dict[Var, Set[WriteNode]] = defaultdict(set)
+            fw_groups: Dict[Var, Set[WriteNode]] = defaultdict(set)
+            fr_groups: Dict[Var, Set[ReadNode]]  = defaultdict(set)
+            
+            # Get thread nodes in order
+            thread_nodes = self._hbg.get_thread_nodes(tid)
+            
+            # Initialize ha group
+            for n in filter(lambda n: n.itype == nodes.NodeType.READ, thread_nodes):
+                merge(ha_groups, delta_ha_groups.get(n, {}))
+            
+            # Run over thread nodes in order (top to bottom)
+            for i, n in enumerate(thread_nodes):
+                if not isinstance(n, nodes.InstructionNode):
+                    continue
+                
+                if n.itype == nodes.NodeType.READ:
+                    n: ReadNode
+                    
+                    temp_fw_groups:   Dict[Var, Set[WriteNode]] = copy(fw_groups)
+                    temp_fr_groups:   Dict[Var, Set[ReadNode]]  = copy(fr_groups)
+                    temp_safe_groups: Dict[Var, Set[WriteNode]] = copy(ha_groups)
+                    
+                    merge(temp_safe_groups, temp_fw_groups)
+                    
+                    dependant_writes = list(self._ppdg.get_dependants(n))
+                    locations = list(map(self._hbg.get_node_location, dependant_writes))
+                    
+                    for j in range(i, max(locations).tindex + 1):
+                        temp_n = thread_nodes[j]
+                        
+                        if temp_n.itype != nodes.NodeType.WRITE:
+                            continue
+                        
+                        temp_n: WriteNode
+                        
+                        merge(temp_fw_groups, delta_fw_groups.get(n, {}))        # TODO: not needed
+                        merge(temp_fr_groups, delta_fr_groups.get(n, {}))
+                        merge(temp_safe_groups, delta_fw_groups.get(n, {}))
+                        
+                        if temp_n.interval == n.interval:
+                            continue
+                        
+                        if n in temp_fr_groups[n.interval]:
+                            # Read node is flushed from this point. No need to continue.
+                            break
+                        
+                        # TODO: simplify complexity of next part! Check sizes instead
+                        
+                        
+                        
+                        
+                        
+                
+                    discard(ha_groups, delta_ha_groups.get(n, {}))
+                
+                elif n.itype == nodes.NodeType.WRITE:
+                    merge(fw_groups, delta_fw_groups.get(n, {}))
+                    merge(fr_groups, delta_fr_groups.get(n, {}))
+            
+
+
     def part_1(self):
         """Find delta groups"""
         thread_contexts = self._thread_contexts
