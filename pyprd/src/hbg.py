@@ -54,28 +54,38 @@ class HBG:
             self._vars_by_size[n.size].add(n.interval)
             self._cachelines[(cacheline_address, cacheline_address+self._cacheline_size)].add(n.interval)
 
-    def stats(self) -> str:
+    def stats(self, full=False) -> str:
         lines = []
-        
+
+        # Threads
         lines.append(f'Number of Threads     {len(self.tids)}')
-        lines.append(f'Number of Nodes       {self._graph.number_of_nodes()}')
-        lines.append(f'Number of Edges       {self._graph.number_of_edges()}')
-        lines.append(f'Number of Inter Edges {self.inter.number_of_edges()}')
-        lines.append(f'Number of Intra Edges {self.intra.number_of_edges()}')
-        lines.append(f'Number of Vars        {len(self._vars)}')
-        lines.append(f'Number of Cachelines  {len(self._cache_lines)}')
+
+        # Variables
+        lines.append(f'Number of Variables   {len(self._vars)}')
+        for k in sorted(self._vars_by_size):
+            lines.append(f'\t{k:<2} {len(self._vars_by_size[k])}')
+
+        # Cachelines
+        lines.append(f'Number of Cachelines  {len(self._cachelines)}')
         lines.append(f'Cacheline size        {self._cacheline_size}')
-        
-        lines.append('Node types')
+
+        # Nodes
+        lines.append(f'Number of Nodes       {self._graph.number_of_nodes()}')
         for t in nodes.NodeType:
             lines.append(f'\t{t.name:6} {len(self.get_nodes_by_type(t))}')
-        
+
+        # Edges
+        if full:
+            lines.append(f'Number of Edges       {self._graph.number_of_edges()}')
+            lines.append(f'\tInter Edges {self.inter.number_of_edges()}')
+            lines.append(f'\tIntra Edges {self.intra.number_of_edges()}')
+
         max_line_size = max(map(len, lines))
         lines.insert(0, f'{" HBG Stats ":#^{max_line_size}}')
         lines.append(f'{"":#^{max_line_size}}')
-        
+
         return '\n'.join(lines)
-    
+
     @property
     def inter(self) -> nx.DiGraph:
         return self._inter_graph
@@ -139,7 +149,7 @@ class HBG:
     @property
     def all_nodes(self) -> Set[nodes.AbstractNode]:
         return self._graph.nodes()
-    
+
     @property
     def write_nodes(self) -> Set[nodes.InstructionNode]:
         return self.get_nodes_by_type(nodes.NodeType.WRITE)
@@ -253,7 +263,7 @@ class HBGBuilder:
 
     def build(self, filter_volatile_nodes=True) -> HBG:
         cacheline_size = None
-        
+
         if filter_volatile_nodes:
             self._filter_volatile_nodes()
 
