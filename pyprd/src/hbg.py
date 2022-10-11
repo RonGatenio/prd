@@ -1,5 +1,5 @@
 from typing import Dict, Generator, Iterable, List, Set, Tuple
-from collections import namedtuple
+from collections import namedtuple, defaultdict
 from enum import Enum
 import networkx as nx
 import nodes
@@ -29,26 +29,30 @@ class HBG:
         self._nodes_location = nodes_location
         self._cacheline_size = cacheline_size
 
-        self._inter_graph               = nx.subgraph_view(self._graph, filter_edge=lambda u, v: self._graph[u][v]['type'] == EdgeType.INTER_THREAD)
-        self._intra_graph               = nx.subgraph_view(self._graph, filter_edge=lambda u, v: self._graph[u][v]['type'] == EdgeType.INTRA_THREAD)
+        self._inter_graph = nx.subgraph_view(self._graph, filter_edge=lambda u, v: self._graph[u][v]['type'] == EdgeType.INTER_THREAD)
+        self._intra_graph = nx.subgraph_view(self._graph, filter_edge=lambda u, v: self._graph[u][v]['type'] == EdgeType.INTRA_THREAD)
 
         self._vars: Set[Tuple[int, int]] = set()
-        self._cache_lines: Dict[Tuple[int, int], Set[Tuple[int, int]]] = {}
+        self._vars_by_size: Dict[int, Set[Tuple[int, int]]] = defaultdict(set)
+        self._cachelines: Dict[Tuple[int, int], Set[Tuple[int, int]]] = defaultdict(set)
 
         self._find_vars()
 
         assert nx.is_directed_acyclic_graph(self._graph), 'HBG graph is not a DAG'
 
     def _find_vars(self):
-        mask = ((1 << 64) - 1) * self._cacheline_size
-
         for n in self.read_write_nodes:
-            # TODO: assert vars are fully contained in a cacheline
             if n.interval in self._vars:
                 continue
+
+            cacheline_address = utils.get_cacheline_address(n.address, self._cacheline_size)
+            next_cacheline_address = cacheline_address + self._cacheline_size
+
+            assert n.interval[1] <= next_cacheline_address, f'Variable at {n.address:#x} of size {n.size} crosses a cacheline'
+
             self._vars.add(n.interval)
-            cache_line_address = n.address & mask
-            self._cache_lines.setdefault((cache_line_address, cache_line_address+self._cacheline_size), set()).add(n.interval)
+            self._vars_by_size[n.size].add(n.interval)
+            self._cachelines[(cacheline_address, cacheline_address+self._cacheline_size)].add(n.interval)
 
     def stats(self) -> str:
         lines = []
@@ -88,8 +92,12 @@ class HBG:
     def vars(self) -> Set[Tuple[int, int]]:
         return self._vars
 
+    @property
+    def cacheline_size(self) -> int:
+        return self._cacheline_size
+
     def get_vars_in_cache_line(self, cache_line: Tuple[int, int]):
-        return self._cache_lines[cache_line]
+        return self._cachelines[cache_line]
 
     def get_node_by_location(self, location: NodeLocation | Tuple[int, int]) -> nodes.AbstractNode:
         location = NodeLocation(*location)
