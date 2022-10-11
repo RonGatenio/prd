@@ -9,9 +9,13 @@ class PDG:
         self._graph = base_graph
 
     def get_dependencies(self, write_node: nodes.InstructionNode) -> Iterable[nodes.InstructionNode]:
+        if write_node not in self._graph:
+            return set()
         return self._graph.neighbors(write_node)
 
     def get_dependants(self, read_node: nodes.InstructionNode) -> Iterable[nodes.InstructionNode]:
+        if read_node not in self._graph:
+            return set()
         return self._graph.predecessors(read_node)
 
 
