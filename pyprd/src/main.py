@@ -165,8 +165,8 @@ def main():
     hbg = trace.to_hbg(filter=True)
     print(f'hbg {time.time() - s} sec')
     
-    for t in nodes.NodeType:
-        print(f'{t.name:6} {len(hbg.get_nodes_by_type(t))}')
+    print(hbg.stats())
+    import ipdb; ipdb.set_trace()
             
     # PDG
     s = time.time()
