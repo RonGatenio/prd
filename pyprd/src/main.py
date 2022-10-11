@@ -254,6 +254,56 @@ def simple_test():
     assert r00 in fr[w02][w11.interval]
 
 
+def test2():
+    b = HBGBuilder()
+    
+    v1 = 0x1000
+    v2 = 0x2000
+    v3 = 0x3000
+    
+    w11 = b.add_instruction_node('WRITE', 1, 0, v1, 8, 'w11')
+    b.add_instruction_node('FLUSH', 1, 0, v1, 64)
+    b.add_epoch_node(1, 0)
+    w12 = b.add_instruction_node('WRITE', 1, 0, v1, 8, 'w12')
+    b.add_instruction_node('FLUSH', 1, 0, v1, 64)
+    b.add_epoch_node(1, 1)
+    w13 = b.add_instruction_node('WRITE', 1, 0, v2, 8, 'w13')
+    
+    r21 = b.add_instruction_node('READ', 2, 0, v1, 8, 'r21')
+    r22 = b.add_instruction_node('READ', 2, 0, v2, 8, 'r22')
+    b.add_instruction_node('FLUSH', 2, 0, v2, 64)
+    b.add_epoch_node(2, 0)
+    w21 = b.add_instruction_node('WRITE', 2, 0, v1, 8, 'w21')
+    b.add_epoch_node(2, 1)
+    w22 = b.add_instruction_node('WRITE', 2, 0, v3, 8, 'w22')
+    b.add_epoch_node(2, 2)
+    w23 = b.add_instruction_node('WRITE', 2, 0, v2, 8, 'w23')
+    
+    w31 = b.add_instruction_node('WRITE', 3, 0, v1, 8, 'w31')
+    w32 = b.add_instruction_node('WRITE', 3, 0, v2, 8, 'w32')
+    b.add_instruction_node('FLUSH', 3, 0, v1, 64)
+    b.add_epoch_node(3, 0)
+    b.add_epoch_node(3, 1)
+    w33 = b.add_instruction_node('WRITE', 3, 0, v1, 8, 'w33')
+    b.add_instruction_node('FLUSH', 3, 0, v3, 64)
+    
+    b.add_happens_before_edge(1, 0, 2, 1)
+    b.add_happens_before_edge(1, 1, 2, 2)
+    b.add_happens_before_edge(2, 0, 1, 1)
+    b.add_happens_before_edge(2, 0, 3, 1)
+    b.add_happens_before_edge(3, 0, 2, 0)
+    
+    hbg = b.build()
+    pdg = generate_mock_pdg(hbg)
+    p = prd.PersistencyRaceDetector(hbg, pdg)
+    
+    delta_ha_groups = p.build_delta_ha_groups_opt1()
+    delta_fw_groups, delta_fr_groups = p.build_delta_fw_groups_opt0()
+    races = list(p.finale(delta_ha_groups, delta_fw_groups, delta_fr_groups))
+        
+    print('\n----------\n'.join(map(str, races)))
+
+
 def main():
     trace = TraceParser.from_file(r'H:\Projects\LLVM\llvm-project\py_persistency_race_detector\tests\traces\real\test_recipe.txt')
     # trace = TraceParser.from_file(r'H:\Projects\LLVM\llvm-project\py_persistency_race_detector\tests\traces\real\test_recipe_2.txt')
