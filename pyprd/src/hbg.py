@@ -3,9 +3,8 @@ from collections import namedtuple
 from enum import Enum
 import networkx as nx
 import nodes
-
-
-DEFAULT_CACHELINE_SIZE = 64
+import utils
+import config
 
 
 class EdgeType(Enum):
@@ -22,7 +21,7 @@ class HBG:
                  nodes_by_thread: Dict[int, List[nodes.AbstractNode]],
                  nodes_by_type: Dict[nodes.NodeType, Set[nodes.AbstractNode]],
                  nodes_location: Dict[nodes.AbstractNode, NodeLocation],
-                 cacheline_size=DEFAULT_CACHELINE_SIZE):
+                 cacheline_size=config.DEFAULT_CACHELINE_SIZE):
 
         self._graph = base_graph
         self._nodes_by_thread = nodes_by_thread
@@ -260,6 +259,6 @@ class HBGBuilder:
             self._add_happens_before_edge(src, dst)
 
         if not cacheline_size:
-            cacheline_size = DEFAULT_CACHELINE_SIZE
-            
+            cacheline_size = config.DEFAULT_CACHELINE_SIZE
+
         return HBG(self._graph, self._nodes_by_thread, self._nodes_by_type, self._nodes_location, cacheline_size=cacheline_size)
