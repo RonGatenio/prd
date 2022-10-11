@@ -165,7 +165,10 @@ def main():
     hbg = trace.to_hbg(filter=True)
     print(f'hbg {time.time() - s} sec')
     
+    s = time.time()
     print(hbg.stats())
+    print(f'stats {time.time() - s} sec')
+    
     import ipdb; ipdb.set_trace()
             
     # PDG

@@ -130,7 +130,7 @@ class HBG:
         return parent
 
     @property
-    def nodes(self) -> Set[nodes.AbstractNode]:
+    def all_nodes(self) -> Set[nodes.AbstractNode]:
         return self._graph.nodes()
     
     @property
