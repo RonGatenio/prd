@@ -36,7 +36,7 @@ class HBG:
         self._read_nodes_by_vars:  Dict[Tuple[int, int], Set[nodes.InstructionNode]] = defaultdict(set)
         self._write_nodes_by_vars: Dict[Tuple[int, int], Set[nodes.InstructionNode]] = defaultdict(set)
         self._vars_by_size:        Dict[int, Set[Tuple[int, int]]]                   = defaultdict(set)
-        self._cachelines:          Dict[Tuple[int, int], Set[Tuple[int, int]]]       = defaultdict(set)
+        self._cachelines:          Dict[int, Set[Tuple[int, int]]]                   = defaultdict(set)
 
         self._find_vars()
 
@@ -51,7 +51,7 @@ class HBG:
                 assert n.interval[1] <= next_cacheline_address, f'Variable at {n.address:#x} of size {n.size} crosses a cacheline'
 
                 self._vars_by_size[n.size].add(n.interval)
-                self._cachelines[(cacheline_address, cacheline_address+self._cacheline_size)].add(n.interval)
+                self._cachelines[cacheline_address].add(n.interval)
 
             self._vars[n.interval].add(n)
 
@@ -129,8 +129,8 @@ class HBG:
     def cacheline_size(self) -> int:
         return self._cacheline_size
 
-    def get_vars_in_cache_line(self, cache_line: Tuple[int, int]):
-        return self._cachelines[cache_line]
+    def get_vars_in_cacheline(self, cacheline_address: int):
+        return self._cachelines[cacheline_address]
 
     def get_node_by_location(self, location: NodeLocation | Tuple[int, int]) -> nodes.AbstractNode:
         location = NodeLocation(*location)

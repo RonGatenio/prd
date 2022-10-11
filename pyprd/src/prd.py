@@ -378,7 +378,7 @@ class PersistencyRaceDetector:
                     for tid in hbg.tids:
                         if tid not in self._last_found_write:
                             continue
-                        for var in hbg.get_vars_in_cache_line(node.interval):
+                        for var in hbg.get_vars_in_cacheline(node.address):
                             self._last_found_write_before_flush[tid][var] = self._last_found_write[tid]
 
             def merge(self, other: 'SearchContext'):
@@ -470,7 +470,7 @@ class PersistencyRaceDetector:
                     for tid in hbg.tids:
                         if tid not in self._last_found_write:
                             continue
-                        for var in hbg.get_vars_in_cache_line(node.interval):
+                        for var in hbg.get_vars_in_cacheline(node.address):
                             self._last_found_write_before_flush[tid][var] = self._last_found_write[tid]
 
             def merge(self, other: 'SearchContext'):
@@ -545,7 +545,7 @@ class PersistencyRaceDetector:
                 elif node.itype == nodes.NodeType.WRITE:
                     self._unflushed_writes.setdefault(node.interval, set()).add(node)
                 elif node.itype == nodes.NodeType.FLUSH:
-                    for var in hbg.get_vars_in_cache_line(node.interval):
+                    for var in hbg.get_vars_in_cacheline(node.address):
                         if var in self._unflushed_reads:
                             self._flushed_reads[var] = self._unflushed_reads[var]
                             self._unflushed_reads[var] = set()
@@ -732,7 +732,7 @@ class PersistencyRaceDetector:
                     elif n.itype == nodes.NodeType.FLUSH:
                         if not thread_contexts[tid].lfw.get(t):
                             continue
-                        for _var in self._hbg.get_vars_in_cache_line(var):
+                        for _var in self._hbg.get_vars_in_cacheline(n.address):
                             thread_contexts[tid].lpw[t][_var] = thread_contexts[tid].lfw.get(t)
 
             elif isinstance(n, nodes.EpochNode):
