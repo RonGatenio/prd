@@ -1,3 +1,4 @@
+from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any, Dict, List, Set, Tuple
 import nodes
@@ -116,21 +117,21 @@ class PersistencyRaceDetector:
         ReadNode = nodes.InstructionNode
         WriteNode = nodes.InstructionNode
         NodeContextType = Dict[ThreadId, ReadNode]
-        last_read_nodes_storage: Dict[nodes.EpochNode, NodeContextType] = {}
-        last_read_nodes_current: Dict[ThreadId, NodeContextType] = {}
-        delta_ha_groups: Dict[ReadNode, Dict[Var, Set[WriteNode]]] = {}
+        last_read_nodes_storage: Dict[nodes.EpochNode, NodeContextType] = defaultdict(dict)
+        last_read_nodes_current: Dict[ThreadId, NodeContextType] = defaultdict(dict)
+        delta_ha_groups: Dict[ReadNode, Dict[Var, Set[WriteNode]]] = defaultdict(lambda: defaultdict(set))
 
         for n in self._hbg.reverse_postorder():
             if n.itype == nodes.NodeType.READ:
-                last_read_nodes_current.setdefault(n.tid, {})[n.tid] = n
+                last_read_nodes_current[n.tid][n.tid] = n
 
             elif n.itype == nodes.NodeType.WRITE:
                 n: nodes.InstructionNode
 
                 for tid in self._hbg.tids:
-                    last_read_node = last_read_nodes_current.setdefault(n.tid, {}).get(tid)
+                    last_read_node = last_read_nodes_current[n.tid].get(tid)
                     if last_read_node:
-                        delta_ha_groups.setdefault(last_read_node, {}).setdefault(n.interval, set()).add(n)
+                        delta_ha_groups[last_read_node][n.interval].add(n)
 
             elif n.itype == nodes.NodeType.EPOCH:
                 n: nodes.EpochNode
@@ -141,9 +142,9 @@ class PersistencyRaceDetector:
                     parent: nodes.EpochNode
 
                     for tid in self._hbg.tids:
-                        n1 = last_read_nodes_current.setdefault(n.tid, {}).get(tid)
+                        n1 = last_read_nodes_current[n.tid].get(tid)
                         n2 = last_read_nodes_storage[parent].get(tid)
-                        if n2 and ((not n1) or self._hbg.is_before_in_thread(n1, n2)):
+                        if n2 and (not n1 or self._hbg.is_before_in_thread(n1, n2)):
                             last_read_nodes_current[n.tid][tid] = n2
 
                 last_read_nodes_storage[n] = last_read_nodes_current.get(n.tid, {}).copy()
