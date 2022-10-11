@@ -4,6 +4,7 @@ import nodes
 from hbg import HBG
 from pdg import PDG
 import networkx as nx
+import utils
 
 
 class PersistencyRace:
@@ -241,6 +242,87 @@ class PersistencyRaceDetector:
 
         return ha_groups
 
+
+    def build_delta_fw_groups_opt00(self):
+        ReadNode = nodes.InstructionNode
+        WriteNode = nodes.InstructionNode
+        
+        hbg = self._hbg
+        
+        class SearchContext:
+            def __init__(self):
+                self._last_found_write: Dict[ThreadId, WriteNode] = {}  # last found write instruction node in the thread
+                self._last_found_write_before_flush: Dict[ThreadId, Dict[int, WriteNode]] = {}  # last write from thread i that was found before the last flush(Var)
+                
+                for tid in hbg.tids:
+                    self._last_found_write_before_flush.setdefault(tid, {})
+            
+            def add_node(self,
+                         node: nodes.InstructionNode,
+                         delta_fw_group: Dict[WriteNode, Dict[int, Set[WriteNode]]],
+                         delta_fr_group: Dict[WriteNode, Dict[int, Set[ReadNode]]]):
+                if node.itype == nodes.NodeType.WRITE:
+                    self._last_found_write[node.tid] = node
+                    
+                if node.itype == nodes.NodeType.WRITE:
+                    cacheline_address = utils.get_cacheline_address(node.address, hbg.cacheline_size)
+                    for tid in hbg.tids:
+                        other_node = self._last_found_write_before_flush[tid].get(cacheline_address)
+                        if other_node:
+                            delta_fw_group.setdefault(other_node, {}).setdefault(cacheline_address, set()).add(node)
+                    
+                elif node.itype == nodes.NodeType.READ:
+                    cacheline_address = utils.get_cacheline_address(node.address, hbg.cacheline_size)
+                    for tid in hbg.tids:
+                        other_node = self._last_found_write_before_flush[tid].get(cacheline_address)
+                        if other_node:
+                            delta_fr_group.setdefault(other_node, {}).setdefault(cacheline_address, set()).add(node)
+                
+                elif node.itype == nodes.NodeType.FLUSH:
+                    for tid in hbg.tids:
+                        if tid not in self._last_found_write:
+                            continue
+                        self._last_found_write_before_flush[tid][node.address] = self._last_found_write[tid]
+
+            def merge(self, other: 'SearchContext'):
+                for tid in hbg.tids:
+                    n1 = self._last_found_write.get(tid)
+                    n2 = other._last_found_write.get(tid)
+                    if n2 and (not n1 or hbg.is_before_in_thread(n2, n1)):
+                        self._last_found_write[tid] = n2
+
+                    for var in other._last_found_write_before_flush[tid]:
+                        n1 = self._last_found_write_before_flush[tid].get(var)
+                        n2 = other._last_found_write_before_flush[tid][var]
+                        
+                        if n2 and (not n1 or hbg.is_before_in_thread(n2, n1)):
+                            self._last_found_write_before_flush[tid][var] = n2
+        
+        thread_context: Dict[ThreadId, SearchContext] = {}
+        node_context: Dict[nodes.EpochNode, SearchContext] = {}
+        
+        delta_fw_groups: Dict[WriteNode, Dict[int, Set[WriteNode]]] = {}
+        delta_fr_groups: Dict[WriteNode, Dict[int, Set[ReadNode]]] = {}
+        
+        for tid in self._hbg.tids:
+            thread_context.setdefault(tid, SearchContext())
+        
+        for i, n in enumerate(self._hbg.postorder()):
+            if isinstance(n, nodes.InstructionNode):
+                thread_context[n.tid].add_node(n, delta_fw_groups, delta_fr_groups)
+                
+            elif isinstance(n, nodes.EpochNode):
+                if n in node_context:
+                    thread_context[n.tid].merge(node_context[n])
+                    del node_context[n]
+                    
+                for parent in self._hbg.get_inter_parents(n):
+                    if parent not in node_context:
+                        node_context[parent] = SearchContext()
+                    
+                    node_context[parent].merge(thread_context[n.tid])
+                
+        return delta_fw_groups, delta_fr_groups
 
     def build_delta_fw_groups_opt0(self):
         ReadNode = nodes.InstructionNode
