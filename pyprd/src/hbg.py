@@ -32,7 +32,7 @@ class HBG:
         self._inter_graph = nx.subgraph_view(self._graph, filter_edge=lambda u, v: self._graph[u][v]['type'] == EdgeType.INTER_THREAD)
         self._intra_graph = nx.subgraph_view(self._graph, filter_edge=lambda u, v: self._graph[u][v]['type'] == EdgeType.INTRA_THREAD)
 
-        self._vars: Set[Tuple[int, int]] = set()
+        self._vars: Dict[Tuple[int, int], Set[nodes.InstructionNode]] = defaultdict(set)
         self._vars_by_size: Dict[int, Set[Tuple[int, int]]] = defaultdict(set)
         self._cachelines: Dict[Tuple[int, int], Set[Tuple[int, int]]] = defaultdict(set)
 
@@ -43,6 +43,7 @@ class HBG:
     def _find_vars(self):
         for n in self.read_write_nodes:
             if n.interval in self._vars:
+                self._vars[n.interval].add(n)
                 continue
 
             cacheline_address = utils.get_cacheline_address(n.address, self._cacheline_size)
@@ -50,12 +51,16 @@ class HBG:
 
             assert n.interval[1] <= next_cacheline_address, f'Variable at {n.address:#x} of size {n.size} crosses a cacheline'
 
-            self._vars.add(n.interval)
+            self._vars[n.interval].add(n)
             self._vars_by_size[n.size].add(n.interval)
             self._cachelines[(cacheline_address, cacheline_address+self._cacheline_size)].add(n.interval)
 
     def stats(self, full=False) -> str:
+        import statistics
+        
         lines = []
+        
+        INDENT = ' ' * 2
 
         # Threads
         lines.append(f'Number of Threads     {len(self.tids)}')
@@ -63,7 +68,20 @@ class HBG:
         # Variables
         lines.append(f'Number of Variables   {len(self._vars)}')
         for k in sorted(self._vars_by_size):
-            lines.append(f'\t{k:<2} {len(self._vars_by_size[k])}')
+            lines.append(f'{INDENT}{k:<2} {len(self._vars_by_size[k])}')
+
+        # Nodes per variable statistics
+        lines.append('Nodes per variable statistics')
+        total_nodes_per_var = sorted(list(map(len, self._vars.values())))
+        assert sum(total_nodes_per_var) == len(self.read_write_nodes)
+        lines.append(f'{INDENT}Average      {len(self.read_write_nodes) / len(self._vars):.2f}')
+        lines.append(f'{INDENT}Variance     {statistics.variance(total_nodes_per_var):.2f}')
+        total_nodes_per_var_set = set(total_nodes_per_var)
+        lines.append(f'{INDENT}Unique sizes {len(total_nodes_per_var_set)}')
+        if len(total_nodes_per_var_set) < 15:
+            lines.append(f'{INDENT}Sizes        {sorted(list(total_nodes_per_var_set), reverse=True)}')
+        # lines.append(f'{INDENT}2nd max  {total_nodes_per_var[-2]}')
+        # lines.append(f'{INDENT}Min      {min(total_nodes_per_var)}')
 
         # Cachelines
         lines.append(f'Number of Cachelines  {len(self._cachelines)}')
@@ -72,13 +90,13 @@ class HBG:
         # Nodes
         lines.append(f'Number of Nodes       {self._graph.number_of_nodes()}')
         for t in nodes.NodeType:
-            lines.append(f'\t{t.name:6} {len(self.get_nodes_by_type(t))}')
+            lines.append(f'{INDENT}{t.name:6} {len(self.get_nodes_by_type(t))}')
 
         # Edges
         if full:
             lines.append(f'Number of Edges       {self._graph.number_of_edges()}')
-            lines.append(f'\tInter Edges {self.inter.number_of_edges()}')
-            lines.append(f'\tIntra Edges {self.intra.number_of_edges()}')
+            lines.append(f'{INDENT}Inter Edges {self.inter.number_of_edges()}')
+            lines.append(f'{INDENT}Intra Edges {self.intra.number_of_edges()}')
 
         max_line_size = max(map(len, lines))
         lines.insert(0, f'{" HBG Stats ":#^{max_line_size}}')
@@ -99,8 +117,8 @@ class HBG:
         return self._nodes_by_thread.keys()
 
     @property
-    def vars(self) -> Set[Tuple[int, int]]:
-        return self._vars
+    def vars(self) -> Iterable[Tuple[int, int]]:
+        return self._vars.keys()
 
     @property
     def cacheline_size(self) -> int:
