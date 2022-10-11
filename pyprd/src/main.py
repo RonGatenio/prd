@@ -148,7 +148,7 @@ def timeit(name):
     print(f'[*] {name:60} {total} sec')
 
 
-def fw_fr_tests(p: prd.PersistencyRaceDetector):
+def fw_fr_tests(p: prd.PersistencyRaceDetector, full=True):
     hbg = p.hbg
 
     print(f'{" FW FR Tests ":*^30}')
@@ -229,13 +229,7 @@ def ha_tests(p: prd.PersistencyRaceDetector):
     print(f'{"":*^30}')
 
 
-def main():
-    trace = TraceParser.from_file(r'H:\Projects\LLVM\llvm-project\py_persistency_race_detector\tests\traces\real\test_recipe.txt')
-    # trace = TraceParser.from_file(r'H:\Projects\LLVM\llvm-project\py_persistency_race_detector\tests\traces\real\test_recipe_2.txt')
-    trace = TraceParser.from_file(r'H:\Projects\LLVM\llvm-project\py_persistency_race_detector\tests\traces\real\test_recipe_3.txt')
-    # trace = TraceParser.from_file(r'H:\Projects\LLVM\llvm-project\py_persistency_race_detector\tests\traces\real\test_out_small.txt')
-    # trace = TraceParser.from_file(r'H:\Home\Technion\Projects\Repos\RECIPE\P-CLHT\build\test_recipe_4.txt')
-
+def simple_test():
     b = HBGBuilder()
     r00 = b.add_instruction_node('READ', 0, 0, 0x1000, 8)
     f01 = b.add_instruction_node('FLUSH', 0, 0, 0x1000, 64)
@@ -259,37 +253,39 @@ def main():
     assert w20 in fw[w02][w11.interval]
     assert r00 in fr[w02][w11.interval]
 
-    # import ipdb; ipdb.set_trace()
 
-    # assert nx.is_directed_acyclic_graph(hbg._intra_graph)
-    # import ipdb; ipdb.set_trace()
+def main():
+    trace = TraceParser.from_file(r'H:\Projects\LLVM\llvm-project\py_persistency_race_detector\tests\traces\real\test_recipe.txt')
+    # trace = TraceParser.from_file(r'H:\Projects\LLVM\llvm-project\py_persistency_race_detector\tests\traces\real\test_recipe_2.txt')
+    trace = TraceParser.from_file(r'H:\Projects\LLVM\llvm-project\py_persistency_race_detector\tests\traces\real\test_recipe_3.txt')
+    # trace = TraceParser.from_file(r'H:\Projects\LLVM\llvm-project\py_persistency_race_detector\tests\traces\real\test_out_small.txt')
+    # trace = TraceParser.from_file(r'H:\Home\Technion\Projects\Repos\RECIPE\P-CLHT\build\test_recipe_4.txt')
 
 
+    # Simple test
+    with timeit('simple_test'):
+        simple_test()
 
     # HBG
-    s = time.time()
-    hbg = trace.to_hbg(filter=True, max_lines=10000)
-    # hbg = trace.to_hbg(filter=True)
-    print(f'hbg {time.time() - s} sec')
+    with timeit('hbg'):
+        hbg = trace.to_hbg(max_lines=10000)
+        # hbg = trace.to_hbg()
 
-    s = time.time()
-    print(hbg.stats())
-    print(f'stats {time.time() - s} sec')
-
-    # with open('data.bin', 'wb') as f:
-    #     pp = pickle.Pickler(f)
-    #     pp.dump(hbg)
+    with timeit('hbg stats'):
+        print(hbg.stats())
 
     # PDG
-    s = time.time()
-    pdg = generate_mock_pdg(hbg)
-    print(f'pdg {time.time() - s} sec')
-
-    print(f'nodes count {len(hbg.read_nodes)}')
-    total = len(hbg.read_nodes)
-
+    with timeit('pdg'):
+        pdg = generate_mock_pdg(hbg)
+    
     # PRD
     p = prd.PersistencyRaceDetector(hbg, pdg)
+    
+    with timeit('ha delta groups'):
+        delta_ha_groups = p.build_delta_ha_groups_opt1()
+    
+    with timeit('fw fr delta groups'):
+        delta_fw_groups, delta_fr_groups = p.build_delta_fw_groups_opt0()
 
     print()
     fw_fr_tests(p)
@@ -297,8 +293,6 @@ def main():
     print()
     ha_tests(p)
 
-
-    # import ipdb; ipdb.set_trace()
 
 if __name__ == "__main__":
     main()
