@@ -44,18 +44,21 @@ class HBG:
 
     def _find_vars(self):
         for n in self.read_write_nodes:
-            if n.interval in self._vars:
-                self._vars[n.interval].add(n)
-                continue
+            if n.interval not in self._vars:
+                cacheline_address = utils.get_cacheline_address(n.address, self._cacheline_size)
+                next_cacheline_address = cacheline_address + self._cacheline_size
 
-            cacheline_address = utils.get_cacheline_address(n.address, self._cacheline_size)
-            next_cacheline_address = cacheline_address + self._cacheline_size
+                assert n.interval[1] <= next_cacheline_address, f'Variable at {n.address:#x} of size {n.size} crosses a cacheline'
 
-            assert n.interval[1] <= next_cacheline_address, f'Variable at {n.address:#x} of size {n.size} crosses a cacheline'
+                self._vars_by_size[n.size].add(n.interval)
+                self._cachelines[(cacheline_address, cacheline_address+self._cacheline_size)].add(n.interval)
 
             self._vars[n.interval].add(n)
-            self._vars_by_size[n.size].add(n.interval)
-            self._cachelines[(cacheline_address, cacheline_address+self._cacheline_size)].add(n.interval)
+
+            if n.itype == nodes.NodeType.READ:
+                self._read_nodes_by_vars[n.interval].add(n)
+            elif n.itype == nodes.NodeType.WRITE:
+                self._write_nodes_by_vars[n.interval].add(n)
 
     def stats(self, full=False) -> str:
         import statistics
@@ -141,6 +144,15 @@ class HBG:
 
     def get_nodes_by_type(self, itype: nodes.NodeType) -> Set[nodes.AbstractNode]:
         return self._nodes_by_type.setdefault(itype, set())
+    
+    def get_nodes_by_var(self, var: Tuple[int, int]) -> Set[nodes.InstructionNode]:
+        return self._vars[var]
+    
+    def get_read_nodes_by_var(self, var: Tuple[int, int]) -> Set[nodes.InstructionNode]:
+        return self._read_nodes_by_vars[var]
+    
+    def get_write_nodes_by_var(self, var: Tuple[int, int]) -> Set[nodes.InstructionNode]:
+        return self._write_nodes_by_vars[var]
 
     def get_inter_children(self, node: nodes.AbstractNode) -> Iterable[nodes.AbstractNode]:
         return self.inter.neighbors(node)
