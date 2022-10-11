@@ -1,3 +1,6 @@
+from contextlib import contextmanager
+import dill as pickle
+# import pickle
 from typing import Any, Dict, Set, Tuple
 from hbg_trace_parser import TraceParser
 from pdg import generate_mock_pdg
@@ -85,7 +88,7 @@ def compare(hbg: HBG, d1: Dict[ReadNode, Dict[Var, Set[WriteNode]]], d2: Dict[Re
             
     return True
 
-def mycopy(d1: Dict[Var, Set[WriteNode]]):
+def mycopy(d1: Dict[Any, Set[Any]]):
     d = {}
     for k, v in d1.items():
         d[k] = v.copy()
@@ -120,6 +123,110 @@ def build_ha_groups_per_thread(hbg: HBG, delta_ha_groups: Dict[ReadNode, Dict[Va
             merge(ha_groups[tid], delta_ha_groups.get(n, {}))
             
     return ha_groups
+
+def build_fwr_groups(hbg: HBG, delta_fwr_groups: Dict[WriteNode, Dict[Var, Set[nodes.InstructionNode]]]):
+    fwr_groups: Dict[WriteNode, Dict[Var, Set[nodes.InstructionNode]]] = {}
+    
+    for tid in hbg.tids:
+        thread_nodes = hbg.get_thread_nodes(tid)
+        prev: Dict[WriteNode, Dict[Var, Set[nodes.InstructionNode]]] = {}
+        
+        for n in thread_nodes:
+            if n.itype != 'WRITE':
+                continue
+            merge(prev, delta_fwr_groups.get(n, {}))
+            fwr_groups[n] = mycopy(prev)
+            
+    return fwr_groups
+
+
+@contextmanager
+def timeit(name):
+    s = time.time()
+    yield
+    total = time.time() - s
+    print(f'[*] {name:60} {total} sec')
+
+
+def fw_fr_tests(p: prd.PersistencyRaceDetector):
+    hbg = p.hbg
+    
+    print(f'{" FW FR Tests ":*^30}')
+    
+    # op00
+    with timeit('opt00 - delta groups -  using cahclines instead of vars'):
+        delta_fw_op00, delta_fr_op00 = p.build_delta_fw_groups_opt00()
+    
+    # op0
+    with timeit('opt0  - delta groups'):
+        delta_fw_op0, delta_fr_op0 = p.build_delta_fw_groups_opt0()
+        
+    with timeit('opt0  - full groups (from the delta groups)'):
+        fw_op0 = build_fwr_groups(hbg, delta_fw_op0)
+        fr_op0 = build_fwr_groups(hbg, delta_fr_op0)
+    
+    # op1
+    with timeit('opt1  - delta groups'):
+        delta_fw_op1, delta_fr_op1 = p.build_delta_fw_groups_opt1()
+        
+    with timeit('opt1  - full groups (from the delta groups)'):
+        fw_op1 = build_fwr_groups(hbg, delta_fw_op1)
+        fr_op1 = build_fwr_groups(hbg, delta_fr_op1)
+    
+    # op2
+    with timeit('opt2  - full groups'):
+        fw_op2, fr_op2 = p.build_fw_groups_opt2()
+        
+    assert compare(hbg, fw_op0, fw_op1)
+    assert compare(hbg, fw_op0, fw_op2)
+    assert compare(hbg, fr_op0, fr_op1)
+    assert compare(hbg, fr_op0, fr_op2)
+
+    print(f'{"":*^30}')
+
+
+def ha_tests(p: prd.PersistencyRaceDetector):
+    hbg = p.hbg
+    
+    print(f'{" HA Tests ":*^30}')
+    
+    ## op1
+    with timeit('opt1 - delta groups'):
+        dop1 = p.build_delta_ha_groups_opt1()
+    
+    with timeit('opt1 - full groups (from the delta groups)'):
+        op1 = build_ha_groups(hbg, dop1)
+    
+    with timeit('opt1 - the top full group per thread (from the delta groups)'):
+        top1 = build_ha_groups_per_thread(hbg, dop1)
+    
+    for tid in hbg.tids:
+        for n in hbg.get_thread_nodes(tid):
+            if n.itype == 'READ':
+                break
+        if not compare(hbg, top1[tid], op1[n]):
+            print('NOT EQUAL')
+            
+    ## op2
+    with timeit('opt2 - delta groups'):
+        dop2 = p.build_delta_ha_groups_opt2()
+    
+    with timeit('opt2 - full groups (from the delta groups)'):
+        op2 = build_ha_groups(hbg, dop2)
+    
+    ## op3
+    with timeit('opt3 - full groups'):
+        op3 = p.build_ha_groups_opt3()
+    
+    # op4
+    with timeit('opt4 - full groups - BFS from each READ'):
+        op4 = p.build_ha_groups_opt4()
+    
+    assert compare(hbg, op1, op2)
+    assert compare(hbg, op1, op3)
+    assert compare(hbg, op1, op4)
+
+    print(f'{"":*^30}')
 
 
 def main():
@@ -161,16 +268,18 @@ def main():
     
     # HBG
     s = time.time()
-    # hbg = trace.to_hbg(filter=True, max_lines=10000)
-    hbg = trace.to_hbg(filter=True)
+    hbg = trace.to_hbg(filter=True, max_lines=10000)
+    # hbg = trace.to_hbg(filter=True)
     print(f'hbg {time.time() - s} sec')
     
     s = time.time()
     print(hbg.stats())
     print(f'stats {time.time() - s} sec')
     
-    import ipdb; ipdb.set_trace()
-            
+    # with open('data.bin', 'wb') as f:
+    #     pp = pickle.Pickler(f)
+    #     pp.dump(hbg)
+    
     # PDG
     s = time.time()
     pdg = generate_mock_pdg(hbg)
@@ -182,70 +291,14 @@ def main():
     # PRD    
     p = prd.PersistencyRaceDetector(hbg, pdg)
     
-    # delta fw fr op0
-    s = time.time()
-    delta_fw_op0, delta_fr_op0 = p.build_delta_fw_groups_opt0()
-    print(f'build_delta_fw_groups_opt0 {time.time() - s} sec')
-    import ipdb; ipdb.set_trace()
-    
-    # delta fw fr op1
-    s = time.time()
-    delta_fw_op1, delta_fr_op1 = p.build_delta_fw_groups_opt1()
-    print(f'build_delta_fw_groups_opt1 {time.time() - s} sec')
-    import ipdb; ipdb.set_trace()
-    
-    # fw fr op2
-    s = time.time()
-    fw_op2, fr_op2 = p.build_fw_groups_opt2()
-    print(f'build_fw_groups_opt2 {time.time() - s} sec')
-    import ipdb; ipdb.set_trace()
+    print()
+    fw_fr_tests(p)
 
+    print()
+    ha_tests(p)
     
-    ## op1
-    s = time.time()
-    dop1 = p.build_delta_ha_groups_opt1()
-    print(f'build_delta_ha_groups_opt1 {time.time() - s} sec')
     
-    s = time.time()
-    op1 = build_ha_groups(hbg, dop1)
-    print(f'build_ha_groups_opt1 {time.time() - s} sec')
-    
-    s = time.time()
-    top1 = build_ha_groups_per_thread(hbg, dop1)
-    print(f'build_ha_groups_per_thread {time.time() - s} sec')
-    
-    import ipdb; ipdb.set_trace()
-    
-    for tid in hbg.tids:
-        for n in hbg.get_thread_nodes(tid):
-            if n.itype == 'READ':
-                break
-        if not compare(hbg, top1[tid], op1[n]):
-            print('NOT EQUAL')
-            
-    ## op2
-    s = time.time()
-    dop2 = p.build_delta_ha_groups_opt2()
-    print(f'build_delta_ha_groups_opt2 {time.time() - s} sec')
-    
-    s = time.time()
-    op2 = build_ha_groups(hbg, dop2)
-    print(f'build_ha_groups_opt2 {time.time() - s} sec')
-    
-    ## op3
-    s = time.time()
-    op3 = p.build_ha_groups_opt3()
-    print(f'build_ha_groups_opt3 {time.time() - s} sec')
-    
-    s = time.time()
-    op4 = p.build_ha_groups_opt4()
-    print(f'build_ha_groups_opt4 {time.time() - s} sec')
-    
-    print(compare(hbg, op1, op2))
-    print(compare(hbg, op1, op3))
-    print(compare(hbg, op1, op4))
-    
-    import ipdb; ipdb.set_trace()
+    # import ipdb; ipdb.set_trace()
 
 if __name__ == "__main__":
     main()
