@@ -23,18 +23,20 @@ class HBG:
                  nodes_location: Dict[nodes.AbstractNode, NodeLocation],
                  cacheline_size=config.DEFAULT_CACHELINE_SIZE):
 
-        self._graph = base_graph
+        self._graph           = base_graph
         self._nodes_by_thread = nodes_by_thread
-        self._nodes_by_type = nodes_by_type
-        self._nodes_location = nodes_location
-        self._cacheline_size = cacheline_size
+        self._nodes_by_type   = nodes_by_type
+        self._nodes_location  = nodes_location
+        self._cacheline_size  = cacheline_size
 
         self._inter_graph = nx.subgraph_view(self._graph, filter_edge=lambda u, v: self._graph[u][v]['type'] == EdgeType.INTER_THREAD)
         self._intra_graph = nx.subgraph_view(self._graph, filter_edge=lambda u, v: self._graph[u][v]['type'] == EdgeType.INTRA_THREAD)
 
-        self._vars: Dict[Tuple[int, int], Set[nodes.InstructionNode]] = defaultdict(set)
-        self._vars_by_size: Dict[int, Set[Tuple[int, int]]] = defaultdict(set)
-        self._cachelines: Dict[Tuple[int, int], Set[Tuple[int, int]]] = defaultdict(set)
+        self._vars:                Dict[Tuple[int, int], Set[nodes.InstructionNode]] = defaultdict(set)
+        self._read_nodes_by_vars:  Dict[Tuple[int, int], Set[nodes.InstructionNode]] = defaultdict(set)
+        self._write_nodes_by_vars: Dict[Tuple[int, int], Set[nodes.InstructionNode]] = defaultdict(set)
+        self._vars_by_size:        Dict[int, Set[Tuple[int, int]]]                   = defaultdict(set)
+        self._cachelines:          Dict[Tuple[int, int], Set[Tuple[int, int]]]       = defaultdict(set)
 
         self._find_vars()
 
