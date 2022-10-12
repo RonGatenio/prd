@@ -254,8 +254,8 @@ def simple_test():
     assert r00 in fr[w02][w11.interval]
 
 
-def test2():
-    b = HBGBuilder()
+def test2(dbg=True):
+    b = HBGBuilder(dbg)
     
     v1 = 0x1000
     v2 = 0x2000
@@ -301,7 +301,66 @@ def test2():
     delta_fw_groups, delta_fr_groups = p.build_delta_fw_groups_opt0()
     races = list(p.finale(delta_ha_groups, delta_fw_groups, delta_fr_groups))
         
-    print('\n----------\n'.join(map(str, races)))
+    if dbg:
+        print('\n----------\n'.join(map(str, races)))
+    
+    assert len(races) == 1
+    race, = races
+    assert race.read_node == r21
+    assert race.write_node == w22
+
+
+def test3(dbg=True):
+    b = HBGBuilder(dbg)
+    
+    X = 0x1000
+    Y = 0x2000
+    Z = 0x3000
+    
+    w11 = b.add_instruction_node('WRITE', 1, 0, Z, 8, 'w11')
+    w12 = b.add_instruction_node('WRITE', 1, 0, X, 8, 'w12')
+    b.add_epoch_node(1, 0)
+    b.add_instruction_node('FLUSH', 1, 0, X, 64)
+    b.add_epoch_node(1, 1)
+    w13 = b.add_instruction_node('WRITE', 1, 0, X, 8, 'w13')
+    
+    r21 = b.add_instruction_node('READ', 2, 0, X, 8, 'r21')
+    r22 = b.add_instruction_node('READ', 2, 0, Z, 8, 'r22')
+    b.add_instruction_node('FLUSH', 2, 0, Z, 64)
+    b.add_epoch_node(2, 0)
+    w21 = b.add_instruction_node('WRITE', 2, 0, Y, 8, 'w21')
+    
+    w31 = b.add_instruction_node('WRITE', 3, 0, X, 8, 'w31')
+    b.add_instruction_node('FLUSH', 3, 0, X, 64)
+    b.add_epoch_node(3, 0)
+    w32 = b.add_instruction_node('WRITE', 3, 0, X, 8, 'w32')
+    r31 = b.add_instruction_node('READ', 3, 0, Y, 8, 'r31')
+    w33 = b.add_instruction_node('WRITE', 3, 0, Z, 8, 'w33')
+    
+    b.add_happens_before_edge(1, 0, 2, 0)
+    b.add_happens_before_edge(2, 0, 1, 1)
+    b.add_happens_before_edge(3, 0, 2, 0)
+    
+    hbg = b.build(False)
+    pdg = generate_mock_pdg(hbg)
+    p = prd.PersistencyRaceDetector(hbg, pdg)
+    
+    delta_ha_groups = p.build_delta_ha_groups_opt1()
+    delta_fw_groups, delta_fr_groups = p.build_delta_fw_groups_opt0()
+    races = list(p.finale(delta_ha_groups, delta_fw_groups, delta_fr_groups))
+        
+    if dbg:
+        print('\n----------\n'.join(map(str, races)))
+    
+    assert len(races) == 2
+    
+    races = {r.tid: r for r in races}
+    
+    assert races[2].read_node == r21
+    assert races[2].write_node == w21
+    
+    assert races[3].read_node == r31
+    assert races[3].write_node == w33
 
 
 def main():
@@ -351,4 +410,6 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    test2(False)
+    test3(False)
+    # main()
