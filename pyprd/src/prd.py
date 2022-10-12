@@ -12,6 +12,9 @@ class PersistencyRace:
     def __init__(self, write_node: nodes.InstructionNode, read_node: nodes.InstructionNode):
         self._write_node = write_node
         self._read_node = read_node
+        
+        assert self.read_node.interval != self.write_node.interval
+        assert self.read_node.tid == self.write_node.tid
 
     @property
     def write_node(self):
@@ -20,9 +23,10 @@ class PersistencyRace:
     @property
     def read_node(self):
         return self._read_node
-
-    def is_valid(self):
-        return self.read_node.interval != self.write_node.interval
+    
+    @property
+    def tid(self):
+        return self._read_node.tid
 
     def __str__(self) -> str:
         space = 14
