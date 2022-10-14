@@ -129,6 +129,18 @@ class HBG:
     def cacheline_size(self) -> int:
         return self._cacheline_size
 
+    @property
+    def nodes_by_var(self):
+        return self._vars
+    
+    @property
+    def read_nodes_by_var(self):
+        return self._read_nodes_by_vars
+    
+    @property
+    def write_nodes_by_var(self):
+        return self._write_nodes_by_vars
+    
     def get_vars_in_cacheline(self, cacheline_address: int):
         return self._cachelines[cacheline_address]
 
