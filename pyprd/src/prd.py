@@ -719,6 +719,8 @@ class PersistencyRaceDetector:
                delta_fw_groups: Dict[WriteNode, Dict[Var, Set[WriteNode]]],
                delta_fr_groups: Dict[WriteNode, Dict[Var, Set[ReadNode]]]) -> Generator[PersistencyRace, None, None]:
         
+        self._races: Dict[str, Dict[str, Set[str]]] = defaultdict(lambda: defaultdict(set))
+        
         def merge(d1: Dict[Any, Set[Any]], d2: Dict[Any, Set[Any]]):
             for k, v in d2.items():
                 d1.setdefault(k, set()).update(v)
@@ -798,6 +800,11 @@ class PersistencyRaceDetector:
                             break
                         
                         yield PersistencyRace(write_node, read_node)
+                        
+                        if not self._races.get(read_node.info, {}).get(write_node.info):
+                            violation_nodes = self._hbg.get_write_nodes_by_var(read_node.interval) - temp_safe_group
+                            violation_nodes = {v.info for v in violation_nodes}
+                            self._races[read_node.info][write_node.info].update(violation_nodes)
                 
                     # Update ha_groups
                     discard(ha_groups, delta_ha_groups.get(n, {}))
