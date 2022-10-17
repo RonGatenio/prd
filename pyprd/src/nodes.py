@@ -11,6 +11,10 @@ class NodeType(str, Enum):
     @classmethod
     def is_instruction_type(cls, itype: 'NodeType'):
         return itype in (cls.READ, cls.WRITE, cls.FLUSH)
+    
+    @classmethod
+    def is_read_write_type(cls, itype: 'NodeType'):
+        return itype in (cls.READ, cls.WRITE)
 
 
 class AbstractNode(ABC):

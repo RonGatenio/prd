@@ -110,6 +110,10 @@ class HBG:
         return '\n'.join(lines)
 
     @property
+    def graph(self) -> nx.DiGraph:
+        return  nx.subgraph_view(self._graph)
+
+    @property
     def inter(self) -> nx.DiGraph:
         return self._inter_graph
 
