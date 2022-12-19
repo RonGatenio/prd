@@ -1,5 +1,6 @@
 from abc import ABC
 from enum import Enum
+from typing import Any
 
 
 class NodeType(str, Enum):
@@ -71,12 +72,13 @@ class EpochNode(AbstractNode):
 
 
 class InstructionNode(AbstractNode):
-    def __init__(self, itype: NodeType, tid: int, pc: int, address: int, size: int, info):
+    def __init__(self, itype: NodeType, tid: int, pc: int, address: int, size: int, info: Any, trace_line_number: int=None):
         super().__init__(itype, tid)
         self._pc = pc
         self._address = address
         self._size = size
         self._info = info
+        self._trace_line_number = trace_line_number
 
     @property
     def instruction(self):

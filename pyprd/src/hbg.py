@@ -1,4 +1,4 @@
-from typing import Dict, Generator, Iterable, List, Set, Tuple
+from typing import Any, Dict, Generator, Iterable, List, Set, Tuple
 from collections import namedtuple, defaultdict
 from enum import Enum
 import networkx as nx
@@ -258,8 +258,8 @@ class HBGBuilder:
         self._nodes.append(n)
         return n
 
-    def add_instruction_node(self, itype: nodes.NodeType, tid: int, pc: int, address: int, size: int, info=None):
-        n = nodes.InstructionNode(itype, tid, pc, address, size, info)
+    def add_instruction_node(self, itype: nodes.NodeType, tid: int, pc: int, address: int, size: int, info: Any=None, trace_line_number: int=None):
+        n = nodes.InstructionNode(itype, tid, pc, address, size, info, trace_line_number)
         self._nodes.append(n)
         return n
 

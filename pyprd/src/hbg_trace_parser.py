@@ -14,7 +14,7 @@ class TraceParser:
         with open(filename, 'r') as f:
             return cls(f.readlines())
 
-    def _parse_line(self, line):
+    def _parse_line(self, line, line_number=None):
         line = line.split('#')[0].strip()
         tid, key, *args = line.split(':')
         tid = int(tid)
@@ -31,7 +31,7 @@ class TraceParser:
             pc = _any_int(pc)
             address = _any_int(address)
             size = _any_int(size)
-            self._hbg_builder.add_instruction_node(key, tid, pc, address, size, ':'.join(info) if info else '')
+            self._hbg_builder.add_instruction_node(key, tid, pc, address, size, ':'.join(info) if info else '', line_number)
 
     @staticmethod
     def _is_comment_line(line):
@@ -43,11 +43,10 @@ class TraceParser:
         for i, line in enumerate(self._trace):
             if max_lines and i > max_lines:
                 break
-            # dbg_print(line)
 
             if not self._is_comment_line(line):
                 try:
-                    self._parse_line(line)
+                    self._parse_line(line, i)
                 except Exception as e:
                     dbg_print(f'Parse error {e}')
                     continue
