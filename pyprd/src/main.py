@@ -9,6 +9,8 @@ import time
 import networkx as nx
 import nodes
 import prd
+import serializer
+import utils
 
 
 def analyze_cycle(g: HBG):
@@ -60,8 +62,6 @@ def analyze_vars(hbg: HBG):
                     if b:
                         break
 
-
-    # print(f'')
 
 ReadNode = WriteNode = nodes.InstructionNode
 Var = Tuple[int, int]
@@ -176,11 +176,21 @@ def fw_fr_tests(p: prd.PersistencyRaceDetector, full=True):
     # op2
     with timeit('opt2  - full groups'):
         fw_op2, fr_op2 = p.build_fw_groups_opt2()
+        
+    # op3
+    with timeit('opt3  - delta groups'):
+        delta_fw_op3, delta_fr_op3 = p.build_delta_fw_groups_opt3()
 
-    assert compare(hbg, fw_op0, fw_op1)
-    assert compare(hbg, fw_op0, fw_op2)
-    assert compare(hbg, fr_op0, fr_op1)
-    assert compare(hbg, fr_op0, fr_op2)
+    with timeit('opt3  - full groups (from the delta groups)'):
+        fw_op3 = build_fwr_groups(hbg, delta_fw_op3)
+        fr_op3 = build_fwr_groups(hbg, delta_fr_op3)
+
+    # assert compare(hbg, fw_op0, fw_op1)
+    # assert compare(hbg, fw_op0, fw_op2)
+    assert compare(hbg, fw_op0, fw_op3)
+    # assert compare(hbg, fr_op0, fr_op1)
+    # assert compare(hbg, fr_op0, fr_op2)
+    assert compare(hbg, fr_op0, fr_op3)
 
     print(f'{"":*^30}')
 
@@ -255,6 +265,9 @@ def simple_test():
 
 
 def test2(dbg=True):
+    if dbg:
+        print(f'{"Test 2":*^30}')
+        
     b = HBGBuilder(dbg)
     
     v1 = 0x1000
@@ -302,7 +315,7 @@ def test2(dbg=True):
     races = list(p.finale(delta_ha_groups, delta_fw_groups, delta_fr_groups))
         
     if dbg:
-        print('\n----------\n'.join(map(str, races)))
+        print(p.races_to_str())
     
     assert len(races) == 1
     race, = races
@@ -311,6 +324,9 @@ def test2(dbg=True):
 
 
 def test3(dbg=True):
+    if dbg:
+        print(f'{"Test 3":*^30}')
+        
     b = HBGBuilder(dbg)
     
     X = 0x1000
@@ -350,7 +366,7 @@ def test3(dbg=True):
     races = list(p.finale(delta_ha_groups, delta_fw_groups, delta_fr_groups))
         
     if dbg:
-        print('\n----------\n'.join(map(str, races)))
+        print(p.races_to_str())
     
     assert len(races) == 2
     
