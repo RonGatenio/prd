@@ -37,6 +37,8 @@ class HBG:
         self._write_nodes_by_vars: Dict[Tuple[int, int], Set[nodes.InstructionNode]] = defaultdict(set)
         self._vars_by_size:        Dict[int, Set[Tuple[int, int]]]                   = defaultdict(set)
         self._cachelines:          Dict[int, Set[Tuple[int, int]]]                   = defaultdict(set)
+        
+        self._pc_info = {n.pc: n.info for n in self.instruction_nodes}
 
         self._find_vars()
 
@@ -233,6 +235,9 @@ class HBG:
 
     def reverse_postorder(self) -> Generator[nodes.AbstractNode, None, None]:
         return nx.topological_sort(self._graph)
+
+    def get_pc_info(self, pc: int) -> str | None:
+        return self._pc_info.get(pc)
 
 
 class HBGBuilder:
