@@ -816,3 +816,15 @@ class PersistencyRaceDetector:
                     # Update fw fr groups
                     merge(fw_groups, delta_fw_groups.get(n, {}))
                     merge(fr_groups, delta_fr_groups.get(n, {}))
+                    
+    def run(self):
+        with utils.timeit('Build ha delta groups'):
+            self._delta_ha_groups = self.build_delta_ha_groups_opt1()
+            
+        with utils.timeit('Build fw fr delta groups'):
+            self._delta_fw_groups, self._delta_fr_groups = self.build_delta_fw_groups_opt3()
+
+        with utils.timeit('Find races'):
+            self._all_races = list(self.finale(self._delta_ha_groups, self._delta_fw_groups, self._delta_fr_groups))
+            
+        return self._all_races
