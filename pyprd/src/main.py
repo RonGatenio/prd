@@ -1,9 +1,11 @@
+from collections import defaultdict, namedtuple
 from contextlib import contextmanager
+from functools import reduce
 import dill as pickle
 # import pickle
 from typing import Any, Dict, Set, Tuple
 from hbg_trace_parser import TraceParser
-from pdg import generate_mock_pdg
+from pdg import PDG, generate_mock_pdg
 from hbg import HBG, HBGBuilder
 import time
 import networkx as nx
