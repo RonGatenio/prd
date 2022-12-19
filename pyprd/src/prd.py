@@ -107,7 +107,7 @@ class PersistencyRaceDetector:
     def __init__(self, hbg: HBG, ppdg: PDG):
         self._hbg = hbg
         self._ppdg = ppdg
-        self._races: Dict[int, Dict[int, Set[int]]] = defaultdict(lambda: defaultdict(set))
+        self._races: Dict[int, Dict[int, Set[int]]] = defaultdict(lambda: defaultdict(set))  # pc values of R(X) -> W(Y) -> {W(X)}
         
     @property
     def hbg(self):
@@ -804,10 +804,10 @@ class PersistencyRaceDetector:
                         
                         yield PersistencyRace(write_node, read_node)
                         
-                        if not self._races.get(read_node.info, {}).get(write_node.info):
+                        if not self._races.get(read_node.pc, {}).get(write_node.pc):
                             violation_nodes = self._hbg.get_write_nodes_by_var(read_node.interval) - temp_safe_group
-                            violation_nodes = {v.info for v in violation_nodes}
-                            self._races[read_node.info][write_node.info].update(violation_nodes)
+                            violation_nodes = {(v.pc, v.tid) for v in violation_nodes}
+                            self._races[read_node.pc][write_node.pc].update(violation_nodes)
                 
                     # Update ha_groups
                     discard(ha_groups, delta_ha_groups.get(n, {}))
@@ -828,3 +828,17 @@ class PersistencyRaceDetector:
             self._all_races = list(self.finale(self._delta_ha_groups, self._delta_fw_groups, self._delta_fr_groups))
             
         return self._all_races
+    
+    def races_to_str(self):
+        all_lines = []
+        for i, r in enumerate(self.races):
+            lines = []
+            lines.append(f'{i}')
+            lines.append(f'R(X): {self.hbg.get_pc_info(r)}')
+            for w in self.races[r]:
+                lines.append(f'\tW(Y): {self.hbg.get_pc_info(w)}')
+                for v, t in self.races[r][w]:
+                    lines.append(f'\t\tW(X): {self.hbg.get_pc_info(v)}, {t}')
+            all_lines.append('\n'.join(lines))
+            
+        return '\n----------\n'.join(all_lines)
