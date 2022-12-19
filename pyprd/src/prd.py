@@ -107,6 +107,7 @@ class PersistencyRaceDetector:
     def __init__(self, hbg: HBG, ppdg: PDG):
         self._hbg = hbg
         self._ppdg = ppdg
+        self._races: Dict[int, Dict[int, Set[int]]] = defaultdict(lambda: defaultdict(set))
         
     @property
     def hbg(self):
@@ -115,6 +116,10 @@ class PersistencyRaceDetector:
     @property
     def ppdg(self):
         return self._ppdg
+    
+    @property
+    def races(self):
+        return self._races
 
     def build_delta_ha_groups_opt1(self):
         ReadNode = nodes.InstructionNode
@@ -718,8 +723,6 @@ class PersistencyRaceDetector:
                delta_ha_groups: Dict[ReadNode,  Dict[Var, Set[WriteNode]]],
                delta_fw_groups: Dict[WriteNode, Dict[Var, Set[WriteNode]]],
                delta_fr_groups: Dict[WriteNode, Dict[Var, Set[ReadNode]]]) -> Generator[PersistencyRace, None, None]:
-        
-        self._races: Dict[str, Dict[str, Set[str]]] = defaultdict(lambda: defaultdict(set))
         
         def merge(d1: Dict[Any, Set[Any]], d2: Dict[Any, Set[Any]]):
             for k, v in d2.items():
