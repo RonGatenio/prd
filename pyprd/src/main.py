@@ -382,9 +382,25 @@ def test3(dbg=True):
 
 
 def main():
-    trace = TraceParser.from_file(r'H:\Projects\LLVM\llvm-project\py_persistency_race_detector\tests\traces\real\test_recipe.txt')
+    # trace = TraceParser.from_file(r'H:\Projects\LLVM\llvm-project\py_persistency_race_detector\tests\traces\real\test_recipe.txt')
     # trace = TraceParser.from_file(r'H:\Projects\LLVM\llvm-project\py_persistency_race_detector\tests\traces\real\test_recipe_2.txt')
-    trace = TraceParser.from_file(r'H:\Projects\LLVM\llvm-project\py_persistency_race_detector\tests\traces\real\test_recipe_3.txt')
+    # trace = TraceParser.from_file(r'H:\Projects\LLVM\llvm-project\py_persistency_race_detector\tests\traces\real\test_recipe_3.txt')
+    # trace = TraceParser.from_file(r'H:\Projects\LLVM\llvm-project\py_persistency_race_detector\tests\traces\real\test_recipe_2022-10-12.txt')
+    # trace = TraceParser.from_file(r'H:\Projects\LLVM\llvm-project\py_persistency_race_detector\tests\traces\real\test_recipe_2022-10-13.txt')
+    # trace = TraceParser.from_file(r'H:\Projects\LLVM\llvm-project\pyprd\real_tests\2022-10-17_14-40\test_recipe_2022-10-17_10000-8.txt')
+    trace = TraceParser.from_file(r'H:\Projects\LLVM\llvm-project\pyprd\real_tests\2022-10-17-16-49\trace.txt')
+    trace = TraceParser.from_file(r'H:\Projects\LLVM\llvm-project\pyprd\real_tests\2022-10-17-21-15-gc\trace.txt')
+    trace = TraceParser.from_file(r'H:\Projects\LLVM\llvm-project\pyprd\real_tests\2022-10-18-02-29\trace.txt')
+    trace = TraceParser.from_file(r'H:\Projects\LLVM\llvm-project\pyprd\real_tests\2022-10-18-20-30\trace.txt')
+    trace = TraceParser.from_file(r'H:\Projects\LLVM\llvm-project\pyprd\real_tests\2022-10-19-00-16\trace.txt')
+    trace = TraceParser.from_file(r'H:\Projects\LLVM\llvm-project\pyprd\real_tests\2022-10-20-01-16\trace.txt')
+    trace = TraceParser.from_file(r'H:\Projects\LLVM\llvm-project\pyprd\real_tests\2022-10-20-01-16\trace.txt')
+    trace = TraceParser.from_file(r'H:\Projects\LLVM\llvm-project\pyprd\real_tests\2022-11-04\trace.txt')
+    trace = TraceParser.from_file(r'H:\Projects\LLVM\llvm-project\pyprd\real_tests\2022-11-30\trace.txt')
+    trace = TraceParser.from_file(r'H:\Projects\LLVM\llvm-project\pyprd\real_tests\2022-12-16\trace.txt')
+    # trace = TraceParser.from_file(r'H:\Projects\LLVM\llvm-project\pyprd\tests\traces\trace.txt')
+    # trace = TraceParser.from_file(r'H:\Projects\LLVM\llvm-project\pyprd\tests\traces\trace2.txt')
+    # trace = TraceParser.from_file(r'H:\Projects\LLVM\llvm-project\pyprd\tests\traces\trace3.txt')
     # trace = TraceParser.from_file(r'H:\Projects\LLVM\llvm-project\py_persistency_race_detector\tests\traces\real\test_out_small.txt')
     # trace = TraceParser.from_file(r'H:\Home\Technion\Projects\Repos\RECIPE\P-CLHT\build\test_recipe_4.txt')
 
@@ -395,31 +411,45 @@ def main():
 
     # HBG
     with timeit('hbg'):
-        hbg = trace.to_hbg(max_lines=10000)
-        # hbg = trace.to_hbg()
+        # hbg = trace.to_hbg(max_lines=10000)
+        # hbg = trace.to_hbg(max_lines=100000)
+        # hbg = trace.to_hbg(max_lines=500000)
+        # hbg = trace.to_hbg(max_lines=1000000)
+        # hbg = trace.to_hbg(max_lines=1400000)
+        hbg = trace.to_hbg()
 
     with timeit('hbg stats'):
         print(hbg.stats())
 
+    
+    import os
+    def simplify_info(s: str):
+        parts = s.split()
+        parts[-2] = f'<{os.path.basename(parts[-2])}>'
+        return ' '.join(parts)
+
+    for n in hbg.read_write_nodes:
+        n._info = simplify_info(n.info)
+
     # PDG
     with timeit('pdg'):
-        pdg = generate_mock_pdg(hbg)
+        pdg = generate_mock_pdg(hbg, 30)
     
     # PRD
     p = prd.PersistencyRaceDetector(hbg, pdg)
     
-    with timeit('ha delta groups'):
-        delta_ha_groups = p.build_delta_ha_groups_opt1()
-    
-    with timeit('fw fr delta groups'):
-        delta_fw_groups, delta_fr_groups = p.build_delta_fw_groups_opt0()
-
-    with timeit('finale'):
-        races = list(p.finale(delta_ha_groups, delta_fw_groups, delta_fr_groups))
+    races = p.run()
         
     with open('races.txt', 'w') as f:
         f.write('\n----------\n'.join(map(str, races)))
-        
+    
+    with open('races_summary.txt', 'w') as f:
+        f.write(p.races_to_str())
+    
+    with timeit('save all'):
+        serializer.save(hbg=hbg, pdg=pdg, p=p)
+    return
+
     print()
     fw_fr_tests(p)
 
