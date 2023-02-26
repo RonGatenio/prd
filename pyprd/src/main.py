@@ -1,5 +1,6 @@
 from collections import defaultdict, namedtuple
 from contextlib import contextmanager
+from datetime import datetime
 from functools import reduce
 import dill as pickle
 # import pickle
@@ -439,15 +440,21 @@ def main():
     p = prd.PersistencyRaceDetector(hbg, pdg)
     
     races = p.run()
+    
+    dirname = f'test-results/{datetime.now():%Y-%m-%d_%H-%M}-{trace.name}'
+    try:
+        os.makedirs(dirname)
+    except:
+        pass
         
-    with open('races.txt', 'w') as f:
+    with open(f'{dirname}/races.txt', 'w') as f:
         f.write('\n----------\n'.join(map(str, races)))
     
-    with open('races_summary.txt', 'w') as f:
+    with open(f'{dirname}/races_summary.txt', 'w') as f:
         f.write(p.races_to_str())
     
     with timeit('save all'):
-        serializer.save(hbg=hbg, pdg=pdg, p=p)
+        serializer.save(hbg=hbg, pdg=pdg, p=p, filename=f'{dirname}/data.bin')
     return
 
     print()
