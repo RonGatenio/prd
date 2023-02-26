@@ -243,7 +243,7 @@ class HBG:
 class HBGBuilder:
     def __init__(self, verbose=True):
         self._log = print if verbose else lambda x: None
-
+        
         self._nodes: List[nodes.AbstractNode] = []
         self._edges: Set[Tuple[nodes.AbstractNode, nodes.AbstractNode]] = set()
 
@@ -266,15 +266,19 @@ class HBGBuilder:
     def add_happens_before_edge(self, src_tid, src_epoch, dst_tid, dst_epoch):
         self._edges.add((nodes.EpochNode(src_tid, src_epoch), nodes.EpochNode(dst_tid, dst_epoch)))
 
-    def _filter_volatile_nodes(self):
+    def _filter_volatile_nodes(self, pmem_range=None):
         import intervaltree
 
         t = intervaltree.IntervalTree()
 
-        for n in self._nodes:
-            if n.itype == nodes.NodeType.FLUSH:
-                n: nodes.InstructionNode
-                t.addi(*n.interval)
+        if pmem_range:
+            self._log(f'Filtering with given PMEM range from 0x{pmem_range[0]:x} to 0x{pmem_range[1]:x} (size of 0x{pmem_range[1]-pmem_range[0]:x})')
+            t.addi(*pmem_range)
+        else:
+            for n in self._nodes:
+                if n.itype == nodes.NodeType.FLUSH:
+                    n: nodes.InstructionNode
+                    t.addi(*n.interval)
 
         t.merge_overlaps(strict=False)
 
@@ -314,11 +318,11 @@ class HBGBuilder:
         assert src.tid != dst.tid, 'TIDs must be different'
         self._graph.add_edge(src, dst, type=EdgeType.INTER_THREAD)
 
-    def build(self, filter_volatile_nodes=True) -> HBG:
+    def build(self, filter_volatile_nodes=True, pmem_range=None) -> HBG:
         cacheline_size = None
-
+        
         if filter_volatile_nodes:
-            self._filter_volatile_nodes()
+            self._filter_volatile_nodes(pmem_range)
 
         for n in self._nodes:
             self._add_node(n)
