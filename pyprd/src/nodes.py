@@ -108,6 +108,9 @@ class InstructionNode(AbstractNode):
     def get_cacheline_address(self, cacheline_size=utils.DEFAULT_CACHELINE_SIZE):
         return utils.get_cacheline_address(self.address, cacheline_size=cacheline_size)
 
+    def get_cacheline_interval(self, cacheline_size=utils.DEFAULT_CACHELINE_SIZE):
+        return utils.get_cacheline_interval(self.address, self.size, cacheline_size=cacheline_size)
+
     def __repr__(self) -> str:
         tid = self.tid
         instruction = self.instruction.name
