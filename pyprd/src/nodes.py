@@ -1,6 +1,7 @@
 from abc import ABC
 from enum import Enum
 from typing import Any
+import utils
 
 
 class NodeType(str, Enum):
@@ -99,10 +100,13 @@ class InstructionNode(AbstractNode):
     @property
     def interval(self):
         return (self.address, self.address + self.size)
-    
+
     @property
     def info(self):
         return self._info
+
+    def get_cacheline_address(self, cacheline_size=utils.DEFAULT_CACHELINE_SIZE):
+        return utils.get_cacheline_address(self.address, cacheline_size=cacheline_size)
 
     def __repr__(self) -> str:
         tid = self.tid

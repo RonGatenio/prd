@@ -790,8 +790,8 @@ class PersistencyRaceDetector:
                         if write_node not in dependant_writes:
                             continue
                         
-                        # if var(W) == var(R), continue, there is no race here
-                        if write_node.interval == read_node.interval:
+                        # if cacheline(W) == cacheline(W), continue, there is no race here
+                        if write_node.get_cacheline_address(self.hbg.cacheline_size) == read_node.get_cacheline_address(self.hbg.cacheline_size):
                             continue
                         
                         # if the Read node is flushed from this point. No need to continue. No possible races from here
