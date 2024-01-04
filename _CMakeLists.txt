@@ -1,17 +1,18 @@
 cmake_minimum_required(VERSION 3.12)
 project(PRD)
 
-# Find LLVM
-find_package(LLVM REQUIRED CONFIG)
-
 # Set the path to the LLVMConfig.cmake file
 list(APPEND CMAKE_PREFIX_PATH "${LLVM_CMAKE_DIR}")
+
+# Find LLVM
+find_package(LLVM REQUIRED CONFIG)
 
 # Add your LLVM pass source files from the "src" folder
 file(GLOB MyPassSources src/**/*.cpp)
 
 # Add your LLVM pass source files to the library
-add_library(PRD MODULE ${MyPassSources})
+# add_library(PRD MODULE ${MyPassSources})
+add_library(PRD SHARED ${MyPassSources})
 
 # # Add your LLVM pass source files from the "src" folder
 # add_library(PRD MODULE /app/src/prd/Prd.cpp)

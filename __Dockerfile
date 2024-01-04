@@ -1,0 +1,10 @@
+FROM dokken/ubuntu-23.10
+
+# ENV LLVM_VERSION 9
+
+RUN wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
+RUN apt-add-repository "deb http://apt.llvm.org/bionic/ llvm-toolchain-bionic-9.0 main"
+RUN apt-get update
+RUN apt-get install -y llvm-9 llvm-9-dev llvm-9-tools clang-9 mlocate
+
+ENTRYPOINT ["tail", "-f", "/dev/null"]

@@ -12,6 +12,7 @@ namespace {
     MyFunctionReplacementPass() : FunctionPass(ID) {}
 
     bool runOnFunction(Function &F) override {
+      errs() << "Visiting function " << F.getName() << "\n";
       // Get a reference to the LLVM context.
       LLVMContext &Context = F.getContext();
 
@@ -48,6 +49,7 @@ namespace {
         }
       }
 
+      // return false; // The function was not modified.
       return true; // The function was modified.
     }
   };
