@@ -4,3 +4,4 @@
 *.so
 *.i64
 *.idb
+cmake_install.cmake

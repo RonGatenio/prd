@@ -1,0 +1,4 @@
+dummy.cpp
+cxx_dummy.cpp
+*.vers
+*.syms-stamp
