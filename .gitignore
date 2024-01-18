@@ -1,0 +1,6 @@
+﻿CMakeFiles/
+*.a
+*.a.syms
+*.so
+*.i64
+*.idb
