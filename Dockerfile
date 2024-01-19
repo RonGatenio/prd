@@ -49,9 +49,16 @@ RUN echo "define i32 @main() {" > /app/sample.ll && \
 
 
 # RUN opt-11 -load ./libtsantestpass.so sample.ll -enable-new-pm=0 -S -bsab
-RUN opt -load ./libtsantestpass.so sample.ll -enable-new-pm=0 -bsab > a.bc
-RUN llc -asm-verbose=false -O0 -filetype=obj a.bc -o a.o
-RUN llvm-dis a.bc
+# RUN opt -load ./libtsantestpass.so sample.ll -enable-new-pm=0 -bsab > a.bc
+
+
+
+# RUN opt -load ./libtsantestpass.so sample.ll -enable-new-pm=0 -tsan2 > a.bc
+# RUN llc -asm-verbose=false -O0 -filetype=obj a.bc -o a.o
+# RUN llvm-dis a.bc
+
+
+
 # RUN clang a.o -o a.exe
 # RUN clang a.o -o a.exe src/bin/libclang_rt.tsan_cxx-x86_64.a src/bin/libclang_rt.tsan-x86_64.a
 # RUN clang a.o -o a.exe src/bin/libclang_rt.tsan_cxx-x86_64.a src/bin/libclang_rt.tsan-x86_64.a -fuse-ld=gold -lm
@@ -67,6 +74,46 @@ RUN llvm-dis a.bc
 WORKDIR /app/src/runtime/compiler-rt
 RUN cmake .
 RUN make -j 2
+
+
+
+
+WORKDIR /app
+
+RUN clang++ -g -O0 -c -emit-llvm -fPIC -fPIE ./src/example/test.cpp
+RUN llvm-dis test.bc
+
+RUN opt -load ./libtsantestpass.so test.bc -enable-new-pm=0 -tsan2 > test_instrumented.bc
+RUN llvm-dis test_instrumented.bc
+
+RUN llc -asm-verbose=false -O0 -filetype=obj test_instrumented.bc -o test_instrumented.o
+
+RUN clang++ test_instrumented.o \
+    -o test_instrumented.exe \
+    src/bin/libclang_rt.tsan_cxx-x86_64.a src/bin/libclang_rt.tsan-x86_64.a \
+    -fuse-ld=gold \
+    -lm -ldl -lpthread \
+    -z muldefs \
+    -mclwb -mclflushopt \
+    -v
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 # ENTRYPOINT ["cmake", "."]
 ENTRYPOINT ["/bin/bash"]
 # ENTRYPOINT ["make"]
