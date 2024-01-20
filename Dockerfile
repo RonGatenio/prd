@@ -5,9 +5,9 @@ ENV LLVM_VERSION 11
 
 # Install dev packages
 RUN apt-get update && apt-get install -y llvm-${LLVM_VERSION} llvm-${LLVM_VERSION}-dev clang-${LLVM_VERSION}
+RUN apt install -y cmake
 
 # Install tools packages
-RUN apt install -y cmake
 RUN apt install -y mlocate less
 
 # Set env
@@ -30,18 +30,6 @@ COPY src /app/src
 
 # Compile pass
 RUN clang -g3 -shared -o /app/libtsantestpass.so /app/src/prd/tsanpass.cpp -v -I/usr/include/llvm/ -I/usr/include/llvm-c/ -fPIC
-
-# Generate sample
-RUN echo "define i32 @main() {" > /app/sample.ll && \
-    echo "  ret i32 0" >> /app/sample.ll && \
-    echo "}" >> /app/sample.ll
-
-
-# RUN opt -load ./libdummypass.so -myprd sample.ll -enable-new-pm=0 -S 2> x.txt
-# CMD ["opt -load ./libdummypass.so -myprd sample.ll -enable-new-pm=0"]
-
-# RUN opt -load ./libtsantestpass.so -tsan sample.ll -enable-new-pm=0 -S 2> x.txt
-# RUN opt-11 -load ./libtsantestpass.so --print-passes
 
 
 # Compile runtime lib
