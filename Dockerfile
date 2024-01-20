@@ -16,18 +16,7 @@ ENV PATH /usr/lib/llvm-${LLVM_VERSION}/bin:$PATH
 RUN ln -s /usr/include/llvm-${LLVM_VERSION} /usr/include/llvm
 RUN ln -s /usr/include/llvm-c-${LLVM_VERSION} /usr/include/llvm-c
 
-RUN printf "export LLVM_INSTALL_PREFIX=\$(llvm-config --prefix)\n"     >> ~/.bashrc
-RUN printf "export LLVM_DEFINITIONS=\$(llvm-config --cxxflags)\n"      >> ~/.bashrc
-RUN printf "export LLVM_INCLUDE_DIRS=\$(llvm-config --includedir)\n"   >> ~/.bashrc
-RUN printf "export LLVM_LIBRARY_DIRS=\$(llvm-config --libdir)\n"       >> ~/.bashrc
-RUN printf "export LLVM_CMAKE_DIR=\$(llvm-config --cmakedir)\n"        >> ~/.bashrc
-RUN . ~/.bashrc
-
-RUN export LLVM_INSTALL_PREFIX=$(llvm-config --prefix)
-RUN export LLVM_DEFINITIONS=$(llvm-config --cxxflags)
-RUN export LLVM_INCLUDE_DIRS=$(llvm-config --includedir)
-RUN export LLVM_LIBRARY_DIRS=$(llvm-config --libdir)
-RUN export LLVM_CMAKE_DIR=$(llvm-config --cmakedir)
+RUN echo . /app/src/scripts/setup-env.sh >> ~/.bashrc
 
 # Create a working directory
 WORKDIR /app
@@ -35,9 +24,7 @@ WORKDIR /app
 # Copy src folder to docker
 COPY src /app/src
 
-WORKDIR /app/build
-RUN export LLVM_CMAKE_DIR=$(llvm-config --cmakedir) && export LLVM_INCLUDE_DIRS=$(llvm-config --includedir) && export LLVM_LIBRARY_DIRS=$(llvm-config --libdir) && cmake /app/src
-RUN make -j 4
+RUN /app/src/scripts/build.sh
 
 # Compile example
 RUN clang -g -O0 -c -emit-llvm -fPIC -fPIE /app/src/example/test.c
@@ -46,7 +33,7 @@ RUN clang -g -O0 -c -emit-llvm -fPIC -fPIE /app/src/example/test.c
 RUN llvm-dis test.bc
 
 # Run pass on example
-RUN opt -load /app/build/pass/prd/PrdPass.so test.bc -enable-new-pm=0 -tsan2 > test_instrumented.bc
+RUN opt -load /app/build/bin/PrdPass.so test.bc -enable-new-pm=0 -tsan2 > test_instrumented.bc
 
 # Disasm the instrumented bytecode
 RUN llvm-dis test_instrumented.bc
@@ -57,8 +44,7 @@ RUN llc -asm-verbose=false -O0 -filetype=obj test_instrumented.bc -o test_instru
 # Link instrumented binary with runtime lib
 RUN clang test_instrumented.o \
     -o test_instrumented.exe \
-    /app/build/runtime/compiler-rt/lib/linux/libclang_rt.tsan-x86_64.a \
-    /app/build/runtime/compiler-rt/lib/linux/libclang_rt.tsan_cxx-x86_64.a \
+    /app/build/bin/tsan-x86_64.a \
     -fuse-ld=gold \
     -lm -ldl -lpthread \
     -z muldefs \
