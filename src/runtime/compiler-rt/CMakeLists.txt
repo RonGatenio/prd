@@ -9,6 +9,9 @@ if(POLICY CMP0075)
   cmake_policy(SET CMP0075 NEW)
 endif()
 
+# NOTE: compiler-rt's cmake makes some errors when it is not a standalone build
+set(COMPILER_RT_STANDALONE_BUILD TRUE)
+
 # Check if compiler-rt is built as a standalone project.
 if (CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR OR COMPILER_RT_STANDALONE_BUILD)
   project(CompilerRT C CXX ASM)
