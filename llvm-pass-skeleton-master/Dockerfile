@@ -33,123 +33,14 @@ RUN /app/src/scripts/build.sh
 # RUN llvm-dis test.bc
 
 # # Run pass on example
-RUN clang -O0 -g -fpass-plugin=/app/build/bin/SkeletonPass.so /app/src/example/test.c
-# RUN clang 
-# RUN opt -debug-pass-manager -load /app/build/bin/SkeletonPass.so -passes=skeleton-pass test.bc
-# RUN opt -load /app/build/bin/PrdPass.so test.bc sec.bc -enable-new-pm=0 -tsan2 > test_instrumented.bc
 
-# # Disasm the instrumented bytecode
-# RUN llvm-dis test_instrumented.bc
+RUN clang -O0 -g -c -emit-llvm -fpass-plugin=/app/build/bin/SkeletonPass.so /app/src/example/test.c
+RUN clang++ test.bc -L/app/build/bin -lRuntimeLib -o test.exe
+# note that test.bc must come before -lRuntimeLib because https://stackoverflow.com/questions/41364698/c-differ-between-linking-with-o-and-with-a-file-different-behavior-why
 
-# # Compile bytecode to machine code
-# RUN llc -asm-verbose=false -O0 -filetype=obj test_instrumented.bc -o test_instrumented.o
+# OR
 
-# # Link instrumented binary with runtime lib
-# RUN clang test_instrumented.o \
-#     -o test_instrumented.exe \
-#     /app/build/bin/tsan-x86_64.a \
-#     -fuse-ld=gold \
-#     -lm -ldl -lpthread \
-#     -z muldefs \
-#     -mclwb -mclflushopt \
-#     -v
+RUN clang -O0 -g -fpass-plugin=/app/build/bin/SkeletonPass.so /app/src/example/test.c -L/app/build/bin -lRuntimeLib -o test.exe -lstdc++
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# # # Compile pass
-# # RUN clang -g3 -shared -o /app/libtsantestpass.so /app/src/prd/tsanpass.cpp -v -I/usr/include/llvm/ -I/usr/include/llvm-c/ -fPIC
-
-
-# # # Compile runtime lib
-
-
-
-# # # RUN opt-11 -load ./libtsantestpass.so sample.ll -enable-new-pm=0 -S -bsab
-# # # RUN opt -load ./libtsantestpass.so sample.ll -enable-new-pm=0 -bsab > a.bc
-
-
-
-# # # RUN opt -load ./libtsantestpass.so sample.ll -enable-new-pm=0 -tsan2 > a.bc
-# # # RUN llc -asm-verbose=false -O0 -filetype=obj a.bc -o a.o
-# # # RUN llvm-dis a.bc
-
-
-
-# # # RUN clang a.o -o a.exe
-# # # RUN clang a.o -o a.exe src/bin/libclang_rt.tsan_cxx-x86_64.a src/bin/libclang_rt.tsan-x86_64.a
-# # # RUN clang a.o -o a.exe src/bin/libclang_rt.tsan_cxx-x86_64.a src/bin/libclang_rt.tsan-x86_64.a -fuse-ld=gold -lm
-# #     # -fuse-ld=gold see https://github.com/android/ndk/issues/1088
-# #     # -lm because of signgam see https://gcc.gnu.org/legacy-ml/gcc-patches/2013-12/msg00510.html
-# # # RUN clang a.o -o a.exe -Lsrc/bin
-
-
-# # # ENTRYPOINT ["tail", "-f", "/dev/null"]
-# # # ENTRYPOINT ["cat", "x.txt", "&&", "/bin/bash"]
-# # # ENTRYPOINT ["echo", "x.txt", "&&", "/bin/bash"]
-# # # ENTRYPOINT ["/bin/bash"]
-# # WORKDIR /app/src/runtime/compiler-rt
-# # RUN cmake .
-# # RUN make -j 2
-
-
-
-
-# # WORKDIR /app
-
-# # RUN clang -g -O0 -c -emit-llvm -fPIC -fPIE ./src/example/test.c
-# # RUN llvm-dis test.bc
-
-# # RUN opt -load ./libtsantestpass.so test.bc -enable-new-pm=0 -tsan2 > test_instrumented.bc
-# # RUN llvm-dis test_instrumented.bc
-
-# # RUN llc -asm-verbose=false -O0 -filetype=obj test_instrumented.bc -o test_instrumented.o
-
-# # RUN clang test_instrumented.o \
-# #     -o test_instrumented.exe \
-# #     /app/src/runtime/compiler-rt/lib/linux/libclang_rt.tsan-x86_64.a \
-# #     /app/src/runtime/compiler-rt/lib/linux/libclang_rt.tsan_cxx-x86_64.a \
-# #     -fuse-ld=gold \
-# #     -lm -ldl -lpthread \
-# #     -z muldefs \
-# #     -mclwb -mclflushopt \
-# #     -v
-# #     # src/bin/libclang_rt.tsan_cxx-x86_64.a src/bin/libclang_rt.tsan-x86_64.a \
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# ENTRYPOINT ["cmake", "."]
 ENTRYPOINT ["/bin/bash"]
-# ENTRYPOINT ["make"]
-# CMD /bin/echo "Welcome, $name"
-

@@ -4,6 +4,8 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/IR/Instruction.h"
+#include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/Type.h"
 
 using namespace llvm;
 
@@ -61,15 +63,47 @@ OpcodeCounter::Result OpcodeCounter::run(llvm::Module &M,
 
 struct SkeletonPass : public PassInfoMixin<SkeletonPass> {
     PreservedAnalyses run(Module &M, ModuleAnalysisManager &AM) {
+
+        // Get a reference to the LLVM context.
+        LLVMContext &Context = M.getContext();
+
+        // Create an IRBuilder for constructing new instructions.
+        IRBuilder<> Builder(Context);
+
+        FunctionCallee InstructionLogFunc = M.getOrInsertFunction(
+            // "_Z15log_instructionj", // Name of the new function.
+            "log_instruction", // Name of the new function.
+            Type::getVoidTy(Context), // Return type.
+            Type::getInt32Ty(Context)
+        );
+
+        
+
+    //     CallInst *NewCall = Builder.CreateCall(NewFunction, {});
+
+
+
         auto &OpcodeMap = AM.getResult<OpcodeCounter>(M);
 
         for (auto &F : M) {
             errs() << "I saw a function called " << F.getName() << "!\n";
             for (auto &BB : F)
             {
-                for (auto &I : BB)
-                {
-                    errs() << "    I saw opcode " << OpcodeMap[&I] << "\n";
+                errs() << "  I saw a BB in function called " << F.getName() << "!\n";
+                // Iterate through the instructions of the basic block
+                for (Instruction &I : BB) {
+                    errs() << "    I saw opcode " << OpcodeMap[&I] << " in function called " << F.getName() << "!\n";
+
+                    // Check if the instruction is a load instruction
+                    if (LoadInst *loadInst = dyn_cast<LoadInst>(&I)) {
+                        errs() << "      I a load instruction\n";
+                        
+                        // Create an unsigned int constant (replace 42 with the actual value)
+                        ConstantInt *argValue = ConstantInt::get(Type::getInt32Ty(Context), OpcodeMap[&I]);
+
+                        // Insert the call instruction before the load instruction
+                        CallInst::Create(InstructionLogFunc, {argValue}, "", loadInst);
+                    }
                 }
             }
         }

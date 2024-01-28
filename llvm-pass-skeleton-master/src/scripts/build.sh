@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -eux
+
 # Get the scripts dir path
 SCRIPTS_DIR="$(cd "$(dirname "$0")" && pwd)"
 
@@ -20,4 +22,5 @@ pushd $BUILD_DIR
 cmake $SRC_DIR
 make -j 4
 
-cp $BUILD_DIR/skeleton/SkeletonPass.so $BIN_DIR/
+mv $BUILD_DIR/*/*.so $BIN_DIR/
+mv $BUILD_DIR/*/*.a $BIN_DIR/
