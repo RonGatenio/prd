@@ -5,6 +5,7 @@ import networkx as nx
 import nodes
 import utils
 import config
+import math
 
 
 class EdgeType(Enum):
@@ -12,7 +13,35 @@ class EdgeType(Enum):
     INTRA_THREAD                = 'intra-thread'
 
 
-NodeLocation = namedtuple('NodeLocation', ['tid', 'tindex'])
+class NodeLocation(namedtuple('NodeLocation', ['tid', 'tindex'])):
+    class DifferentThreadsException(Exception): pass
+
+    def _convert(self, obj: object):
+        if isinstance(obj, self.__class__):
+            if obj.tid != self.tid:
+                raise self.DifferentThreadsException("Can't compare different tids")
+            return obj
+        elif obj is None:
+            return self.__class__(self.tid, -math.inf)
+        raise TypeError(f"Can't convert {obj} to {self.__class__}")
+    
+    def __eq__(self, other: 'NodeLocation') -> bool:
+        return super().__eq__(self._convert(other))
+    
+    def __ne__(self, other: 'NodeLocation') -> bool:
+        return super().__ne__(self._convert(other))
+
+    def __gt__(self, other: 'NodeLocation') -> bool:
+        return super().__gt__(self._convert(other))
+    
+    def __ge__(self, other: 'NodeLocation') -> bool:
+        return super().__ge__(self._convert(other))
+    
+    def __lt__(self, other: 'NodeLocation') -> bool:
+        return super().__lt__(self._convert(other))
+    
+    def __le__(self, other: 'NodeLocation') -> bool:
+        return super().__le__(self._convert(other))
 
 
 class HBG:
