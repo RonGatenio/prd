@@ -1,74 +1,46 @@
-# LLVM version
+FROM ubuntu:latest
 
-# Use an LLVM Docker image as the base image
-# FROM silkeh/clang:$LLVM_VERSION
-FROM silkeh/clang:latest
+# Set LLVM version
+ENV LLVM_VERSION 14
 
-ENV LLVM_VERSION 16
-# Set the LLVM installation directory (adjust the path as needed)
-ENV LLVM_HOME /usr/lib/llvm-$LLVM_VERSION
+# Install dev packages
+RUN apt-get update && apt-get install -y llvm-${LLVM_VERSION} llvm-${LLVM_VERSION}-dev clang-${LLVM_VERSION}
+RUN apt install -y cmake
 
-ENV LLVM_INCLUDE_DIRS $LLVM_HOME/include
-ENV LLVM_LIBRARY_DIRS $LLVM_HOME/lib
+# Install tools packages
+RUN apt install -y mlocate less
 
-# Set the LLVM CMake directory
-ENV LLVM_CMAKE_DIR $LLVM_HOME/lib/cmake/llvm
+# Set env
+ENV PATH /usr/lib/llvm-${LLVM_VERSION}/bin:$PATH
 
-# Add LLVM bin directory to the PATH
-ENV PATH $LLVM_HOME/bin:$PATH
+RUN ln -s /usr/include/llvm-${LLVM_VERSION} /usr/include/llvm
+RUN ln -s /usr/include/llvm-c-${LLVM_VERSION} /usr/include/llvm-c
 
-# Add LLVM lib directory to LD_LIBRARY_PATH (optional)
-ENV LD_LIBRARY_PATH $LLVM_HOME/lib:$LD_LIBRARY_PATH
-
-# Add LLVM include directory to C_INCLUDE_PATH and CPLUS_INCLUDE_PATH (optional)
-ENV C_INCLUDE_PATH $LLVM_HOME/include:$C_INCLUDE_PATH
-ENV CPLUS_INCLUDE_PATH $LLVM_HOME/include:$CPLUS_INCLUDE_PATH
-
-# Set LLVM_DIR for CMake projects (optional)
-ENV LLVM_DIR $LLVM_CMAKE_DIR
-
-# Install necessary packages
-RUN apt-get update && \
-    apt-get install -y cmake build-essential zlib1g-dev
+RUN echo . /app/src/scripts/setup-env.sh >> ~/.bashrc
 
 # Create a working directory
 WORKDIR /app
 
-# # Create a directory in the container to copy your folder into
-# RUN mkdir /app
+# Copy src folder to docker
+COPY src /app/src
 
-# Copy your "src" folder and CMakeLists.txt to the container
-COPY CMakeLists.txt /app/
-ADD src /app/src
+RUN /app/src/scripts/build.sh
 
-# Create a build directory and run CMake
-RUN (mkdir build && cd build && cmake -DENABLE_LLVM_SHARED=1 ..)
+# Compile example
+# RUN clang -g -O0 -c -emit-llvm -fPIC -fPIE /app/src/example/test.c
 
-# Build your LLVM pass
-RUN cmake --build build
+# Disasm the bytecode
+# RUN llvm-dis test.bc
 
-# Install the LLVM pass
-# RUN cp /app/build/PRD.so /path/to/llvm/lib/
+# # Run pass on example
 
-# Clean up the build files if needed
-# RUN rm -rf /app/build
+RUN clang -O0 -g -c -emit-llvm -fpass-plugin=/app/build/bin/SkeletonPass.so /app/src/example/test.c
+RUN clang++ test.bc -L/app/build/bin -lRuntimeLib -o test.exe
+# note that test.bc must come before -lRuntimeLib because https://stackoverflow.com/questions/41364698/c-differ-between-linking-with-o-and-with-a-file-different-behavior-why
 
-# # Copy the LLVM pass source code to the container
-# COPY src/ /app
+# OR
 
-# # Compile the LLVM pass
-# RUN clang++ -shared -o /app/<YourPassName>.so -I/usr/local/include/llvm-c -I/usr/local/include/llvm-cxx /app/<YourPassName>.cpp
+RUN clang -O0 -g -fpass-plugin=/app/build/bin/SkeletonPass.so /app/src/example/test.c -L/app/build/bin -lRuntimeLib -o test.exe -lstdc++
 
-# Create a sample LLVM IR file (you can replace this with your own)
-RUN echo "define i32 @main() {" > /app/sample.ll && \
-    echo "  ret i32 0" >> /app/sample.ll && \
-    echo "}" >> /app/sample.ll
 
-# Run your LLVM pass on the sample LLVM IR file
-RUN opt -load /app/build/libPRD.so -S /app/sample.ll -o /app/output.ll && cat /app/output.ll -DENABLE_LLVM_SHARED=1
-# RUN opt -load /app/build/libPRD.so -myprd --force < /app/sample.ll
-# RUN opt -load /app/build/libPRD.so < /app/sample.ll
-# CMD opt -load /app/build/libPRD.so -c -S /app/sample.ll -o /app/output.ll && cat /app/output.ll
-# CMD opt -load /app/build/libPRD.so -S /app/sample.ll -o /app/output.ll && cat /app/output.ll
-# CMD /bin/bash
-ENTRYPOINT ["tail", "-f", "/dev/null"]
+ENTRYPOINT ["/bin/bash"]

@@ -1,0 +1,12 @@
+[submodule "benchmarks/FAST_FAIR"]
+	path = benchmarks/FAST_FAIR
+	url = https://github.com/RonGatenio/FAST_FAIR
+[submodule "benchmarks/CCEH"]
+	path = benchmarks/CCEH
+	url = https://github.com/RonGatenio/CCEH.git
+[submodule "benchmarks/RECIPE"]
+	path = benchmarks/RECIPE
+	url = https://github.com/RonGatenio/RECIPE.git
+[submodule "src/deps/dg"]
+	path = src/deps/dg
+	url = https://github.com/RonGatenio/dg.git
