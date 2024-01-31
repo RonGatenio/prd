@@ -2,10 +2,105 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any, Dict, Generator, List, Set, Tuple
 import nodes
-from hbg import HBG
+from hbg import HBG, NodeLocation
 from pdg import PDG
 import networkx as nx
 import utils
+
+
+###########################################################
+# Types
+###########################################################
+ThreadId    = int
+Var         = Tuple[int, int]
+ReadNode    = nodes.InstructionNode
+WriteNode   = nodes.InstructionNode
+
+
+class PersistencyVectorClock:
+    def __init__(self, tid: ThreadId):
+        self._tid = tid
+        self._last_seen_write:      Dict[ThreadId, NodeLocation] = defaultdict(lambda: None)
+        self._last_persisted_write: Dict[ThreadId, NodeLocation] = defaultdict(lambda: None)
+
+    @property
+    def tid(self):
+        return self._tid
+
+    @property
+    def _threads(self):
+        # TODO: could also be just self._last_seen_write.keys()
+        assert (self._last_seen_write.keys() | self._last_persisted_write.keys()) == self._last_seen_write.keys(), 'asserting for now, delete later'
+
+        return self._last_seen_write.keys() | self._last_persisted_write.keys()
+    
+    def add_write(self, loc: NodeLocation):
+        assert loc.tid == self._tid, f'Invalid thread ID {loc.tid} (expected {self._tid})'
+        assert self._last_seen_write.get(self._tid, None) < loc, 'New location is in the past'
+        
+        self._last_seen_write[self._tid] = loc
+
+    def flush(self):
+        for tid, node in self._last_seen_write.items():
+            assert self._last_persisted_write[tid] < node, 'Persisting a past value'
+            self._last_persisted_write[tid] = node
+
+    def is_persisted(self) -> bool:
+        for tid in self._threads:
+            if self._last_persisted_write[tid] != self._last_seen_write[tid]:
+                return False
+        return True
+    
+    def merge(self, other: 'PersistencyVectorClock'):
+        if self._tid in other._last_seen_write:
+            assert other._last_seen_write[self._tid] <= self._last_seen_write[self._tid], 'Other thread has more information about this thread'
+        if self._tid in other._last_persisted_write:
+            assert other._last_persisted_write[self._tid] <= self._last_seen_write[self._tid], 'Other thread has more information about this thread'
+
+        for tid in other._threads:
+            if self._last_seen_write[tid] < other._last_seen_write[tid]:
+                self._last_seen_write[tid] = other._last_seen_write[tid]
+
+            if self._last_persisted_write[tid] is not None or other._last_persisted_write[tid] is not None:
+                if self._last_persisted_write[tid] < other._last_persisted_write[tid]:
+                    self._last_persisted_write[tid] = other._last_persisted_write[tid]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 class PersistencyRace:
@@ -37,10 +132,7 @@ class PersistencyRace:
         return '\n\t'.join(s)
 
 
-ThreadId = int
-Var = Tuple[int, int]
-ReadNode = nodes.InstructionNode
-WriteNode = nodes.InstructionNode
+
 
 import intervaltree
 
