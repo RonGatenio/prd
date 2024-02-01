@@ -1,0 +1,22 @@
+{
+    "files.associations": {
+        "mutex": "cpp",
+        "__mutex_base": "cpp",
+        "cstdint": "cpp",
+        "__config": "cpp",
+        "cassert": "cpp",
+        "immintrin.h": "c",
+        "xmmintrin.h": "c",
+        "mm_malloc.h": "c",
+        "stdlib.h": "c",
+        "functional": "cpp"
+    },
+    "python.testing.pytestArgs": [
+        "pyprd"
+    ],
+    "python.testing.unittestEnabled": false,
+    "python.testing.pytestEnabled": true,
+    "python.analysis.extraPaths": [
+        "./pyprd/src"
+    ]
+}
