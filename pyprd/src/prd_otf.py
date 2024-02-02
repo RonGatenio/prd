@@ -17,11 +17,11 @@ ReadNode    = nodes.InstructionNode
 WriteNode   = nodes.InstructionNode
 
 
-class PersistencyVectorClock:
+class PersistencyVectorClockSingleEventType:
     def __init__(self, tid: ThreadId):
         self._tid = tid
-        self._last_seen_write:      Dict[ThreadId, NodeLocation] = defaultdict(lambda: None)
-        self._last_persisted_write: Dict[ThreadId, NodeLocation] = defaultdict(lambda: None)
+        self._last_seen:      Dict[ThreadId, NodeLocation] = defaultdict(lambda: None)
+        self._last_persisted: Dict[ThreadId, NodeLocation] = defaultdict(lambda: None)
 
     @property
     def tid(self):
@@ -29,46 +29,75 @@ class PersistencyVectorClock:
 
     @property
     def _threads(self):
-        # TODO: could also be just self._last_seen_write.keys()
-        assert (self._last_seen_write.keys() | self._last_persisted_write.keys()) == self._last_seen_write.keys(), 'asserting for now, delete later'
+        # TODO: could also be just self._last_seen.keys()
+        assert (self._last_seen.keys() | self._last_persisted.keys()) == self._last_seen.keys(), 'asserting for now, delete later'
 
-        return self._last_seen_write.keys() | self._last_persisted_write.keys()
+        return self._last_seen.keys() | self._last_persisted.keys()
     
-    def add_write(self, loc: NodeLocation):
+    def add_event(self, loc: NodeLocation):
         assert loc.tid == self._tid, f'Invalid thread ID {loc.tid} (expected {self._tid})'
-        assert self._last_seen_write.get(self._tid, None) < loc, 'New location is in the past'
+        assert self._last_seen.get(self._tid, None) < loc, 'New location is in the past'
         
-        self._last_seen_write[self._tid] = loc
+        self._last_seen[self._tid] = loc
 
     def flush(self):
-        for tid, node in self._last_seen_write.items():
-            assert self._last_persisted_write[tid] < node, 'Persisting a past value'
-            self._last_persisted_write[tid] = node
+        for tid, node in self._last_seen.items():
+            assert self._last_persisted[tid] < node, 'Persisting a past value'
+            self._last_persisted[tid] = node
 
     def is_persisted(self) -> bool:
         for tid in self._threads:
-            if self._last_persisted_write[tid] != self._last_seen_write[tid]:
+            if self._last_persisted[tid] != self._last_seen[tid]:
                 return False
         return True
     
-    def merge(self, other: 'PersistencyVectorClock'):
-        if self._tid in other._last_seen_write:
-            assert other._last_seen_write[self._tid] <= self._last_seen_write[self._tid], 'Other thread has more information about this thread'
-        if self._tid in other._last_persisted_write:
-            assert other._last_persisted_write[self._tid] <= self._last_seen_write[self._tid], 'Other thread has more information about this thread'
+    def is_event_persisted(self, loc: NodeLocation):
+        return loc <= self._last_persisted[loc.tid]
+    
+    def merge(self, other: 'PersistencyVectorClockSingleEventType'):
+        if self._tid in other._last_seen:
+            assert other._last_seen[self._tid] <= self._last_seen[self._tid], 'Other thread has more information about this thread'
+        if self._tid in other._last_persisted:
+            assert other._last_persisted[self._tid] <= self._last_seen[self._tid], 'Other thread has more information about this thread'
 
         for tid in other._threads:
-            if self._last_seen_write[tid] < other._last_seen_write[tid]:
-                self._last_seen_write[tid] = other._last_seen_write[tid]
+            if self._last_seen[tid] < other._last_seen[tid]:
+                self._last_seen[tid] = other._last_seen[tid]
 
-            if self._last_persisted_write[tid] is not None or other._last_persisted_write[tid] is not None:
-                if self._last_persisted_write[tid] < other._last_persisted_write[tid]:
-                    self._last_persisted_write[tid] = other._last_persisted_write[tid]
-
-
+            if self._last_persisted[tid] is not None or other._last_persisted[tid] is not None:
+                if self._last_persisted[tid] < other._last_persisted[tid]:
+                    self._last_persisted[tid] = other._last_persisted[tid]
 
 
+class PersistencyVectorClock:
+    def __init__(self, tid: ThreadId):
+        self._tid = tid
+        self._vc_write_events = PersistencyVectorClockSingleEventType(tid)
+        self._vc_read_events = PersistencyVectorClockSingleEventType(tid)
 
+    @property
+    def tid(self):
+        return self._tid
+
+    def add_write(self, write_loc: NodeLocation):
+        self._vc_write_events.add_event(write_loc)
+
+    def add_read(self, read_loc: NodeLocation):
+        self._vc_read_events.add_event(read_loc)
+
+    def flush(self):
+        self._vc_write_events.flush()
+        self._vc_read_events.flush()
+
+    def is_persisted_writes(self) -> bool:
+        return self._vc_write_events.is_persisted()
+    
+    def is_read_persisted(self, read_loc: NodeLocation) -> bool:
+        return self._vc_read_events.is_event_persisted(read_loc)
+    
+    def merge(self, other: 'PersistencyVectorClock'):
+        self._vc_write_events.merge(other._vc_write_events)
+        self._vc_read_events.merge(other._vc_read_events)
 
 
 
