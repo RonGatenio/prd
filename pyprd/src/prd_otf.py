@@ -15,6 +15,44 @@ ThreadId    = int
 Var         = Tuple[int, int]
 ReadNode    = nodes.InstructionNode
 WriteNode   = nodes.InstructionNode
+Epoch       = int
+MIN_EPOCH   = -1
+
+
+
+
+class VectorClock:
+    def __init__(self, tid: ThreadId):
+        self._tid = tid
+        self._epochs: Dict[ThreadId, Epoch] = defaultdict(lambda: MIN_EPOCH)
+
+    @property
+    def tid(self):
+        return self._tid
+
+    @property
+    def _threads(self):
+        return self._epochs.keys()
+    
+    def add_epoch(self, epoch: Epoch):
+        assert self._epochs[self._tid] < epoch, f"Can't add past epoch {epoch} (last recorded epoch was {self._epochs[self._tid]})"
+        self._epochs[self._tid] = epoch
+
+    def add_event(self, loc: NodeLocation):
+        assert loc.tid == self._tid, f'Invalid thread ID {loc.tid} (expected {self._tid})'
+        self.add_epoch(loc.tindex)
+
+    def merge(self, other: 'VectorClock'):
+        for tid in other._threads:
+            if self._epochs[tid] < other._epochs[tid]:
+                self._epochs[tid] = other._epochs[tid]
+
+    def is_happens_before(self, loc: NodeLocation) -> bool:
+        return loc.tindex <= self._epochs[loc.tid]
+
+
+
+
 
 
 class PersistencyVectorClockSingleEventType:
