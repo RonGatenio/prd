@@ -55,6 +55,8 @@ class PersistencyVectorClockSingleEventType:
         return loc <= self._last_persisted[loc.tid]
     
     def merge(self, other: 'PersistencyVectorClockSingleEventType'):
+
+        # assertion is not always correct if merge a parent to an inter-son
         if self._tid in other._last_seen:
             assert other._last_seen[self._tid] <= self._last_seen[self._tid], 'Other thread has more information about this thread'
         if self._tid in other._last_persisted:
