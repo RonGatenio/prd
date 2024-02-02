@@ -80,6 +80,16 @@ class PersistencyVectorClock:
     @property
     def tid(self):
         return self._tid
+    
+    def add_event(self, event: nodes.InstructionNode, loc: NodeLocation):
+        if event.instruction == nodes.NodeType.READ:
+            self.add_read(loc)
+        elif event.instruction == nodes.NodeType.WRITE:
+            self.add_write(loc)
+        elif event.instruction == nodes.NodeType.FLUSH:
+            self.flush()
+        raise TypeError()
+        
 
     def add_write(self, write_loc: NodeLocation):
         self._vc_write_events.add_event(write_loc)
@@ -96,6 +106,9 @@ class PersistencyVectorClock:
     
     def is_read_persisted(self, read_loc: NodeLocation) -> bool:
         return self._vc_read_events.is_event_persisted(read_loc)
+    
+    def get_all_unpersisted_writes_that_dont_happen_before_read(self, read_loc: NodeLocation):
+        pass
     
     def merge(self, other: 'PersistencyVectorClock'):
         self._vc_write_events.merge(other._vc_write_events)
