@@ -1,18 +1,10 @@
 from collections import defaultdict
-from typing import Callable, Dict, NamedTuple
+from typing import Callable, Dict
 import math
-
-from hbg import NodeLocation
 
 
 ThreadId    = int
 Epoch       = int
-MIN_EPOCH   = -1
-
-
-class ThreadEpoch(NamedTuple):
-    tid: ThreadId
-    epoch: Epoch
 
 
 class VectorClock:
@@ -22,22 +14,22 @@ class VectorClock:
         self._epochs: Dict[ThreadId, Epoch] = defaultdict(lambda: min_value)
 
     @classmethod
-    def create(cls, tid: ThreadId):
-        return cls(tid, int.__lt__, -math.inf)
+    def create(cls, tid: ThreadId) -> 'VectorClock':
+        return cls(tid, float.__lt__, -math.inf)
 
     @classmethod
-    def create_reversed(cls, tid: ThreadId):
-        return cls(tid, int.__gt__, math.inf)
+    def create_reversed(cls, tid: ThreadId) -> 'VectorClock':
+        return cls(tid, float.__gt__, math.inf)
 
     @property
-    def tid(self):
+    def tid(self) -> ThreadId:
         return self._tid
 
     @property
     def threads(self):
         return self._epochs.keys()
 
-    def get_epoch(self, tid: ThreadId):
+    def get_epoch(self, tid: ThreadId) -> Epoch:
         return self._epochs[tid]
 
     def add_epoch(self, epoch: Epoch):
@@ -53,8 +45,8 @@ class VectorClock:
         for tid in other.threads:
             self._epochs[tid] = other._epochs[tid]
 
-    def is_happens_before(self, loc: ThreadEpoch) -> bool:
-        return loc.epoch == self._epochs[loc.tid] or self._compare_func(loc.epoch, self._epochs[loc.tid])
+    def is_happens_before(self, tid: ThreadId, epoch: Epoch) -> bool:
+        return epoch == self._epochs[tid] or self._compare_func(epoch, self._epochs[tid])
 
 
 class PersistencyVectorClock:
@@ -65,11 +57,11 @@ class PersistencyVectorClock:
 
     @classmethod
     def create(cls, tid: ThreadId):
-        return cls(tid, int.__lt__, -math.inf)
+        return cls(tid, float.__lt__, -math.inf)
 
     @classmethod
     def create_reversed(cls, tid: ThreadId):
-        return cls(tid, int.__gt__, math.inf)
+        return cls(tid, float.__gt__, math.inf)
 
     @property
     def tid(self):
@@ -91,5 +83,8 @@ class PersistencyVectorClock:
         self._last_seen.merge(other._last_seen)
         self._last_persisted.merge(other._last_persisted)
 
-    def get_persisted_epoch(self, tid: ThreadId):
+    def get_persisted_epoch(self, tid: ThreadId) -> Epoch:
         return self._last_persisted.get_epoch(tid)
+    
+    def is_persisted(self, tid: ThreadId, epoch: Epoch) -> bool:
+        return self._last_persisted.is_happens_before(tid, epoch)
