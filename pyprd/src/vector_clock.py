@@ -1,25 +1,23 @@
 from collections import defaultdict
-from typing import Callable, Dict
-import math
+from typing import Dict
+from epoch import EpochBase, Epoch, ReverseEpoch
 
 
-ThreadId    = int
-Epoch       = int
+ThreadId = int
 
 
 class VectorClock:
-    def __init__(self, tid: ThreadId, compare_func: Callable[[Epoch, Epoch], bool], min_value: Epoch):
+    def __init__(self, tid: ThreadId, epoch_class: type[EpochBase]):
         self._tid = tid
-        self._compare_func = compare_func
-        self._epochs: Dict[ThreadId, Epoch] = defaultdict(lambda: min_value)
+        self._epochs: Dict[ThreadId, EpochBase] = defaultdict(epoch_class)
 
     @classmethod
     def create(cls, tid: ThreadId) -> 'VectorClock':
-        return cls(tid, float.__lt__, -math.inf)
+        return cls(tid, Epoch)
 
     @classmethod
     def create_reversed(cls, tid: ThreadId) -> 'VectorClock':
-        return cls(tid, float.__gt__, math.inf)
+        return cls(tid, ReverseEpoch)
 
     @property
     def tid(self) -> ThreadId:
@@ -29,42 +27,42 @@ class VectorClock:
     def threads(self):
         return self._epochs.keys()
 
-    def get_epoch(self, tid: ThreadId) -> Epoch:
-        return self._epochs[tid]
-
-    def add_epoch(self, epoch: Epoch):
-        assert self._compare_func(self._epochs[self._tid], epoch), f"Can't add past epoch {epoch} (last recorded epoch was {self._epochs[self._tid]})"
+    def add_epoch(self, epoch: EpochBase):
+        assert self._epochs[self._tid] < epoch, f"Can't add past epoch {epoch} (last recorded epoch was {self._epochs[self._tid]})"
         self._epochs[self._tid] = epoch
 
     def merge(self, other: 'VectorClock'):
         for tid in other.threads:
-            if self._compare_func(self._epochs[tid], other._epochs[tid]):
+            if self._epochs[tid] < other._epochs[tid]:
                 self._epochs[tid] = other._epochs[tid]
 
     def copy_from(self, other: 'VectorClock'):
         for tid in other.threads:
             self._epochs[tid] = other._epochs[tid]
 
-    def is_happens_before(self, tid: ThreadId, epoch: Epoch) -> bool:
-        return epoch == self._epochs[tid] or self._compare_func(epoch, self._epochs[tid])
+    def get_epoch(self, tid: ThreadId) -> EpochBase:
+        return self._epochs[tid]
+
+    def is_happens_before(self, tid: ThreadId, epoch: EpochBase) -> bool:
+        return self._epochs[tid] >= epoch
 
 
 class PersistencyVectorClock:
-    def __init__(self, tid: ThreadId, compare_func: Callable[[Epoch, Epoch], bool], min_value: Epoch):
+    def __init__(self, tid: ThreadId, epoch_class: type[EpochBase]):
         self._tid = tid
-        self._last_seen         = VectorClock(tid, compare_func, min_value)
-        self._last_persisted    = VectorClock(tid, compare_func, min_value)
+        self._last_seen         = VectorClock(tid, epoch_class)
+        self._last_persisted    = VectorClock(tid, epoch_class)
 
     @classmethod
-    def create(cls, tid: ThreadId):
-        return cls(tid, float.__lt__, -math.inf)
+    def create(cls, tid: ThreadId) -> 'PersistencyVectorClock':
+        return cls(tid, Epoch)
 
     @classmethod
-    def create_reversed(cls, tid: ThreadId):
-        return cls(tid, float.__gt__, math.inf)
+    def create_reversed(cls, tid: ThreadId) -> 'PersistencyVectorClock':
+        return cls(tid, ReverseEpoch)
 
     @property
-    def tid(self):
+    def tid(self) -> ThreadId:
         return self._tid
 
     @property
@@ -73,7 +71,7 @@ class PersistencyVectorClock:
         assert (self._last_seen.threads | self._last_persisted.threads) == self._last_seen.threads, 'asserting for now, delete later'
         return self._last_seen.threads
 
-    def add_epoch(self, epoch: Epoch):
+    def add_epoch(self, epoch: EpochBase):
         self._last_seen.add_epoch(epoch)
 
     def flush(self):
@@ -83,8 +81,14 @@ class PersistencyVectorClock:
         self._last_seen.merge(other._last_seen)
         self._last_persisted.merge(other._last_persisted)
 
-    def get_persisted_epoch(self, tid: ThreadId) -> Epoch:
+    def get_persisted_epoch(self, tid: ThreadId) -> EpochBase:
         return self._last_persisted.get_epoch(tid)
     
-    def is_persisted(self, tid: ThreadId, epoch: Epoch) -> bool:
+    def is_event_persisted(self, tid: ThreadId, epoch: EpochBase) -> bool:
         return self._last_persisted.is_happens_before(tid, epoch)
+    
+    def is_persisted(self) -> bool:
+        for tid in self.threads:
+            if self._last_persisted.get_epoch(tid) != self._last_seen.get_epoch(tid):
+                return False
+        return True
