@@ -19,7 +19,7 @@ def test_compare_same():
     assert     (ReverseEpoch(0) >= ReverseEpoch(0))
 
 
-def test_compare_none():
+def test_compare_min():
     assert not (ReverseEpoch(0) == ReverseEpoch())
     assert     (ReverseEpoch(0) != ReverseEpoch())
     assert     (ReverseEpoch(0) <  ReverseEpoch())
@@ -28,10 +28,28 @@ def test_compare_none():
     assert not (ReverseEpoch(0) >= ReverseEpoch())
 
 
-def test_compare_none_left():
+def test_compare_none():
+    assert not (ReverseEpoch(0) == None)
+    assert     (ReverseEpoch(0) != None)
+    assert     (ReverseEpoch(0) <  None)
+    assert     (ReverseEpoch(0) <= None)
+    assert not (ReverseEpoch(0) >  None)
+    assert not (ReverseEpoch(0) >= None)
+
+
+def test_compare_min_left():
     assert not (ReverseEpoch() == ReverseEpoch(0))
     assert     (ReverseEpoch() != ReverseEpoch(0))
     assert not (ReverseEpoch() <  ReverseEpoch(0))
     assert not (ReverseEpoch() <= ReverseEpoch(0))
     assert     (ReverseEpoch() >  ReverseEpoch(0))
     assert     (ReverseEpoch() >= ReverseEpoch(0))
+
+
+def test_compare_none_left():
+    assert not (None == ReverseEpoch(0))
+    assert     (None != ReverseEpoch(0))
+    assert not (None <  ReverseEpoch(0))
+    assert not (None <= ReverseEpoch(0))
+    assert     (None >  ReverseEpoch(0))
+    assert     (None >= ReverseEpoch(0))
