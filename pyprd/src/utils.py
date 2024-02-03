@@ -1,7 +1,6 @@
 import collections
 import time
 from contextlib import contextmanager
-from typing import Callable, TypeVar
 from config import DEFAULT_CACHELINE_SIZE
 
 
@@ -17,16 +16,10 @@ def timeit(name):
     total = time.time() - s
     print(f'[*] {name:60} {total:.3f} sec')
 
-K = TypeVar("K")
-V = TypeVar("V")
-class DefaultDictByKey(collections.defaultdict):
-    def __init__(self, default_factory: Callable[[K], V]=None, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        if not callable(default_factory) and default_factory is not None:
-            raise TypeError('first argument must be callable or None')
-        self.default_factory = default_factory
 
-    def __missing__(self, key: K) -> V:
+# TODO: move to another place
+class DefaultDictByKey(collections.defaultdict):
+    def __missing__(self, key):
         if self.default_factory is None:
             raise KeyError(key)
         if key not in self:
