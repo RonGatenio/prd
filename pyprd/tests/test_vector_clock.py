@@ -3,7 +3,7 @@ from vector_clock import VectorClock, PersistencyVectorClock
 
 
 def test_sanity():
-    vc = VectorClock.create(0)
+    vc = VectorClock(0)
 
     assert vc.get_epoch(0) == None
     assert vc.get_epoch(1) == None
@@ -13,7 +13,7 @@ def test_sanity():
     assert vc.get_epoch(0) == 11
     assert vc.get_epoch(1) == None
 
-    vc1 = VectorClock.create(1)
+    vc1 = VectorClock(1)
     vc1.add_epoch(22)
 
     assert vc.get_epoch(0) == 11
@@ -24,7 +24,7 @@ def test_sanity():
     assert vc.get_epoch(0) == 11
     assert vc.get_epoch(1) == 22
 
-    with pytest.raises(AssertionError, match="Can't add past epoch"):
+    with pytest.raises(AssertionError, match="Can't change epoch"):
         vc.add_epoch(10)
 
     assert vc.get_epoch(0) == 11
@@ -32,7 +32,7 @@ def test_sanity():
 
 
 def test_flush():
-    vc = PersistencyVectorClock.create(0)
+    vc = PersistencyVectorClock(0)
     assert vc.is_persisted()
     assert vc.get_persisted_epoch(0) == None
 
@@ -54,8 +54,8 @@ def test_flush():
 
 
 def test_merge():
-    vc0 = PersistencyVectorClock.create(0)
-    vc1 = PersistencyVectorClock.create(1)
+    vc0 = PersistencyVectorClock(0)
+    vc1 = PersistencyVectorClock(1)
 
     assert vc0.is_persisted()
     assert vc1.is_persisted()
