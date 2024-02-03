@@ -9,11 +9,11 @@ class NodeType(str, Enum):
     WRITE = 'WRITE'
     FLUSH = 'FLUSH'
     EPOCH = 'EPOCH'
-    
+
     @classmethod
     def is_instruction_type(cls, itype: 'NodeType'):
         return itype in (cls.READ, cls.WRITE, cls.FLUSH)
-    
+
     @classmethod
     def is_read_write_type(cls, itype: 'NodeType'):
         return itype in (cls.READ, cls.WRITE)
@@ -25,7 +25,7 @@ class AbstractNode(ABC):
         self._itype = NodeType(itype)
         self._tid = int(tid)
         # self._tindex = int(tindex)
-    
+
     @property
     def itype(self):
         """Return the instruction type"""
@@ -35,7 +35,7 @@ class AbstractNode(ABC):
     def tid(self):
         """Return the thread ID"""
         return self._tid
-    
+
     # @property
     # def tindex(self):
     #     """Return the index of the node in the thread"""
@@ -57,10 +57,10 @@ class EpochNode(AbstractNode):
     @property
     def epoch(self):
         return self._epoch
-    
+
     def __hash__(self) -> int:
         return hash((self.tid, self.epoch))
-    
+
     def __eq__(self, __o: object) -> bool:
         if isinstance(__o, self.__class__):
             return (__o.tid, __o.epoch) == (self.tid, self.epoch)
@@ -73,7 +73,7 @@ class EpochNode(AbstractNode):
 
 
 class InstructionNode(AbstractNode):
-    def __init__(self, itype: NodeType, tid: int, pc: int, address: int, size: int, info: Any, trace_line_number: int=None):
+    def __init__(self, itype: NodeType, tid: int, pc: int, address: int, size: int, info: Any, trace_line_number: int = None):
         super().__init__(itype, tid)
         self._pc = pc
         self._address = address
@@ -119,3 +119,18 @@ class InstructionNode(AbstractNode):
         size = self.size
         info = self.info
         return f'{self.__class__.__name__}({tid=}, {instruction=}, {pc=:#x}, {address=:#x}, {size=}, {info=})'
+
+
+class WriteNode(InstructionNode):
+    def __init__(self, tid: int, pc: int, address: int, size: int, info: Any, trace_line_number: int = None):
+        super().__init__(NodeType.WRITE, tid, pc, address, size, info, trace_line_number)
+
+
+class ReadNode(InstructionNode):
+    def __init__(self, tid: int, pc: int, address: int, size: int, info: Any, trace_line_number: int = None):
+        super().__init__(NodeType.READ, tid, pc, address, size, info, trace_line_number)
+
+
+class FlushNode(InstructionNode):
+    def __init__(self, tid: int, pc: int, address: int, size: int, info: Any, trace_line_number: int = None):
+        super().__init__(NodeType.FLUSH, tid, pc, address, size, info, trace_line_number)
