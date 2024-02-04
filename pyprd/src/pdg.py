@@ -34,7 +34,7 @@ class PDGBuilder:
         return PDG(self._graph)
 
 
-def generate_mock_pdg(hbg: HBG, threshold=10):
+def generate_mock_pdg(hbg: HBG, threshold=10) -> PDG:
     """
     Generates a full pdg. every WRITE is dependent of all previous READs in the thread.
     This is a mock!
@@ -53,5 +53,26 @@ def generate_mock_pdg(hbg: HBG, threshold=10):
             elif n.itype == nodes.NodeType.WRITE:
                 for read_node in read_instruction_nodes[-threshold:]:
                     pdgbuilder.add_dependency(n, read_node)
+
+    return pdgbuilder.build()
+
+
+def generate_mock_pdg_v2(hbg: HBG) -> PDG:
+    pdgbuilder = PDGBuilder()
+
+    for tid in hbg.tids:
+        read_instruction_nodes = set()
+
+        for n in hbg.get_thread_nodes(tid):
+            n: nodes.AbstractNode
+
+            match n.itype:
+                case nodes.NodeType.READ:
+                    read_instruction_nodes.add(n)
+                case nodes.NodeType.WRITE:
+                    cacheline_address = n.get_cacheline_address()
+                    for read_node in set(filter(lambda r: r.get_cacheline_address() != cacheline_address, read_instruction_nodes)):
+                        pdgbuilder.add_dependency(n, read_node)
+                        read_instruction_nodes.remove(read_node)
 
     return pdgbuilder.build()
