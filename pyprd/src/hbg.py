@@ -3,6 +3,7 @@ from collections import namedtuple, defaultdict
 from enum import Enum
 import networkx as nx
 import nodes
+from nodes import ReadNode, WriteNode
 import utils
 import config
 import math
@@ -46,11 +47,13 @@ class NodeLocation(namedtuple('NodeLocation', ['tid', 'tindex'])):
 
 class DaisyChain:
     def __init__(self):
-        self._first_node: nodes.WriteNode = None
-        self._last_node: nodes.WriteNode = None
-        self._chain: Dict[nodes.WriteNode, nodes.WriteNode] = {}
+        self._first_node:     WriteNode                             = None
+        self._last_node:      WriteNode                             = None
+        self._chain:          Dict[WriteNode | ReadNode, WriteNode] = {}
+        self._write_nodes:    Set[WriteNode]                        = set()
+        self._dangling_reads: Set[ReadNode]                         = set()
 
-    def add_write_node(self, n: nodes.WriteNode):
+    def add_write_node(self, n: WriteNode):
         if self._last_node is not None:
             self._chain[self._last_node] = n
         else:
@@ -58,7 +61,17 @@ class DaisyChain:
         self._last_node = n
         self._chain[n] = None
 
-    def get_chain(self, start_node: nodes.WriteNode | None = None):
+        while self._dangling_reads:
+            r = self._dangling_reads.pop()
+            self._chain[r] = n
+
+        self._write_nodes.add(n)
+
+    def add_read_node(self, n: ReadNode):
+        self._dangling_reads.add(n)
+        self._chain[n] = None
+
+    def get_chain(self, start_node: WriteNode | None = None):
         if start_node is None:
             if self._first_node is None:
                 return
@@ -68,7 +81,9 @@ class DaisyChain:
         
         next_node = start_node
         while True:
-            yield next_node
+            # TODO: can be changed to a itype validation
+            if next_node in self._write_nodes:
+                yield next_node
             next_node = self._chain[next_node]
             if next_node is None:
                 return
@@ -86,8 +101,21 @@ class DaisyChains:
     def add_write_node(self, n: nodes.WriteNode):
         self._chains[n.get_cacheline_address()][n.tid].add_write_node(n)
         return n
+    
+    def add_read_node(self, n: nodes.ReadNode):
+        self._chains[n.get_cacheline_address()][n.tid].add_read_node(n)
+        return n
+    
+    def add_node(self, n: nodes.AbstractNode):
+        op = {
+            nodes.NodeType.WRITE: self.add_write_node,
+            nodes.NodeType.READ: self.add_read_node,
+        }.get(n.itype)
 
-    def get_chain_by_node(self, n: nodes.WriteNode):
+        if op:
+            return op(n)
+
+    def get_chain_by_node(self, n: nodes.WriteNode | nodes.ReadNode):
         return self._chains[n.get_cacheline_address()][n.tid].get_chain(n)
 
     def get_chain_by_thread(self, tid: ThreadId, cacheline: Cacheline):

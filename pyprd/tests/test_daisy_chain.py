@@ -1,6 +1,6 @@
 import pytest
 from hbg import DaisyChain, DaisyChains
-from nodes import WriteNode
+from nodes import WriteNode, ReadNode
 
 
 def test_daisy_chain():
@@ -37,6 +37,40 @@ def test_daisy_chain():
     assert list(d.get_chain(-20)) == [-20, 30]
     assert list(d.get_chain(30))  == [30]
     with pytest.raises(IndexError): list(d.get_chain(40))
+
+
+def test_daisy_chain_reads():
+    d = DaisyChain()
+
+    d.add_read_node(10)
+    d.add_read_node(11)
+    d.add_write_node(0)
+    d.add_write_node(1)
+    d.add_read_node(12)
+    d.add_write_node(2)
+    d.add_read_node(13)
+    d.add_write_node(3)
+    d.add_read_node(14)
+    d.add_read_node(15)
+    d.add_read_node(16)
+    d.add_write_node(4)
+    d.add_read_node(17)
+
+    assert list(d.get_chain())    == [0, 1, 2, 3, 4]
+    assert list(d.get_chain(10))  == [0, 1, 2, 3, 4]
+    assert list(d.get_chain(11))  == [0, 1, 2, 3, 4]
+    assert list(d.get_chain(0))   == [0, 1, 2, 3, 4]
+    assert list(d.get_chain(1))   == [1, 2, 3, 4]
+    assert list(d.get_chain(12))  == [2, 3, 4]
+    assert list(d.get_chain(2))   == [2, 3, 4]
+    assert list(d.get_chain(13))  == [3, 4]
+    assert list(d.get_chain(3))   == [3, 4]
+    assert list(d.get_chain(14))  == [4]
+    assert list(d.get_chain(15))  == [4]
+    assert list(d.get_chain(16))  == [4]
+    assert list(d.get_chain(4))   == [4]
+    assert list(d.get_chain(17))  == []
+    with pytest.raises(IndexError): list(d.get_chain(18))
 
 
 def test_daisy_chains():
