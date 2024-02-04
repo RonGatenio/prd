@@ -119,7 +119,7 @@ class PersistencyRaceDetector:
 
                                 # Is happens after the read
                                 if vc_per_read_node[read_node].is_happens_after(*write_node_loc):
-                                    continue
+                                    break
 
                                 # It is a bug! Report it!
                                 yield 'Bug'
