@@ -128,13 +128,15 @@ class HBG:
                  nodes_by_thread: Dict[int, List[nodes.AbstractNode]],
                  nodes_by_type: Dict[nodes.NodeType, Set[nodes.AbstractNode]],
                  nodes_location: Dict[nodes.AbstractNode, NodeLocation],
-                 cacheline_size=config.DEFAULT_CACHELINE_SIZE):
+                 cacheline_size=config.DEFAULT_CACHELINE_SIZE,
+                 daisy_chains: DaisyChains = None):
 
         self._graph           = base_graph
         self._nodes_by_thread = nodes_by_thread
         self._nodes_by_type   = nodes_by_type
         self._nodes_location  = nodes_location
         self._cacheline_size  = cacheline_size
+        self._daisy_chains   = daisy_chains
 
         self._inter_graph = nx.subgraph_view(self._graph, filter_edge=lambda u, v: self._graph[u][v]['type'] == EdgeType.INTER_THREAD)
         self._intra_graph = nx.subgraph_view(self._graph, filter_edge=lambda u, v: self._graph[u][v]['type'] == EdgeType.INTRA_THREAD)
@@ -254,6 +256,10 @@ class HBG:
     @property
     def write_nodes_by_var(self):
         return self._write_nodes_by_vars
+    
+    @property
+    def daisy_chains(self) -> DaisyChains | None:
+        return self._daisy_chains
     
     def get_vars_in_cacheline(self, cacheline_address: int):
         return self._cachelines[cacheline_address]
@@ -426,14 +432,22 @@ class HBGBuilder:
         assert src.tid != dst.tid, 'TIDs must be different'
         self._graph.add_edge(src, dst, type=EdgeType.INTER_THREAD)
 
-    def build(self, filter_volatile_nodes=True, pmem_range=None) -> HBG:
+    def build(self, filter_volatile_nodes=True, pmem_range=None, make_daisy_chains=True) -> HBG:
         cacheline_size = None
+
+        daisy_chains = None
+        if make_daisy_chains:
+            daisy_chains = DaisyChains()
         
         if filter_volatile_nodes:
             self._filter_volatile_nodes(pmem_range)
 
         for n in self._nodes:
             self._add_node(n)
+
+            if daisy_chains:
+                daisy_chains.add_node(n)
+
             if not cacheline_size and n.itype == nodes.NodeType.FLUSH:
                 n: nodes.InstructionNode
                 cacheline_size = n.size
@@ -444,4 +458,4 @@ class HBGBuilder:
         if not cacheline_size:
             cacheline_size = config.DEFAULT_CACHELINE_SIZE
 
-        return HBG(self._graph, self._nodes_by_thread, self._nodes_by_type, self._nodes_location, cacheline_size=cacheline_size)
+        return HBG(self._graph, self._nodes_by_thread, self._nodes_by_type, self._nodes_location, cacheline_size=cacheline_size, daisy_chains=daisy_chains)
