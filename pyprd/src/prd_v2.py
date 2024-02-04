@@ -100,13 +100,14 @@ class PersistencyRaceDetector:
             match n.itype:
                 case NodeType.WRITE:
                     n: WriteNode
-                    pvc: PersistencyVectorClock = pvc_per_thread[n.get_cacheline_address][n.tid]
-                    
+                    pvc: PersistencyVectorClock = pvc_per_thread[n.get_cacheline_address()][n.tid]
                     pvc.add_epoch(self._hbg.get_node_location(n).tindex)
                     
                     # Find bugs
                     for read_node in self._pdg.get_dependencies(n):
                         assert read_node.get_cacheline_address() != n.get_cacheline_address()
+                        
+                        pvc: PersistencyVectorClock = pvc_per_thread[read_node.get_cacheline_address()][n.tid]
 
                         loc = self._hbg.get_node_location(read_node)
 
@@ -121,10 +122,10 @@ class PersistencyRaceDetector:
                         for tid in self._hbg.tids:
                             last_persisted_epoch = pvc.get_persisted_epoch(tid)
                             if last_persisted_epoch:
-                                last_persisted_node = self._hbg.get_node_by_location(tid, last_persisted_epoch)
+                                last_persisted_node = self._hbg.get_node_by_location((tid, last_persisted_epoch))
                                 chain = daisy_chains.get_chain_by_node(last_persisted_node)
                             else:
-                                chain = daisy_chains.get_chain_by_thread(tid)
+                                chain = daisy_chains.get_chain_by_thread(tid, read_node.get_cacheline_address())
 
                             for write_node in chain:
                                 write_node: WriteNode
@@ -151,12 +152,12 @@ class PersistencyRaceDetector:
 
                 case NodeType.READ:
                     n: ReadNode
-                    pvc: PersistencyVectorClock = pvc_per_thread[n.get_cacheline_address][n.tid]
+                    pvc: PersistencyVectorClock = pvc_per_thread[n.get_cacheline_address()][n.tid]
                     pvc.add_epoch(self._hbg.get_node_location(n).tindex)
 
                 case NodeType.FLUSH:
                     n: FlushNode
-                    pvc: PersistencyVectorClock = pvc_per_thread[n.get_cacheline_address][n.tid]
+                    pvc: PersistencyVectorClock = pvc_per_thread[n.get_cacheline_address()][n.tid]
                     pvc.flush()
 
                 case NodeType.EPOCH:
@@ -168,8 +169,8 @@ class PersistencyRaceDetector:
                         # Tell inter children the current state
                         for child in self._hbg.get_inter_children(n):
                             child: EpochNode
-                            _pvc: PersistencyVectorClock = pvc_per_epoch_node[cacheline][child]
-                            _pvc.merge(pvc)
+                            child_pvc: PersistencyVectorClock = pvc_per_epoch_node[cacheline][child]
+                            child_pvc.merge(pvc)
 
                         # Merge my state with thread state and delete me
                         _pvc: ReversedVectorClock = pvc_per_epoch_node[cacheline][n]

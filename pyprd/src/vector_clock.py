@@ -34,7 +34,10 @@ class AbstractVectorClock:
             self._epochs[tid] = other._epochs[tid]
 
     def get_epoch(self, tid: ThreadId) -> AnyEpoch | None:
-        return self._epochs.get(tid, None)
+        epoch = self._epochs.get(tid, None)
+        if epoch == self.EpochClass.MIN:
+            return None
+        return epoch
 
 
 class VectorClock(AbstractVectorClock):
