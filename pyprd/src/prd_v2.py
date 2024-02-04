@@ -16,6 +16,32 @@ ThreadId    = int
 Cacheline   = int
 
 
+@dataclass(frozen=True)
+class PersistencyRace:
+    read_node: ReadNode
+    write_node: WriteNode
+    dependent_node: WriteNode
+
+    def __post_init__(self):
+        assert self.read_node.tid == self.dependent_node.tid
+        assert self.read_node.is_overlap(self.write_node)
+        assert not self.read_node.is_overlap(self.dependent_node)
+        assert not self.write_node.is_overlap(self.dependent_node)
+    
+    @property
+    def tid(self):
+        return self.read_node.tid
+
+    def __str__(self) -> str:
+        space = 16
+        s = []
+        s.append('PERSISTENCY RACE!')
+        s.append(f'{"Write Node: ":{space}}{self.write_node}')
+        s.append(f'{"Read Node: ":{space}}{self.read_node}')
+        s.append(f'{"Dependent Node: ":{space}}{self.dependent_node}')
+        return '\n\t'.join(s)
+
+
 class PersistencyRaceDetector:
     def __init__(self, hbg: HBG, pdg: PDG):
         self._hbg = hbg
@@ -118,7 +144,7 @@ class PersistencyRaceDetector:
                                     break
 
                                 # It is a bug! Report it!
-                                yield 'Bug'
+                                yield PersistencyRace(read_node, write_node, n)
 
                                 if show_first_bug_only:
                                     break
