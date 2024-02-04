@@ -87,6 +87,9 @@ class DaisyChain:
             next_node = self._chain[next_node]
             if next_node is None:
                 return
+            
+    def __len__(self):
+        return len(self._chain)
 
 
 # TODO: move these
@@ -120,6 +123,11 @@ class DaisyChains:
 
     def get_chain_by_thread(self, tid: ThreadId, cacheline: Cacheline):
         return self._chains[cacheline][tid].get_chain()
+    
+    def get_daisychains(self):
+        for _, d in self._chains.items():
+            for _, dc in d.items():
+                yield dc
 
 
 class HBG:
@@ -214,6 +222,14 @@ class HBG:
             lines.append(f'Number of Edges       {self._graph.number_of_edges()}')
             lines.append(f'{INDENT}Inter Edges {self.inter.number_of_edges()}')
             lines.append(f'{INDENT}Intra Edges {self.intra.number_of_edges()}')
+
+        # DaisyChains
+        if self._daisy_chains:
+            daisy_chains = list(self._daisy_chains.get_daisychains())
+            lines.append(f'Number of chains      {len(daisy_chains)}')
+            lines.append(f'{INDENT}Max length     {max(map(len, daisy_chains))}')
+            lines.append(f'{INDENT}Average length {statistics.mean(map(len, daisy_chains)):.2f}')
+            lines.append(f'{INDENT}Median length  {statistics.median(map(len, daisy_chains)):.2f}')
 
         max_line_size = max(map(len, lines))
         lines.insert(0, f'{" HBG Stats ":#^{max_line_size}}')
