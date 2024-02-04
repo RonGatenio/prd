@@ -1,7 +1,7 @@
 import pytest
 from nodes import NodeType
-from prd_v2 import PersistencyRaceDetector
-from pdg import PDG, PDGBuilder
+from prd_v2 import PersistencyRace, PersistencyRaceDetector
+from pdg import PDG, PDGBuilder, generate_mock_pdg_v2
 from hbg import HBG, HBGBuilder
 from vector_clock import VectorClock
 
@@ -63,4 +63,222 @@ def test_happens_after_vector_clocks(hbg: HBG, pdg: PDG):
     assert not vc00.is_happens_after(1, 4)
     assert     vc00.is_happens_after(1, 6)
     assert not vc00.is_happens_after(2, 0)
+
+
+def test_races_sanity():
+    pass
+
+
+
+
+def test_races_flushed_in_different_thread_before_read():
+    # Vars
+    var1 = 0x1000
+    var2 = 0x2000
+
+    # HBG
+    b = HBGBuilder()
+    
+    # Thread 0
+    w0_00 = b.add_instruction_node('WRITE', 0, 0, var1, 8, 'w0_00')
+    e0_01 = b.add_epoch_node(0, 1)
+    e0_02 = b.add_epoch_node(0, 2)
+    r0_03 = b.add_instruction_node('READ',  0, 0, var1, 8, 'r0_03')
+    w0_04 = b.add_instruction_node('WRITE', 0, 0, var2, 8, 'w0_04')
+
+    # Thread 1
+    e1_00 = b.add_epoch_node(1, 0)
+    f1_01 = b.add_instruction_node('FLUSH', 1, 0, var1, 8, 'f1_01')
+    e1_02 = b.add_epoch_node(1, 2)
+    
+    # Edges
+    b.add_happens_before_edge(0, 1, 1, 0)
+    b.add_happens_before_edge(1, 2, 0, 2)
+
+    hbg = b.build(filter_volatile_nodes=False)
+    pdg = generate_mock_pdg_v2(hbg)
+
+    prd = PersistencyRaceDetector(hbg, pdg)
+
+    assert set(prd.run()) == set()
+
+
+def test_races_flushed_in_different_thread_before_read_but_masked_out_before_read_1():
+        # Vars
+    var1 = 0x1000
+    var2 = 0x2000
+
+    # HBG
+    b = HBGBuilder()
+    
+    # Thread 0
+    w0_00 = b.add_instruction_node('WRITE', 0, 0, var1, 8)
+    e0_01 = b.add_epoch_node(0, 1)
+    e0_02 = b.add_epoch_node(0, 2)
+    r0_03 = b.add_instruction_node('READ',  0, 0, var1, 8)
+    e0_04 = b.add_epoch_node(0, 4)
+    e0_05 = b.add_epoch_node(0, 5)
+    w0_06 = b.add_instruction_node('WRITE', 0, 0, var2, 8)
+
+    # Thread 1
+    e1_00 = b.add_epoch_node(1, 0)
+    f1_01 = b.add_instruction_node('FLUSH', 1, 0, var1, 8)
+    e1_02 = b.add_epoch_node(1, 2)
+    e1_03 = b.add_epoch_node(1, 3)
+    w1_04 = b.add_instruction_node('WRITE', 1, 0, var1, 8)
+    e1_05 = b.add_epoch_node(1, 5)
+    
+    # Edges
+    b.add_happens_before_edge(0, 1, 1, 0)
+    b.add_happens_before_edge(1, 2, 0, 2)
+    b.add_happens_before_edge(1, 5, 0, 5)
+
+    hbg = b.build(filter_volatile_nodes=False)
+    pdg = generate_mock_pdg_v2(hbg)
+
+    prd = PersistencyRaceDetector(hbg, pdg)
+
+    assert set(prd.run()) == {PersistencyRace(r0_03, w1_04, w0_06)}
+
+
+def test_races_flushed_in_different_thread_before_read_but_masked_out_before_read_2():
+    # Vars
+    var1 = 0x1000
+    var2 = 0x2000
+
+    # HBG
+    b = HBGBuilder()
+    
+    # Thread 0
+    w0_00 = b.add_instruction_node('WRITE', 0, 0, var1, 8)
+    e0_01 = b.add_epoch_node(0, 1)
+    e0_02 = b.add_epoch_node(0, 2)
+    r0_03 = b.add_instruction_node('READ',  0, 0, var1, 8)
+    e0_04 = b.add_epoch_node(0, 4)
+    e0_05 = b.add_epoch_node(0, 5)
+    w0_06 = b.add_instruction_node('WRITE', 0, 0, var2, 8)
+
+    # Thread 1
+    e1_00 = b.add_epoch_node(1, 0)
+    f1_01 = b.add_instruction_node('FLUSH', 1, 0, var1, 8)
+    e1_02 = b.add_epoch_node(1, 2)
+    e1_03 = b.add_epoch_node(1, 3)
+    w1_04 = b.add_instruction_node('WRITE', 1, 0, var2, 8)
+    e1_05 = b.add_epoch_node(1, 5)
+    
+    # Edges
+    b.add_happens_before_edge(0, 1, 1, 0)
+    b.add_happens_before_edge(1, 2, 0, 2)
+
+    hbg = b.build(filter_volatile_nodes=False)
+    pdg = generate_mock_pdg_v2(hbg)
+
+    prd = PersistencyRaceDetector(hbg, pdg)
+
+    assert set(prd.run()) == set()
+
+
+def test_races_flushed_in_different_thread_before_read_but_masked_out_1():
+        # Vars
+    var1 = 0x1000
+    var2 = 0x2000
+
+    # HBG
+    b = HBGBuilder()
+    
+    # Thread 0
+    w0_00 = b.add_instruction_node('WRITE', 0, 0, var1, 8)
+    e0_01 = b.add_epoch_node(0, 1)
+    e0_02 = b.add_epoch_node(0, 2)
+    r0_03 = b.add_instruction_node('READ',  0, 0, var1, 8)
+    e0_04 = b.add_epoch_node(0, 4)
+    e0_05 = b.add_epoch_node(0, 5)
+    w0_00 = b.add_instruction_node('WRITE', 0, 0, var2, 8)
+
+    # Thread 1
+    e1_00 = b.add_epoch_node(1, 0)
+    f1_01 = b.add_instruction_node('FLUSH', 1, 0, var1, 8)
+    e1_02 = b.add_epoch_node(1, 2)
+    e1_03 = b.add_epoch_node(1, 3)
+    w1_04 = b.add_instruction_node('WRITE', 1, 0, var2, 8)
+    e1_05 = b.add_epoch_node(1, 5)
+    
+    # Edges
+    b.add_happens_before_edge(0, 1, 1, 0)
+    b.add_happens_before_edge(1, 2, 0, 2)
+    b.add_happens_before_edge(0, 4, 1, 3)
+    b.add_happens_before_edge(1, 5, 0, 5)
+
+    hbg = b.build(filter_volatile_nodes=False)
+    pdg = generate_mock_pdg_v2(hbg)
+
+    prd = PersistencyRaceDetector(hbg, pdg)
+
+    assert set(prd.run()) == set()
+
+
+def test_races_flushed_in_different_thread_before_read_but_masked_out_2():
+        # Vars
+    var1 = 0x1000
+    var2 = 0x2000
+
+    # HBG
+    b = HBGBuilder()
+    
+    # Thread 0
+    w0_00 = b.add_instruction_node('WRITE', 0, 0, var1, 8)
+    e0_01 = b.add_epoch_node(0, 1)
+    e0_02 = b.add_epoch_node(0, 2)
+    r0_03 = b.add_instruction_node('READ',  0, 0, var1, 8)
+    e0_04 = b.add_epoch_node(0, 4)
+    e0_05 = b.add_epoch_node(0, 5)
+    w0_00 = b.add_instruction_node('WRITE', 0, 0, var2, 8)
+
+    # Thread 1
+    e1_00 = b.add_epoch_node(1, 0)
+    f1_01 = b.add_instruction_node('FLUSH', 1, 0, var1, 8)
+    e1_02 = b.add_epoch_node(1, 2)
+    e1_03 = b.add_epoch_node(1, 3)
+    w1_04 = b.add_instruction_node('WRITE', 1, 0, var2, 8)
+    e1_05 = b.add_epoch_node(1, 5)
+    
+    # Edges
+    b.add_happens_before_edge(0, 1, 1, 0)
+    b.add_happens_before_edge(1, 2, 0, 2)
+    b.add_happens_before_edge(0, 4, 1, 3)
+
+    hbg = b.build(filter_volatile_nodes=False)
+    pdg = generate_mock_pdg_v2(hbg)
+
+
+def test_races_flushed_in_different_thread_before_dependent():
+    # Vars
+    var1 = 0x1000
+    var2 = 0x2000
+
+    # HBG
+    b = HBGBuilder()
+    
+    # Thread 0
+    w0_00 = b.add_instruction_node('WRITE', 0, 0, var1, 8)
+    e0_01 = b.add_epoch_node(0, 1)
+    r0_02 = b.add_instruction_node('READ',  0, 0, var1, 8)
+    e0_03 = b.add_epoch_node(0, 3)
+    w0_04 = b.add_instruction_node('WRITE', 0, 0, var2, 8)
+
+    # Thread 1
+    e1_00 = b.add_epoch_node(1, 0)
+    f1_01 = b.add_instruction_node('FLUSH', 1, 0, var1, 8)
+    e1_02 = b.add_epoch_node(1, 2)
+    
+    # Edges
+    b.add_happens_before_edge(0, 1, 1, 0)
+    b.add_happens_before_edge(1, 2, 0, 3)
+
+    hbg = b.build(filter_volatile_nodes=False)
+    pdg = generate_mock_pdg_v2(hbg)
+
+
+def test_races_flushed_in_different_thread_after_read():
+    pass
 
