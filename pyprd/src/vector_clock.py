@@ -33,8 +33,8 @@ class AbstractVectorClock:
         for tid in other.threads:
             self._epochs[tid] = other._epochs[tid]
 
-    def get_epoch(self, tid: ThreadId) -> AnyEpoch:
-        return self._epochs[tid]
+    def get_epoch(self, tid: ThreadId) -> AnyEpoch | None:
+        return self._epochs.get(tid, None)
 
 
 class VectorClock(AbstractVectorClock):
@@ -84,7 +84,7 @@ class PersistencyVectorClock:
         self._last_seen.merge(other._last_seen)
         self._last_persisted.merge(other._last_persisted)
 
-    def get_persisted_epoch(self, tid: ThreadId) -> Epoch:
+    def get_persisted_epoch(self, tid: ThreadId) -> Epoch | None:
         return self._last_persisted.get_epoch(tid)
     
     def is_event_persisted(self, tid: ThreadId, epoch: Epoch) -> bool:
