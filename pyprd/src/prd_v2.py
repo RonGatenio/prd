@@ -1,14 +1,11 @@
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Any, Dict, Generator, List, Set, Tuple
-from nodes import AbstractNode, NodeType, ReadNode, WriteNode, FlushNode, EpochNode, InstructionNode
-from hbg import HBG, NodeLocation
-from pdg import PDG
-import networkx as nx
-import utils
-from copy import deepcopy
-
+from typing import Dict, Tuple
+from nodes import AbstractNode, NodeType, ReadNode, WriteNode, FlushNode, EpochNode
 from vector_clock import PersistencyVectorClock, ReversedVectorClock
+from hbg import HBG
+from pdg import PDG
+import utils
 
 
 ###########################################################
