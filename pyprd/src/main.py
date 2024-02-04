@@ -401,7 +401,7 @@ def main():
     # trace = TraceParser.from_file(r'H:\Projects\LLVM\llvm-project\pyprd\real_tests\2022-12-16\trace.txt')
     # trace = TraceParser.from_file(r'H:\Projects\LLVM\llvm-project\deps\CCEH\cceh-test-2023-02-18.txt')
     # trace = TraceParser.from_file(r'H:\Projects\LLVM\llvm-project\deps\CCEH\cceh-pmdk-2023-02-25-2.txt')
-    trace = TraceParser.from_file(r'H:\Projects\LLVM\llvm-project\deps\CCEH\cceh-pmdk-2023-02-26.txt')
+    # trace = TraceParser.from_file(r'C:\Home\Projects\llvm-project\pyprd\real_tests\2022-12-16\trace.txt')
     # trace = TraceParser.from_file(r'H:\Projects\LLVM\llvm-project\pyprd\tests\traces\trace.txt')
     # trace = TraceParser.from_file(r'H:\Projects\LLVM\llvm-project\pyprd\tests\traces\trace2.txt')
     # trace = TraceParser.from_file(r'H:\Projects\LLVM\llvm-project\pyprd\tests\traces\trace3.txt')
@@ -410,20 +410,22 @@ def main():
 
 
     # Simple test
-    with timeit('simple_test'):
-        simple_test()
+    # with timeit('simple_test'):
+    #     simple_test()
 
     # HBG
-    with timeit('hbg'):
-        # hbg = trace.to_hbg(max_lines=10000)
-        # hbg = trace.to_hbg(max_lines=100000)
-        # hbg = trace.to_hbg(max_lines=500000)
-        # hbg = trace.to_hbg(max_lines=1000000)
-        # hbg = trace.to_hbg(max_lines=1400000)
+    trace = TraceParser.from_file(r'C:\Home\Projects\llvm-project\pyprd\real_tests\2022-12-16\trace.txt')
+    with timeit('hbg without dc'):
+        hbg = trace.to_hbg(make_daisy_chains=False)
+
+    trace = TraceParser.from_file(r'C:\Home\Projects\llvm-project\pyprd\real_tests\2022-12-16\trace.txt')
+    with timeit('hbg with dc'):
         hbg = trace.to_hbg()
 
     with timeit('hbg stats'):
         print(hbg.stats())
+
+    return
 
     
     import os
