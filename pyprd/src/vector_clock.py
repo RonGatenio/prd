@@ -57,7 +57,6 @@ class ReversedVectorClock(AbstractVectorClock):
         """
         Is the event at (tid, epoch) happens after this vector clock
         """
-        print(self._epochs[tid] , self.EpochClass(epoch))
         return self._epochs[tid] >= self.EpochClass(epoch)
 
 
