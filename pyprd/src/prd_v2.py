@@ -121,7 +121,7 @@ class PersistencyRaceDetector:
 
                         for tid in self._hbg.tids:
                             last_persisted_epoch = pvc.get_persisted_epoch(tid)
-                            if last_persisted_epoch:
+                            if last_persisted_epoch is not None:
                                 last_persisted_node = self._hbg.get_node_by_location((tid, last_persisted_epoch))
                                 chain = daisy_chains.get_chain_by_node(last_persisted_node)
                             else:
