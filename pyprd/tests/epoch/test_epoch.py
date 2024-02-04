@@ -53,3 +53,16 @@ def test_compare_none_left():
     assert     (None <= Epoch(0))
     assert not (None >  Epoch(0))
     assert not (None >= Epoch(0))
+
+
+def test_copy():
+    e1 = Epoch()
+    e2 = Epoch(e1)
+
+    assert e1 == e2
+    assert e1 < Epoch(-1) < Epoch(0) < Epoch(1)
+    assert e2 < Epoch(-1) < Epoch(0) < Epoch(1)
+
+
+def test_order():
+    assert Epoch() == None < Epoch(-1) == -1 < Epoch(0) == 0 < Epoch(1) == 1 < Epoch(2) < 3 <= Epoch(3)
