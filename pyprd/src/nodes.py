@@ -136,7 +136,13 @@ class FlushNode(InstructionNode):
         super().__init__(NodeType.FLUSH, tid, pc, address, size, info, trace_line_number)
 
 
-def create_instruction_node(self, itype: NodeType, tid: int, pc: int, address: int, size: int, info: Any = None, trace_line_number: int = None):
+def create_instruction_node(itype: NodeType,
+                            tid: int,
+                            pc: int,
+                            address: int,
+                            size: int,
+                            info: Any = None,
+                            trace_line_number: int = None) -> InstructionNode:
     cls = {
         NodeType.READ:  ReadNode,
         NodeType.WRITE: WriteNode,
