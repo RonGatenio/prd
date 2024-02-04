@@ -104,6 +104,14 @@ class InstructionNode(AbstractNode):
     @property
     def info(self):
         return self._info
+    
+    def is_overlap(self, other: 'InstructionNode') -> bool:
+        """
+        Return True if the instructions' variables overlap
+        """
+        i1 = self.interval
+        i2 = other.interval
+        return max(i1[0], i2[0]) < min(i1[1], i2[1])
 
     def get_cacheline_address(self, cacheline_size=utils.DEFAULT_CACHELINE_SIZE):
         return utils.get_cacheline_address(self.address, cacheline_size=cacheline_size)
