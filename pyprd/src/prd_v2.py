@@ -109,8 +109,7 @@ class PersistencyRaceDetector:
                                 write_node_loc = self._hbg.get_node_location(write_node)
 
                                 # Is a different var
-                                # TODO: in the future, do if not overlap
-                                if write_node.interval != read_node.interval:
+                                if not write_node.is_overlap(read_node):
                                     continue
                                 
                                 # Is already persisted
