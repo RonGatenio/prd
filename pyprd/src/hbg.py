@@ -389,7 +389,7 @@ class HBGBuilder:
         return n
 
     def add_instruction_node(self, itype: nodes.NodeType, tid: int, pc: int, address: int, size: int, info: Any=None, trace_line_number: int=None):
-        n = nodes.InstructionNode(itype, tid, pc, address, size, info, trace_line_number)
+        n = nodes.create_instruction_node(itype, tid, pc, address, size, info, trace_line_number)
         self._nodes.append(n)
         return n
 
