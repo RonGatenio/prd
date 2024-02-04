@@ -32,7 +32,7 @@ class PersistencyRaceDetector:
     def pdg(self):
         return self._pdg
     
-    def build_happens_after_vector_clocks(self):
+    def _build_happens_after_vector_clocks(self):
         vc_per_thread:     Dict[ThreadId, ReversedVectorClock]  = utils.DefaultDictByKey(lambda tid: ReversedVectorClock(tid))
         vc_per_epoch_node: Dict[EpochNode, ReversedVectorClock] = utils.DefaultDictByKey(lambda n: ReversedVectorClock(n.tid))
         vc_per_read_node:  Dict[ReadNode, ReversedVectorClock]  = utils.DefaultDictByKey(lambda n: ReversedVectorClock(n.tid))
@@ -67,7 +67,7 @@ class PersistencyRaceDetector:
             
         return vc_per_read_node
     
-    def build_persisted_before_vector_clocks(self, vc_per_read_node: Dict[ReadNode, ReversedVectorClock], show_one_bug=False):
+    def _do_persisted_before_vector_clocks_analysis(self, vc_per_read_node: Dict[ReadNode, ReversedVectorClock], show_first_bug_only=False):
         pvc_per_thread:     Dict[Cacheline, Dict[ThreadId, PersistencyVectorClock]]  = defaultdict(lambda: utils.DefaultDictByKey(lambda tid: PersistencyVectorClock(tid)))
         pvc_per_epoch_node: Dict[Cacheline, Dict[EpochNode, PersistencyVectorClock]] = defaultdict(lambda: utils.DefaultDictByKey(lambda n: PersistencyVectorClock(n.tid)))
 
@@ -124,7 +124,7 @@ class PersistencyRaceDetector:
                                 # It is a bug! Report it!
                                 yield 'Bug'
 
-                                if show_one_bug:
+                                if show_first_bug_only:
                                     break
 
                 case NodeType.READ:
@@ -155,5 +155,10 @@ class PersistencyRaceDetector:
                         d = pvc_per_epoch_node[cacheline]
                         del d[n]
 
+    def run(self, show_first_bug_only=False):
+        with utils.timeit('build_happens_after_vector_clocks'):
+            vc_per_read_node = self._build_happens_after_vector_clocks()
 
+        with utils.timeit('Bug detection'):
+            return list(self._do_persisted_before_vector_clocks_analysis(vc_per_read_node, show_first_bug_only))
 
