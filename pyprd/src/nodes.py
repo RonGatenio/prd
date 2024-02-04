@@ -73,7 +73,7 @@ class EpochNode(AbstractNode):
 
 
 class InstructionNode(AbstractNode):
-    def __init__(self, itype: NodeType, tid: int, pc: int, address: int, size: int, info: Any, trace_line_number: int = None):
+    def __init__(self, itype: NodeType, tid: int, pc: int, address: int, size: int, info: Any = None, trace_line_number: int = None):
         super().__init__(itype, tid)
         self._pc = pc
         self._address = address
@@ -122,15 +122,15 @@ class InstructionNode(AbstractNode):
 
 
 class WriteNode(InstructionNode):
-    def __init__(self, tid: int, pc: int, address: int, size: int, info: Any, trace_line_number: int = None):
+    def __init__(self, tid: int, pc: int, address: int, size: int, info: Any = None, trace_line_number: int = None):
         super().__init__(NodeType.WRITE, tid, pc, address, size, info, trace_line_number)
 
 
 class ReadNode(InstructionNode):
-    def __init__(self, tid: int, pc: int, address: int, size: int, info: Any, trace_line_number: int = None):
+    def __init__(self, tid: int, pc: int, address: int, size: int, info: Any = None, trace_line_number: int = None):
         super().__init__(NodeType.READ, tid, pc, address, size, info, trace_line_number)
 
 
 class FlushNode(InstructionNode):
-    def __init__(self, tid: int, pc: int, address: int, size: int, info: Any, trace_line_number: int = None):
+    def __init__(self, tid: int, pc: int, address: int, size: int, info: Any = None, trace_line_number: int = None):
         super().__init__(NodeType.FLUSH, tid, pc, address, size, info, trace_line_number)

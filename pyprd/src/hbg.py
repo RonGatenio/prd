@@ -44,6 +44,56 @@ class NodeLocation(namedtuple('NodeLocation', ['tid', 'tindex'])):
         return super().__le__(self._convert(other))
 
 
+class DaisyChain:
+    def __init__(self):
+        self._first_node: nodes.WriteNode = None
+        self._last_node: nodes.WriteNode = None
+        self._chain: Dict[nodes.WriteNode, nodes.WriteNode] = {}
+
+    def add_write_node(self, n: nodes.WriteNode):
+        if self._last_node is not None:
+            self._chain[self._last_node] = n
+        else:
+            self._first_node = n
+        self._last_node = n
+        self._chain[n] = None
+
+    def get_chain(self, start_node: nodes.WriteNode | None = None):
+        if start_node is None:
+            if self._first_node is None:
+                return
+            start_node = self._first_node
+        elif start_node not in self._chain:
+            raise IndexError(start_node)
+        
+        next_node = start_node
+        while True:
+            yield next_node
+            next_node = self._chain[next_node]
+            if next_node is None:
+                return
+
+
+# TODO: move these
+ThreadId = int
+Cacheline = int
+
+
+class DaisyChains:
+    def __init__(self):
+        self._chains: Dict[Cacheline, Dict[ThreadId, DaisyChain]] = defaultdict(lambda: defaultdict(DaisyChain))
+
+    def add_write_node(self, n: nodes.WriteNode):
+        self._chains[n.get_cacheline_address()][n.tid].add_write_node(n)
+        return n
+
+    def get_chain_by_node(self, n: nodes.WriteNode):
+        return self._chains[n.get_cacheline_address()][n.tid].get_chain(n)
+
+    def get_chain_by_thread(self, tid: ThreadId, cacheline: Cacheline):
+        return self._chains[cacheline][tid].get_chain()
+
+
 class HBG:
     def __init__(self,
                  base_graph: nx.DiGraph,
@@ -80,6 +130,7 @@ class HBG:
                 next_cacheline_address = cacheline_address + self._cacheline_size
 
                 assert n.interval[1] <= next_cacheline_address, f'Variable at {n.address:#x} of size {n.size} crosses a cacheline'
+                # TODO: if this assert occurs, we must handle these cases!
 
                 self._vars_by_size[n.size].add(n.interval)
                 self._cachelines[cacheline_address].add(n.interval)
