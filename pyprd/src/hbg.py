@@ -133,6 +133,7 @@ class DaisyChains:
 class HBG:
     def __init__(self,
                  base_graph: nx.DiGraph,
+                 nodes: List[nodes.AbstractNode],
                  nodes_by_thread: Dict[int, List[nodes.AbstractNode]],
                  nodes_by_type: Dict[nodes.NodeType, Set[nodes.AbstractNode]],
                  nodes_location: Dict[nodes.AbstractNode, NodeLocation],
@@ -140,6 +141,7 @@ class HBG:
                  daisy_chains: DaisyChains = None):
 
         self._graph           = base_graph
+        self._nodes           = nodes
         self._nodes_by_thread = nodes_by_thread
         self._nodes_by_type   = nodes_by_type
         self._nodes_location  = nodes_location
@@ -474,4 +476,4 @@ class HBGBuilder:
         if not cacheline_size:
             cacheline_size = config.DEFAULT_CACHELINE_SIZE
 
-        return HBG(self._graph, self._nodes_by_thread, self._nodes_by_type, self._nodes_location, cacheline_size=cacheline_size, daisy_chains=daisy_chains)
+        return HBG(self._graph, self._nodes, self._nodes_by_thread, self._nodes_by_type, self._nodes_location, cacheline_size=cacheline_size, daisy_chains=daisy_chains)
