@@ -182,6 +182,21 @@ class HBG:
             elif n.itype == nodes.NodeType.WRITE:
                 self._write_nodes_by_vars[n.interval].add(n)
 
+    def _cacheline_liveliness_analysis(self):
+        cacheline_first = {}
+        cacheline_last  = {}
+
+        for i, n in enumerate(self._nodes):
+            if not nodes.NodeType.is_instruction_type(n.itype):
+                continue
+            n: nodes.InstructionNode
+            cacheline = n.get_cacheline_address()
+            if cacheline not in cacheline_first:
+                cacheline_first[cacheline] = i
+            cacheline_last[cacheline] = i
+
+        return {cacheline: (cacheline_last[cacheline] - cacheline_first[cacheline]) / len(self._nodes) for cacheline in cacheline_first}
+
     def stats(self, full=False) -> str:
         import statistics
         
@@ -213,6 +228,23 @@ class HBG:
         # Cachelines
         lines.append(f'Number of Cachelines  {len(self._cachelines)}')
         lines.append(f'Cacheline size        {self._cacheline_size}')
+
+        cacheline_liveliness = self._cacheline_liveliness_analysis()
+
+        lines.append(f'{INDENT}Max liveliness {max(cacheline_liveliness.values()) * 100:.2f}%')
+        lines.append(f'{INDENT}Average length {statistics.mean(cacheline_liveliness.values()) * 100:.2f}%')
+        lines.append(f'{INDENT}Median length  {statistics.median(cacheline_liveliness.values()) * 100:.2f}%')
+
+        lines.append('Nodes per cacheline statistics')
+        nodes_per_cacheline = defaultdict(int)
+        for n in self._nodes:
+            if nodes.NodeType.is_instruction_type(n.itype):
+                nodes_per_cacheline[n.get_cacheline_address()] += 1
+
+        lines.append(f'{INDENT}Max      {max(nodes_per_cacheline.values())}')
+        lines.append(f'{INDENT}Median   {statistics.median(nodes_per_cacheline.values())}')
+        lines.append(f'{INDENT}Average  {statistics.mean(nodes_per_cacheline.values()):.2f}')
+        lines.append(f'{INDENT}Variance {statistics.variance(nodes_per_cacheline.values()):.2f}')
 
         # Nodes
         lines.append(f'Number of Nodes       {self._graph.number_of_nodes()}')
