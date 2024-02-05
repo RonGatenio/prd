@@ -238,6 +238,9 @@ class HBG:
         lines.append(f'{"":#^{max_line_size}}')
 
         return '\n'.join(lines)
+    
+    def __len__(self):
+        return len(self._nodes)
 
     @property
     def graph(self) -> nx.DiGraph:
