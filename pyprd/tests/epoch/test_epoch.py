@@ -1,3 +1,4 @@
+import pytest
 from epoch import Epoch
 
 
@@ -66,3 +67,13 @@ def test_copy():
 
 def test_order():
     assert Epoch() == None < Epoch(-1) == -1 < Epoch(0) == 0 < Epoch(1) == 1 < Epoch(2) < 3 <= Epoch(3)
+
+
+def test_convert():
+    with pytest.raises(TypeError):
+        int(Epoch())
+    
+    assert int(Epoch(0))  == 0
+    assert int(Epoch(1))  == 1
+    assert int(Epoch(-1)) == -1
+
