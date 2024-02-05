@@ -205,35 +205,35 @@ class HBG:
         INDENT = ' ' * 2
 
         # Threads
-        lines.append(f'Number of Threads     {len(self.tids)}')
+        lines.append(f'Number of Threads     {len(self.tids):,}')
 
         # Variables
-        lines.append(f'Number of Variables   {len(self._vars)}')
+        lines.append(f'Number of Variables   {len(self._vars):,}')
         for k in sorted(self._vars_by_size):
-            lines.append(f'{INDENT}{k:<2} {len(self._vars_by_size[k])}')
+            lines.append(f'{INDENT}{k:<2} {len(self._vars_by_size[k]):,}')
 
         # Nodes per variable statistics
         lines.append('Nodes per variable statistics')
         total_nodes_per_var = sorted(list(map(len, self._vars.values())))
         assert sum(total_nodes_per_var) == len(self.read_write_nodes)
-        lines.append(f'{INDENT}Average      {len(self.read_write_nodes) / len(self._vars):.2f}')
-        lines.append(f'{INDENT}Variance     {statistics.variance(total_nodes_per_var):.2f}')
+        lines.append(f'{INDENT}Average      {len(self.read_write_nodes) / len(self._vars):,.2f}')
+        lines.append(f'{INDENT}Variance     {statistics.variance(total_nodes_per_var):,.2f}')
         total_nodes_per_var_set = set(total_nodes_per_var)
-        lines.append(f'{INDENT}Unique sizes {len(total_nodes_per_var_set)}')
+        lines.append(f'{INDENT}Unique sizes {len(total_nodes_per_var_set):,}')
         if len(total_nodes_per_var_set) < 15:
             lines.append(f'{INDENT}Sizes        {sorted(list(total_nodes_per_var_set), reverse=True)}')
         # lines.append(f'{INDENT}2nd max  {total_nodes_per_var[-2]}')
         # lines.append(f'{INDENT}Min      {min(total_nodes_per_var)}')
 
         # Cachelines
-        lines.append(f'Number of Cachelines  {len(self._cachelines)}')
+        lines.append(f'Number of Cachelines  {len(self._cachelines):,}')
         lines.append(f'Cacheline size        {self._cacheline_size}')
 
         cacheline_liveliness = self._cacheline_liveliness_analysis()
 
-        lines.append(f'{INDENT}Max liveliness {max(cacheline_liveliness.values()) * 100:.2f}%')
-        lines.append(f'{INDENT}Average length {statistics.mean(cacheline_liveliness.values()) * 100:.2f}%')
-        lines.append(f'{INDENT}Median length  {statistics.median(cacheline_liveliness.values()) * 100:.2f}%')
+        lines.append(f'{INDENT}Max liveliness {max(cacheline_liveliness.values()) * 100:,.2f}%')
+        lines.append(f'{INDENT}Average length {statistics.mean(cacheline_liveliness.values()) * 100:,.2f}%')
+        lines.append(f'{INDENT}Median length  {statistics.median(cacheline_liveliness.values()) * 100:,.2f}%')
 
         lines.append('Nodes per cacheline statistics')
         nodes_per_cacheline = defaultdict(int)
@@ -243,27 +243,27 @@ class HBG:
 
         lines.append(f'{INDENT}Max      {max(nodes_per_cacheline.values())}')
         lines.append(f'{INDENT}Median   {statistics.median(nodes_per_cacheline.values())}')
-        lines.append(f'{INDENT}Average  {statistics.mean(nodes_per_cacheline.values()):.2f}')
-        lines.append(f'{INDENT}Variance {statistics.variance(nodes_per_cacheline.values()):.2f}')
+        lines.append(f'{INDENT}Average  {statistics.mean(nodes_per_cacheline.values()):,.2f}')
+        lines.append(f'{INDENT}Variance {statistics.variance(nodes_per_cacheline.values()):,.2f}')
 
         # Nodes
-        lines.append(f'Number of Nodes       {self._graph.number_of_nodes()}')
+        lines.append(f'Number of Nodes       {self._graph.number_of_nodes():,}')
         for t in nodes.NodeType:
-            lines.append(f'{INDENT}{t.name:6} {len(self.get_nodes_by_type(t))}')
+            lines.append(f'{INDENT}{t.name:6} {len(self.get_nodes_by_type(t)):,}')
 
         # Edges
         if full:
-            lines.append(f'Number of Edges       {self._graph.number_of_edges()}')
-            lines.append(f'{INDENT}Inter Edges {self.inter.number_of_edges()}')
-            lines.append(f'{INDENT}Intra Edges {self.intra.number_of_edges()}')
+            lines.append(f'Number of Edges       {self._graph.number_of_edges():,}')
+            lines.append(f'{INDENT}Inter Edges {self.inter.number_of_edges():,}')
+            lines.append(f'{INDENT}Intra Edges {self.intra.number_of_edges():,}')
 
         # DaisyChains
         if self._daisy_chains:
             daisy_chains = list(self._daisy_chains.get_daisychains())
-            lines.append(f'Number of chains      {len(daisy_chains)}')
-            lines.append(f'{INDENT}Max length     {max(map(len, daisy_chains))}')
-            lines.append(f'{INDENT}Average length {statistics.mean(map(len, daisy_chains)):.2f}')
-            lines.append(f'{INDENT}Median length  {statistics.median(map(len, daisy_chains)):.2f}')
+            lines.append(f'Number of chains      {len(daisy_chains):,}')
+            lines.append(f'{INDENT}Max length     {max(map(len, daisy_chains)):,}')
+            lines.append(f'{INDENT}Average length {statistics.mean(map(len, daisy_chains)):,.2f}')
+            lines.append(f'{INDENT}Median length  {statistics.median(map(len, daisy_chains)):,.2f}')
 
         max_line_size = max(map(len, lines))
         lines.insert(0, f'{" HBG Stats ":#^{max_line_size}}')
@@ -459,9 +459,9 @@ class HBGBuilder:
 
             return False
 
-        self._log(f'Total nodes before filter {len(self._nodes)}')
+        self._log(f'Total nodes before filter {len(self._nodes):,}')
         self._nodes = list(filter(should_keep, self._nodes))
-        self._log(f'Total nodes after filter  {len(self._nodes)}')
+        self._log(f'Total nodes after filter  {len(self._nodes):,}')
 
         return self
 
