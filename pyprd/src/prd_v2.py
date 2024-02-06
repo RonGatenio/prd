@@ -91,8 +91,13 @@ class PersistencyRaceDetector:
         return vc_per_read_node
     
     def _do_persisted_before_vector_clocks_analysis(self, vc_per_read_node: Dict[ReadNode, ReversedVectorClock], show_first_bug_only=False):
-        pvc_per_thread:     Dict[Cacheline, Dict[ThreadId, PersistencyVectorClock]]  = defaultdict(lambda: utils.DefaultDictByKey(lambda tid: PersistencyVectorClock(tid)))
-        pvc_per_epoch_node: Dict[Cacheline, Dict[EpochNode, PersistencyVectorClock]] = defaultdict(lambda: utils.DefaultDictByKey(lambda n: PersistencyVectorClock(n.tid)))
+        # pvc_per_thread:          Dict[Cacheline, Dict[ThreadId, PersistencyVectorClock]]  = defaultdict(lambda: utils.DefaultDictByKey(lambda tid: PersistencyVectorClock(tid)))
+        pvc_per_thread:          Dict[ThreadId, Dict[Cacheline, PersistencyVectorClock]]  = utils.DefaultDictByKey(lambda tid: defaultdict(lambda: PersistencyVectorClock(tid)))
+        # pvc_per_epoch_node:      Dict[Cacheline, Dict[EpochNode, PersistencyVectorClock]] = defaultdict(lambda: utils.DefaultDictByKey(lambda n: PersistencyVectorClock(n.tid)))
+        pvc_per_epoch_node:      Dict[EpochNode, Dict[Cacheline, PersistencyVectorClock]] = utils.DefaultDictByKey(lambda n: defaultdict(lambda: PersistencyVectorClock(n.tid)))
+        dirty_cachelines:        Dict[ThreadId, Set[Cacheline]]                           = defaultdict(set)
+        # dirty_cachelines_per_epoch_node:        Dict[EpochNode, Set[Cacheline]]                           = defaultdict(set)
+        dirty_cachelines_vector: Dict[ThreadId, Dict[ThreadId, Set[Cacheline]]]           = defaultdict(lambda: defaultdict(set))
 
         for n in self._hbg.reverse_postorder():
             n:   AbstractNode
@@ -100,14 +105,15 @@ class PersistencyRaceDetector:
             match n.itype:
                 case NodeType.WRITE:
                     n: WriteNode
-                    pvc: PersistencyVectorClock = pvc_per_thread[n.get_cacheline_address()][n.tid]
+                    pvc: PersistencyVectorClock = pvc_per_thread[n.tid][n.get_cacheline_address()]
                     pvc.add_epoch(self._hbg.get_node_location(n).tindex)
+                    dirty_cachelines[n.tid].add(n.get_cacheline_address())
                     
                     # Find bugs
                     for read_node in self._pdg.get_dependencies(n):
                         assert read_node.get_cacheline_address() != n.get_cacheline_address()
                         
-                        pvc: PersistencyVectorClock = pvc_per_thread[read_node.get_cacheline_address()][n.tid]
+                        pvc: PersistencyVectorClock = pvc_per_thread[n.tid][read_node.get_cacheline_address()]
 
                         loc = self._hbg.get_node_location(read_node)
 
@@ -152,31 +158,59 @@ class PersistencyRaceDetector:
 
                 case NodeType.READ:
                     n: ReadNode
-                    pvc: PersistencyVectorClock = pvc_per_thread[n.get_cacheline_address()][n.tid]
+                    pvc: PersistencyVectorClock = pvc_per_thread[n.tid][n.get_cacheline_address()]
                     pvc.add_epoch(self._hbg.get_node_location(n).tindex)
+                    dirty_cachelines[n.tid].add(n.get_cacheline_address())
 
                 case NodeType.FLUSH:
                     n: FlushNode
-                    pvc: PersistencyVectorClock = pvc_per_thread[n.get_cacheline_address()][n.tid]
+                    pvc: PersistencyVectorClock = pvc_per_thread[n.tid][n.get_cacheline_address()]
                     pvc.flush()
+                    dirty_cachelines[n.tid].add(n.get_cacheline_address())
 
                 case NodeType.EPOCH:
                     n: EpochNode
 
-                    for cacheline in pvc_per_thread:
-                        pvc: PersistencyVectorClock = pvc_per_thread[cacheline][n.tid]
+                    if dirty_cachelines[n.tid]:
+                        for thread in self._hbg.tids:
+                            if thread != n.tid:
+                                dirty_cachelines_vector[n.tid][thread].update(dirty_cachelines[n.tid])
+                        
+                        # clear temp dirty buffer
+                        dirty_cachelines[n.tid].clear()
 
-                        # Tell inter children the current state
-                        for child in self._hbg.get_inter_children(n):
-                            child: EpochNode
-                            child_pvc: PersistencyVectorClock = pvc_per_epoch_node[cacheline][child]
-                            child_pvc.merge(pvc)
+                    # Tell inter children the current state
+                    for child in self._hbg.get_inter_children(n):
+                        child: EpochNode
 
-                        # Merge my state with thread state and delete me
-                        _pvc: ReversedVectorClock = pvc_per_epoch_node[cacheline][n]
+                        for cacheline in dirty_cachelines_vector[n.tid][child.tid]:
+                            my_pvc: PersistencyVectorClock = pvc_per_thread[n.tid][cacheline]
+                            child_pvc: PersistencyVectorClock = pvc_per_epoch_node[child][cacheline]
+                            child_pvc.merge(my_pvc)
+                            # dirty_cachelines_per_epoch_node[child].add(cacheline)
+
+                        # clean dirty
+                        dirty_cachelines_vector[n.tid][child.tid].clear()
+
+                    # Merge my state with thread state and delete me
+                    # for cacheline in dirty_cachelines_per_epoch_node
+                    for cacheline in pvc_per_epoch_node[n]:
+                        # only dirty cachelines
+                        _pvc: PersistencyVectorClock = pvc_per_epoch_node[n][cacheline]
+                        pvc: PersistencyVectorClock  = pvc_per_thread[n.tid][cacheline]
                         pvc.merge(_pvc)
-                        d = pvc_per_epoch_node[cacheline]
-                        del d[n]
+                        dirty_cachelines[n.tid].add(cacheline)
+                    del pvc_per_epoch_node[n]                
+
+
+
+
+
+
+
+
+
+        
 
     def run(self, show_first_bug_only=False):
         with utils.timeit('build_happens_after_vector_clocks'):
