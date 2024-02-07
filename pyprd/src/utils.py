@@ -9,6 +9,13 @@ def get_cacheline_address(address, cacheline_size=DEFAULT_CACHELINE_SIZE):
     return address & mask
 
 
+def get_cacheline_interval(address, size, cacheline_size=DEFAULT_CACHELINE_SIZE):
+    mask = ((1 << 64) - 1) * cacheline_size
+    start = address & mask
+    end = (address + size + cacheline_size - 1) & mask
+    return start, end
+
+
 @contextmanager
 def timeit(name):
     s = time.time()
