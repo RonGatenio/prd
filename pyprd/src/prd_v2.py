@@ -32,12 +32,11 @@ class PersistencyRace:
         return self.read_node.tid
 
     def __str__(self) -> str:
-        space = 16
         s = []
         s.append('PERSISTENCY RACE!')
-        s.append(f'{"Write Node: ":{space}}{self.write_node}')
-        s.append(f'{"Read Node: ":{space}}{self.read_node}')
-        s.append(f'{"Dependent Node: ":{space}}{self.dependent_node}')
+        s.append(f'W(X): {self.write_node}')
+        s.append(f'R(X): {self.read_node}')
+        s.append(f'W(Y): {self.dependent_node}')
         return '\n\t'.join(s)
 
 
