@@ -90,6 +90,54 @@ class PersistencyRaceDetector:
             
         return vc_per_read_node
     
+    def _find_bugs(self,
+                   dependent_node: WriteNode,
+                   pvc_per_thread: Dict[ThreadId, Dict[Cacheline, PersistencyVectorClock]],
+                   vc_per_read_node: Dict[ReadNode, ReversedVectorClock]):
+        for read_node in self._pdg.get_dependencies(dependent_node):
+            assert read_node.get_cacheline_address() != dependent_node.get_cacheline_address()
+            
+            pvc: PersistencyVectorClock = pvc_per_thread[dependent_node.tid][read_node.get_cacheline_address()]
+
+            loc = self._hbg.get_node_location(read_node)
+
+            # If the read is persisted, not a bug
+            if pvc.is_event_persisted(*loc):
+                continue
+
+            # Find bugs
+            daisy_chains = self._hbg.daisy_chains
+            assert daisy_chains, "Can't find bugs without daisy chains"
+
+            for tid in self._hbg.tids:
+                last_persisted_epoch = pvc.get_persisted_epoch(tid)
+                if last_persisted_epoch is not None:
+                    last_persisted_node = self._hbg.get_node_by_location((tid, last_persisted_epoch))
+                    chain = daisy_chains.get_chain_by_node(last_persisted_node)
+                else:
+                    chain = daisy_chains.get_chain_by_thread(tid, read_node.get_cacheline_address())
+
+                for write_node in chain:
+                    write_node: WriteNode
+
+                    # Is a different var
+                    if not write_node.is_overlap(read_node):
+                        continue
+
+                    write_node_loc = self._hbg.get_node_location(write_node)
+                    
+                    # Is already persisted
+                    if pvc.is_event_persisted(*write_node_loc):
+                        continue
+
+                    # Is happens after the read
+                    if vc_per_read_node[read_node].is_happens_after(*write_node_loc):
+                        break
+
+                    # It is a bug! Report it!
+                    yield PersistencyRace(read_node, write_node, dependent_node)
+
+    
     def _do_persisted_before_vector_clocks_analysis(self, vc_per_read_node: Dict[ReadNode, ReversedVectorClock], show_first_bug_only=False):
         # pvc_per_thread:          Dict[Cacheline, Dict[ThreadId, PersistencyVectorClock]]  = defaultdict(lambda: utils.DefaultDictByKey(lambda tid: PersistencyVectorClock(tid)))
         pvc_per_thread:          Dict[ThreadId, Dict[Cacheline, PersistencyVectorClock]]  = utils.DefaultDictByKey(lambda tid: defaultdict(lambda: PersistencyVectorClock(tid)))
@@ -110,51 +158,7 @@ class PersistencyRaceDetector:
                     dirty_cachelines[n.tid].add(n.get_cacheline_address())
                     
                     # Find bugs
-                    for read_node in self._pdg.get_dependencies(n):
-                        assert read_node.get_cacheline_address() != n.get_cacheline_address()
-                        
-                        pvc: PersistencyVectorClock = pvc_per_thread[n.tid][read_node.get_cacheline_address()]
-
-                        loc = self._hbg.get_node_location(read_node)
-
-                        # If the read is persisted, not a bug
-                        if pvc.is_event_persisted(*loc):
-                            continue
-
-                        # Find bugs
-                        daisy_chains = self._hbg.daisy_chains
-                        assert daisy_chains, "Can't find bugs without daisy chains"
-
-                        for tid in self._hbg.tids:
-                            last_persisted_epoch = pvc.get_persisted_epoch(tid)
-                            if last_persisted_epoch is not None:
-                                last_persisted_node = self._hbg.get_node_by_location((tid, last_persisted_epoch))
-                                chain = daisy_chains.get_chain_by_node(last_persisted_node)
-                            else:
-                                chain = daisy_chains.get_chain_by_thread(tid, read_node.get_cacheline_address())
-
-                            for write_node in chain:
-                                write_node: WriteNode
-
-                                write_node_loc = self._hbg.get_node_location(write_node)
-
-                                # Is a different var
-                                if not write_node.is_overlap(read_node):
-                                    continue
-                                
-                                # Is already persisted
-                                if pvc.is_event_persisted(*write_node_loc):
-                                    continue
-
-                                # Is happens after the read
-                                if vc_per_read_node[read_node].is_happens_after(*write_node_loc):
-                                    break
-
-                                # It is a bug! Report it!
-                                yield PersistencyRace(read_node, write_node, n)
-
-                                if show_first_bug_only:
-                                    break
+                    yield from self._find_bugs(n, pvc_per_thread, vc_per_read_node)
 
                 case NodeType.READ:
                     n: ReadNode
