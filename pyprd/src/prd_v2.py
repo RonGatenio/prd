@@ -1,6 +1,6 @@
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Dict, Tuple
+from typing import Dict, Generator, Set, Tuple
 from nodes import AbstractNode, NodeType, ReadNode, WriteNode, FlushNode, EpochNode
 from vector_clock import PersistencyVectorClock, ReversedVectorClock
 from hbg import HBG
@@ -41,11 +41,68 @@ class PersistencyRace:
         return '\n\t'.join(s)
 
 
+class PersistencyRaces:
+    def __init__(self):
+        self._races:       Set[PersistencyRace]                       = set()
+        self._races_by_pc: Dict[int, Dict[int, Set[PersistencyRace]]] = defaultdict(lambda: defaultdict(set))
+
+    @property
+    def races(self):
+        return self._races
+    
+    @property
+    def races_by_pc(self):
+        return self._races_by_pc
+
+    def add_race(self, race: PersistencyRace):
+        self._races.add(race)
+
+        read_already_saved  = race.read_node.pc  in self._races_by_pc
+        write_already_saved = race.write_node.pc in self._races_by_pc[race.read_node.pc]
+        self._races_by_pc[race.read_node.pc][race.write_node.pc].add(race)
+
+    def clear(self):
+        self._races.clear()
+        self._races_by_pc.clear()
+
+    def _get_race_nodes_by_pc(self) -> Generator[Tuple[int, ReadNode, WriteNode, Set[WriteNode]], None, None]:
+        for i, read_pc in enumerate(self._races_by_pc):
+            read_node = dependent_node = None
+            write_nodes = set()
+            for write_pc, races in self._races_by_pc[read_pc].items():
+                race: PersistencyRace = next(iter(races))
+                if not read_node:
+                    read_node = race.read_node
+                    dependent_node = race.dependent_node
+                write_nodes.add(race.write_node)
+
+            if read_node:
+                yield i, read_node, dependent_node, write_nodes
+
+    def __str__(self) -> str:
+        all_lines = []
+
+        for i, read_node, dependent_node, write_nodes in self._get_race_nodes_by_pc():
+            lines = [
+                f'Race {i+1:4}',
+                f'R(X): {read_node.info}',
+                f'W(Y): {dependent_node.info}',
+            ]
+            lines.extend([
+                f'    W(X): {write_node.info}' for write_node in write_nodes
+            ])
+
+            all_lines.append('\n'.join(lines))
+
+        return f'\n{"":-^20}\n'.join(all_lines)
+
+
 class PersistencyRaceDetector:
     def __init__(self, hbg: HBG, pdg: PDG):
         self._hbg = hbg
         self._pdg = pdg
-        
+        self._races = PersistencyRaces()
+
     @property
     def hbg(self):
         return self._hbg
@@ -54,6 +111,10 @@ class PersistencyRaceDetector:
     def pdg(self):
         return self._pdg
     
+    @property
+    def races(self):
+        return self._races
+
     def _build_happens_after_vector_clocks(self):
         vc_per_thread:     Dict[ThreadId, ReversedVectorClock]  = utils.DefaultDictByKey(lambda tid: ReversedVectorClock(tid))
         vc_per_epoch_node: Dict[EpochNode, ReversedVectorClock] = utils.DefaultDictByKey(lambda n: ReversedVectorClock(n.tid))
@@ -134,7 +195,10 @@ class PersistencyRaceDetector:
                         break
 
                     # It is a bug! Report it!
-                    yield PersistencyRace(read_node, write_node, dependent_node)
+                    race = PersistencyRace(read_node, write_node, dependent_node)
+                    self._races.add_race(race)
+                    yield race
+
 
     def _do_persisted_before_vector_clocks_analysis(self, vc_per_read_node: Dict[ReadNode, ReversedVectorClock], show_first_bug_only=False):
         pvc_per_thread:          Dict[ThreadId, Dict[Cacheline, PersistencyVectorClock]]  = utils.DefaultDictByKey(lambda tid: defaultdict(lambda: PersistencyVectorClock(tid)))
@@ -202,9 +266,10 @@ class PersistencyRaceDetector:
                     del pvc_per_epoch_node[n]
 
     def run(self, show_first_bug_only=False):
-        with utils.timeit('build_happens_after_vector_clocks'):
+        self._races.clear()
+
+        with utils.timeit('build_happens_after_vector_clocks O(N*T^2) ~ O(N)'):
             vc_per_read_node = self._build_happens_after_vector_clocks()
 
-        with utils.timeit('Bug detection'):
+        with utils.timeit('Bug detection O(N*V*T^2 + B) ~ O(N*(B+V))'):
             return list(self._do_persisted_before_vector_clocks_analysis(vc_per_read_node, show_first_bug_only))
-
