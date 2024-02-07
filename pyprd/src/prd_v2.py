@@ -11,7 +11,6 @@ import utils
 ###########################################################
 # Types
 ###########################################################
-Var         = Tuple[int, int]
 ThreadId    = int
 Cacheline   = int
 
@@ -27,7 +26,7 @@ class PersistencyRace:
         assert self.read_node.is_overlap(self.write_node)
         assert not self.read_node.is_overlap(self.dependent_node)
         assert not self.write_node.is_overlap(self.dependent_node)
-    
+
     @property
     def tid(self):
         return self.read_node.tid
@@ -50,7 +49,7 @@ class PersistencyRaceDetector:
     @property
     def hbg(self):
         return self._hbg
-    
+
     @property
     def pdg(self):
         return self._pdg
@@ -87,16 +86,16 @@ class PersistencyRaceDetector:
                     _vc: ReversedVectorClock = vc_per_epoch_node[n]
                     vc.merge(_vc)
                     del vc_per_epoch_node[n]
-            
+
         return vc_per_read_node
-    
+
     def _find_bugs(self,
                    dependent_node: WriteNode,
                    pvc_per_thread: Dict[ThreadId, Dict[Cacheline, PersistencyVectorClock]],
                    vc_per_read_node: Dict[ReadNode, ReversedVectorClock]):
         for read_node in self._pdg.get_dependencies(dependent_node):
             assert read_node.get_cacheline_address() != dependent_node.get_cacheline_address()
-            
+
             pvc: PersistencyVectorClock = pvc_per_thread[dependent_node.tid][read_node.get_cacheline_address()]
 
             loc = self._hbg.get_node_location(read_node)
@@ -125,7 +124,7 @@ class PersistencyRaceDetector:
                         continue
 
                     write_node_loc = self._hbg.get_node_location(write_node)
-                    
+
                     # Is already persisted
                     if pvc.is_event_persisted(*write_node_loc):
                         continue
@@ -137,18 +136,14 @@ class PersistencyRaceDetector:
                     # It is a bug! Report it!
                     yield PersistencyRace(read_node, write_node, dependent_node)
 
-    
     def _do_persisted_before_vector_clocks_analysis(self, vc_per_read_node: Dict[ReadNode, ReversedVectorClock], show_first_bug_only=False):
-        # pvc_per_thread:          Dict[Cacheline, Dict[ThreadId, PersistencyVectorClock]]  = defaultdict(lambda: utils.DefaultDictByKey(lambda tid: PersistencyVectorClock(tid)))
         pvc_per_thread:          Dict[ThreadId, Dict[Cacheline, PersistencyVectorClock]]  = utils.DefaultDictByKey(lambda tid: defaultdict(lambda: PersistencyVectorClock(tid)))
-        # pvc_per_epoch_node:      Dict[Cacheline, Dict[EpochNode, PersistencyVectorClock]] = defaultdict(lambda: utils.DefaultDictByKey(lambda n: PersistencyVectorClock(n.tid)))
         pvc_per_epoch_node:      Dict[EpochNode, Dict[Cacheline, PersistencyVectorClock]] = utils.DefaultDictByKey(lambda n: defaultdict(lambda: PersistencyVectorClock(n.tid)))
         dirty_cachelines:        Dict[ThreadId, Set[Cacheline]]                           = defaultdict(set)
-        # dirty_cachelines_per_epoch_node:        Dict[EpochNode, Set[Cacheline]]                           = defaultdict(set)
         dirty_cachelines_vector: Dict[ThreadId, Dict[ThreadId, Set[Cacheline]]]           = defaultdict(lambda: defaultdict(set))
 
         for n in self._hbg.reverse_postorder():
-            n:   AbstractNode
+            n: AbstractNode
 
             match n.itype:
                 case NodeType.WRITE:
@@ -156,7 +151,7 @@ class PersistencyRaceDetector:
                     pvc: PersistencyVectorClock = pvc_per_thread[n.tid][n.get_cacheline_address()]
                     pvc.add_epoch(self._hbg.get_node_location(n).tindex)
                     dirty_cachelines[n.tid].add(n.get_cacheline_address())
-                    
+
                     # Find bugs
                     yield from self._find_bugs(n, pvc_per_thread, vc_per_read_node)
 
@@ -179,7 +174,7 @@ class PersistencyRaceDetector:
                         for thread in self._hbg.tids:
                             if thread != n.tid:
                                 dirty_cachelines_vector[n.tid][thread].update(dirty_cachelines[n.tid])
-                        
+
                         # clear temp dirty buffer
                         dirty_cachelines[n.tid].clear()
 
@@ -204,17 +199,7 @@ class PersistencyRaceDetector:
                         pvc: PersistencyVectorClock  = pvc_per_thread[n.tid][cacheline]
                         pvc.merge(_pvc)
                         dirty_cachelines[n.tid].add(cacheline)
-                    del pvc_per_epoch_node[n]                
-
-
-
-
-
-
-
-
-
-        
+                    del pvc_per_epoch_node[n]
 
     def run(self, show_first_bug_only=False):
         with utils.timeit('build_happens_after_vector_clocks'):
