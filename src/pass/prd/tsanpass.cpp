@@ -56,33 +56,33 @@ using namespace llvm;
 #define DEBUG_TYPE "tsan"
 
 static cl::opt<bool> ClInstrumentMemoryAccesses(
-    "tsan-instrument-memory-accesses", cl::init(true),
+    "cprd-instrument-memory-accesses", cl::init(true),
     cl::desc("Instrument memory accesses"), cl::Hidden);
 static cl::opt<bool>
-    ClInstrumentFuncEntryExit("tsan-instrument-func-entry-exit", cl::init(true),
+    ClInstrumentFuncEntryExit("cprd-instrument-func-entry-exit", cl::init(true),
                               cl::desc("Instrument function entry and exit"),
                               cl::Hidden);
 static cl::opt<bool> ClHandleCxxExceptions(
-    "tsan-handle-cxx-exceptions", cl::init(true),
+    "cprd-handle-cxx-exceptions", cl::init(true),
     cl::desc("Handle C++ exceptions (insert cleanup blocks for unwinding)"),
     cl::Hidden);
-static cl::opt<bool> ClInstrumentAtomics("tsan-instrument-atomics",
+static cl::opt<bool> ClInstrumentAtomics("cprd-instrument-atomics",
                                          cl::init(true),
                                          cl::desc("Instrument atomics"),
                                          cl::Hidden);
 static cl::opt<bool> ClInstrumentMemIntrinsics(
-    "tsan-instrument-memintrinsics", cl::init(true),
+    "cprd-instrument-memintrinsics", cl::init(true),
     cl::desc("Instrument memintrinsics (memset/memcpy/memmove)"), cl::Hidden);
 static cl::opt<bool> ClDistinguishVolatile(
-    "tsan-distinguish-volatile", cl::init(false),
+    "cprd-distinguish-volatile", cl::init(false),
     cl::desc("Emit special instrumentation for accesses to volatiles"),
     cl::Hidden);
 static cl::opt<bool> ClInstrumentReadBeforeWrite(
-    "tsan-instrument-read-before-write", cl::init(false),
+    "cprd-instrument-read-before-write", cl::init(false),
     cl::desc("Do not eliminate read instrumentation for read-before-writes"),
     cl::Hidden);
 static cl::opt<bool> ClCompoundReadBeforeWrite(
-    "tsan-compound-read-before-write", cl::init(false),
+    "cprd-compound-read-before-write", cl::init(false),
     cl::desc("Emit special compound instrumentation for reads-before-writes"),
     cl::Hidden);
 
