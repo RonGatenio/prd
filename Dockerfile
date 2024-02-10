@@ -1,7 +1,7 @@
 FROM ubuntu:latest
 
 # Set LLVM version
-ENV LLVM_VERSION 11
+ENV LLVM_VERSION 14
 
 # Install dev packages
 RUN apt-get update && apt-get install -y llvm-${LLVM_VERSION} llvm-${LLVM_VERSION}-dev clang-${LLVM_VERSION}
