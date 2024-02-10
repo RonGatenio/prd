@@ -18,7 +18,7 @@
 // The rest is handled by the run-time library.
 //===----------------------------------------------------------------------===//
 
-#include "ThreadSanitizer.h"
+#include "tsanpass.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallString.h"
