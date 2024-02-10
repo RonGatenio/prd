@@ -34,6 +34,7 @@
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/Intrinsics.h"
+#include "llvm/IR/IntrinsicsX86.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Metadata.h"
 #include "llvm/IR/Module.h"
@@ -172,6 +173,9 @@ private:
   FunctionCallee TsanVptrUpdate;
   FunctionCallee TsanVptrLoad;
   FunctionCallee MemmoveFn, MemcpyFn, MemsetFn;
+  // R.G. Defining the flush and fence functions
+  FunctionCallee TsanFlush;
+  FunctionCallee TsanFence;
 };
 
 struct ThreadSanitizerLegacyPass : FunctionPass {
@@ -369,6 +373,13 @@ void ThreadSanitizer::initialize(Module &M) {
                                                Ty, OrdTy, OrdTy);
     }
   }
+
+  // R.G. Initializing the flush and fence functions
+  TsanFlush =
+      M.getOrInsertFunction("__tsan_flush", Attr, IRB.getVoidTy(), IntptrTy);
+  TsanFence =
+      M.getOrInsertFunction("__tsan_fence", Attr, IRB.getVoidTy());
+	  
   TsanVptrUpdate =
       M.getOrInsertFunction("__tsan_vptr_update", Attr, IRB.getVoidTy(),
                             IRB.getInt8PtrTy(), IRB.getInt8PtrTy());
@@ -591,6 +602,30 @@ bool ThreadSanitizer::sanitizeFunction(Function &F,
           maybeMarkSanitizerLibraryCallNoBuiltin(CI, &TLI);
         if (isa<MemIntrinsic>(Inst))
           MemIntrinCalls.push_back(&Inst);
+
+        // R.G. If intrinsic, check if flush or fence
+        if (isa<IntrinsicInst>(Inst)) {
+          IRBuilder<> IRB(&Inst);
+          auto &InstIntrinsic = reinterpret_cast<IntrinsicInst&>(Inst);
+          switch (InstIntrinsic.getIntrinsicID())
+          {
+          case Intrinsic::x86_sse2_clflush:
+          case Intrinsic::x86_clflushopt:
+          case Intrinsic::x86_clwb:
+            assert(1 == InstIntrinsic.getNumArgOperands() && "Unexpected number of operands!");
+            IRB.CreateCall(TsanFlush, IRB.CreateIntCast(InstIntrinsic.getArgOperand(0), IntptrTy, false));
+            break;
+          case Intrinsic::x86_sse_sfence:
+          case Intrinsic::x86_sse2_lfence:
+          case Intrinsic::x86_sse2_mfence:
+            assert(0 == InstIntrinsic.getNumArgOperands() && "Unexpected number of operands!");
+            IRB.CreateCall(TsanFence);
+            break;
+          default:
+            break;
+          }
+        }
+
         HasCalls = true;
         chooseInstructionsToInstrument(LocalLoadsAndStores, AllLoadsAndStores,
                                        DL);
