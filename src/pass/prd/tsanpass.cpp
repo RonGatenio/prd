@@ -612,13 +612,13 @@ bool ThreadSanitizer::sanitizeFunction(Function &F,
           case Intrinsic::x86_sse2_clflush:
           case Intrinsic::x86_clflushopt:
           case Intrinsic::x86_clwb:
-            assert(1 == InstIntrinsic.getNumArgOperands() && "Unexpected number of operands!");
+            assert(1 == InstIntrinsic.arg_size() && "Unexpected number of operands!");
             IRB.CreateCall(TsanFlush, IRB.CreateIntCast(InstIntrinsic.getArgOperand(0), IntptrTy, false));
             break;
           case Intrinsic::x86_sse_sfence:
           case Intrinsic::x86_sse2_lfence:
           case Intrinsic::x86_sse2_mfence:
-            assert(0 == InstIntrinsic.getNumArgOperands() && "Unexpected number of operands!");
+            assert(0 == InstIntrinsic.arg_size() && "Unexpected number of operands!");
             IRB.CreateCall(TsanFence);
             break;
           default:
