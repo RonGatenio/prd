@@ -10,9 +10,10 @@ ENV LLVM_VERSION 14
 # Install dev packages
 RUN apt-get update && apt-get install -y llvm-${LLVM_VERSION} llvm-${LLVM_VERSION}-dev clang-${LLVM_VERSION}
 RUN apt install -y cmake
+RUN apt install -y python3-pip
 
 # Install tools packages
-RUN apt install -y mlocate less
+RUN apt install -y dos2unix mlocate less
 
 # Set env
 ENV PATH /usr/lib/llvm-${LLVM_VERSION}/bin:$PATH
@@ -32,9 +33,16 @@ FROM setup AS build
 # Create a working directory
 WORKDIR /app
 
+# Copy pyprd folder to docker
+COPY pyprd /app/pyprd
+
+WORKDIR /app/pyprd
+RUN python3 -m pip install -r requirements.txt
+
 # Copy src folder to docker
 COPY src /app/src
 
+# Build pass and runtime lib
 RUN /app/src/scripts/build.sh
 
 
@@ -44,22 +52,43 @@ RUN /app/src/scripts/build.sh
 
 FROM build AS benchmarks
 
-RUN apt install -y dos2unix
+# Install PMDK
 RUN apt install -y libpmem-dev
 RUN apt install -y libpmemobj-cpp-dev
 
+# Copy from build stage
 COPY --from=build /app /app
 
+# Copy benchmarks folder
 COPY benchmarks /app/benchmarks
 
-WORKDIR /app
-# compile fast-fair
+
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# RECIPE (Converting Concurrent DRAM Indexes to Persistent-Memory Indexes)
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+WORKDIR /app/benchmarks/RECIPE
+
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# CCEH (Cacheline-Concious Extendible Hashing)
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+WORKDIR /app/benchmarks/CCEH
+
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# FAST-FAIR (Failure-Atomic ShifT(FAST) and Failure-Atomic In-place Rebalancing(FAIR))
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 WORKDIR /app/benchmarks/FAST_FAIR
-RUN dos2unix *.sh 
-# RUN ./compile_pmdk.sh
-# RUN ./run_pmdk.sh
 
+RUN dos2unix *.sh
+RUN ./compile_pmdk.sh
+RUN ./run_pmdk.sh
+RUN mkdir -p /app/traces && cp *.trace /app/traces
 
+WORKDIR /app/pyprd/src
+
+RUN python3 run.py /app/traces/fast-fair-pmdk-trace-btree_concurrent.trace > out.races
 
 #####################################################################
 # Example stage
