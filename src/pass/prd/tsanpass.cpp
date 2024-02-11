@@ -919,3 +919,19 @@ int ThreadSanitizer::getMemoryAccessFuncIndex(Type *OrigTy, Value *Addr,
   assert(Idx < kNumberOfAccessSizes);
   return Idx;
 }
+
+extern "C" LLVM_ATTRIBUTE_WEAK ::llvm::PassPluginLibraryInfo
+llvmGetPassPluginInfo() {
+    return {
+        .APIVersion = LLVM_PLUGIN_API_VERSION,
+        .PluginName = "PrdPass",
+        .PluginVersion = LLVM_VERSION_STRING,
+        .RegisterPassBuilderCallbacks = [](PassBuilder &PB) {
+          PB.registerPipelineEarlySimplificationEPCallback(
+            [](ModulePassManager &MPM, auto) {
+              MPM.addPass(ModuleThreadSanitizerPass());
+              return true;
+          });
+        }
+    };
+}
