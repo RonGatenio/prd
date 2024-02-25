@@ -54,73 +54,75 @@ $$a\overset{pd}{\to}a$$
 % \noindent\makebox[\linewidth]{\rule{\paperwidth}{0.4pt}}
 
 \newpage
+
 \section{Algorithm}
 
 \subsection{Definitions}
 
-
+\subsubsection{Happens-After Vector Clock}
+${HAVC}_{t,i}(t')$ will be the first node's index in thread $t'$ that happens-after the $i^{th}$ node in thread $t$.
 \[
     {HAVC}_{t,i}(t') = \min \left( \left\{ j \middle| \ 
     \begin{aligned}
         & \exists P = (v_1, \ldots, v_k) \in V^k, k \geq 1 \text{ a path in HBG} \\
-        & \text{such that: } loc(v_1) = (t, i), \ loc(v_k) = (t', j)
+        & \text{such that:} \\
+        & \begin{aligned}
+            & && loc(v_1) = (t, i), \ loc(v_k) = (t', j)
+        \end{aligned}
     \end{aligned}
     \right\} \right)
 \]
 
+\subsubsection{Happens-Before Vector Clock}
+${HBVC}_{t,i}(t',\alpha)$ will be the last node's index in thread $t'$ of variable $\alpha$ that happens-before the $i^{th}$ node in thread $t$.
 \[
     {HBVC}_{t,i}(t',\alpha) = \max \left( \left\{ j \middle| \ 
     \begin{aligned}
         & \exists P = (v_1, \ldots, v_k) \in V^k, k \geq 1 \text{ a path in HBG} \\
         & \text{such that:} \\
         & \begin{aligned}
-            % & \text{such that:} && loc(v_1) = (t', j), \ loc(v_k) = (t, i) \\
             & && loc(v_1) = (t', j), \ loc(v_k) = (t, i) \\
-            % & && var(v_1) = \alpha, op(v_1) \in \{ R, W \}
             & && lbl(v_1) \in \{ R(\alpha), W(\alpha) \}
         \end{aligned}
     \end{aligned}
     \right\} \right)
 \]
 
+\subsubsection{Happens-Before Vector Clock}
+${PBVC}_{t,i}(t',\alpha)$ will be the last node's index in thread $t'$ of variable $\alpha$ that was persisted before the $i^{th}$ node in thread $t$. \\
+A persisted node is a node that happens-before a Flush event (on the same variable).
 \[
     {PBVC}_{t,i}(t',\alpha) = \max \left( \left\{ j \middle| \ 
     \begin{aligned}
-        % & \exists f \in V, \; lbl(f) = F(\alpha) \\
         & \exists P = (v_1, \ldots, v_k) \in V^k, k \geq 1 \text{ a path in HBG} \\
         & \text{such that:} \\
-        % & \;\;\;\; lbl(f) = F(\alpha) \\
         & \begin{aligned}
-            % & \text{such} && \text{that:} \\
-            % & && \exists 1 < n \leq k. \;\; v_n = f \\
             & && loc(v_1) = (t', j), \ loc(v_k) = (t, i) \\
             & && lbl(v_1) \in \{ R(\alpha), W(\alpha) \} \\
             & && \exists 1 < f \leq k. \;\; lbl(v_f) = F(\alpha)
-            % & \text{such that:} && loc(v_1) = (t', j), \ loc(v_k) = (t, i) \\
-            % & && var(v_1) = \alpha, op(v_1) \in \{ R, W \}
         \end{aligned}
     \end{aligned}
     \right\} \right)
 \]
 
-% \[
-%     {HBVC}_{t,i}(t') = \max \left( \left\{ j \middle| \ 
-%     \begin{aligned}
-%         & \exists P = (v_1, \ldots, v_k) \in V^k, \hfill k \geq 0 \\
-%         & loc(v_1) = (t, i) \\
-%         & loc(v_k) = (t', j)
-%     \end{aligned}
-%     \right\} \right)
-% \]
-
-
-% \begin{itemize}
-%     \item ${HAVC}_{t,i}(t') = \min\left( \left\{ j \middle| \exists P = (v_1, \ldots, v_k) \in V^k, \\ loc(v_1) = (t, i), loc(v_k) = (t', j), k \geq 0 \right\} \right)$
-%     \item ${havc}_{t,i}(t') = $
-% \end{itemize}
-
 \subsection{Concurrent Persistence Race}
+We say there is a Concurrent Persistence Race between read node $r$ and write node $w$ if
 
+\[
+    {PersistenceRaces} = \left\{ (r, w) \middle| \ 
+    \begin{aligned}
+        & r, w \in V \\
+        & lbl(r) = R(\alpha), lbl(w) = W(\alpha) \\
+        & \exists v \in V. \;\; lbl(v) = W(\beta)\\
+        & \text{such that:} \\
+        & \begin{aligned}
+            & && loc(v_1) = (t', j), \ loc(v_k) = (t, i) \\
+            & && lbl(v_1) \in \{ R(\alpha), W(\alpha) \} \\
+            & && \exists 1 < f \leq k. \;\; lbl(v_f) = F(\alpha)
+        \end{aligned}
+    \end{aligned}
+    \right\}
+\]
 
 \subsection{Algorithm}
 
