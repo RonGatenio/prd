@@ -1,0 +1,225 @@
+\documentclass[a4paper,12pt]{article}
+
+\usepackage{mathtools}
+\usepackage{enumitem}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+%\usepackage{stackengine}
+
+\usepackage{calc}
+
+\newcommand*{\WidestText}{}%
+\newcommand*{\MakeBox}[1]{\makebox[\widthof{\WidestText}][l]{#1}}
+
+\newenvironment{AlignedItemize}[1]{%
+    \renewcommand*{\WidestText}{#1}%
+    \begin{itemize}
+}{%
+    \end{itemize}%
+}%
+
+\begin{document}
+
+% \begin{equation}
+% V := \{v | c\in E\}
+% \end{equation}
+\[Vars := \{All variables in the trace\}\]
+\[T := \{All threads in the trace\}\]
+\[Ops := \{R, W, F\}\]
+\[HBG := (V, E)\]
+\[V := \{o(\alpha) | o \in Ops \wedge \alpha \in Vars\}\]
+\[V := \{v | c\in E\}\]
+
+Definitions:
+
+Let $HBG = (V, E)$ be a Happens-Before graph where $V$ is the set of the trace events and $E$ is the set of Happens-Before edges derived from the program trace log.
+
+We will denote a path $P \in V^i$ in the graph of length as
+
+% let V be all of the events in the program trace \\
+% let E be the Happens-Before edges calculated in the program trace \\
+We will denote Happens-Before relation with $\prec$
+$$v \prec u \iff \exists P = (v, w_1), (w_1, w_2), ..., (w_i, u) \in E^{i+1}. i>0 $$
+We will denote $v \to u \iff (v,u)\in E$ \\
+We will denote path $P \in E^{i}$ of length $i$ as 
+
+$$HBG := (V, E)$$
+
+$$PDG := (V, E')$$
+
+$$a\overset{\Delta}{=}a$$
+$$a\overset{pd}{\to}a$$
+
+% \noindent\makebox[\linewidth]{\rule{\paperwidth}{0.4pt}}
+
+\newpage
+\section{Algorithm}
+
+\subsection{Definitions}
+
+
+\[
+    {HAVC}_{t,i}(t') = \min \left( \left\{ j \middle| \ 
+    \begin{aligned}
+        & \exists P = (v_1, \ldots, v_k) \in V^k, k \geq 1 \text{ a path in HBG} \\
+        & \text{such that: } loc(v_1) = (t, i), \ loc(v_k) = (t', j)
+    \end{aligned}
+    \right\} \right)
+\]
+
+\[
+    {HBVC}_{t,i}(t',\alpha) = \max \left( \left\{ j \middle| \ 
+    \begin{aligned}
+        & \exists P = (v_1, \ldots, v_k) \in V^k, k \geq 1 \text{ a path in HBG} \\
+        & \text{such that:} \\
+        & \begin{aligned}
+            % & \text{such that:} && loc(v_1) = (t', j), \ loc(v_k) = (t, i) \\
+            & && loc(v_1) = (t', j), \ loc(v_k) = (t, i) \\
+            % & && var(v_1) = \alpha, op(v_1) \in \{ R, W \}
+            & && lbl(v_1) \in \{ R(\alpha), W(\alpha) \}
+        \end{aligned}
+    \end{aligned}
+    \right\} \right)
+\]
+
+\[
+    {PBVC}_{t,i}(t',\alpha) = \max \left( \left\{ j \middle| \ 
+    \begin{aligned}
+        % & \exists f \in V, \; lbl(f) = F(\alpha) \\
+        & \exists P = (v_1, \ldots, v_k) \in V^k, k \geq 1 \text{ a path in HBG} \\
+        & \text{such that:} \\
+        % & \;\;\;\; lbl(f) = F(\alpha) \\
+        & \begin{aligned}
+            % & \text{such} && \text{that:} \\
+            % & && \exists 1 < n \leq k. \;\; v_n = f \\
+            & && loc(v_1) = (t', j), \ loc(v_k) = (t, i) \\
+            & && lbl(v_1) \in \{ R(\alpha), W(\alpha) \} \\
+            & && \exists 1 < f \leq k. \;\; lbl(v_f) = F(\alpha)
+            % & \text{such that:} && loc(v_1) = (t', j), \ loc(v_k) = (t, i) \\
+            % & && var(v_1) = \alpha, op(v_1) \in \{ R, W \}
+        \end{aligned}
+    \end{aligned}
+    \right\} \right)
+\]
+
+% \[
+%     {HBVC}_{t,i}(t') = \max \left( \left\{ j \middle| \ 
+%     \begin{aligned}
+%         & \exists P = (v_1, \ldots, v_k) \in V^k, \hfill k \geq 0 \\
+%         & loc(v_1) = (t, i) \\
+%         & loc(v_k) = (t', j)
+%     \end{aligned}
+%     \right\} \right)
+% \]
+
+
+% \begin{itemize}
+%     \item ${HAVC}_{t,i}(t') = \min\left( \left\{ j \middle| \exists P = (v_1, \ldots, v_k) \in V^k, \\ loc(v_1) = (t, i), loc(v_k) = (t', j), k \geq 0 \right\} \right)$
+%     \item ${havc}_{t,i}(t') = $
+% \end{itemize}
+
+\subsection{Concurrent Persistence Race}
+
+
+\subsection{Algorithm}
+
+\begin{enumerate}[label*=\arabic*.]
+    \item Initialize
+    \begin{enumerate}[label*=\arabic*.]
+        \item Set default ${havc}_{t,i}(t') \gets +\infty$ \hfill $\forall t,t' \in T, i \in \mathbb{N}$
+        \item Set default ${hbvc}_{t,i}(t', \alpha) \gets -\infty$ \hfill $\forall t,t' \in T, i \in \mathbb{N}, \alpha \in {Vars}$
+        \item Set default ${pbvc}_{t,i}(t', \alpha) \gets -\infty$ \hfill $\forall t,t' \in T, i \in \mathbb{N}, \alpha \in {Vars}$
+        % \item Set default ${dirty}(t,t') \gets \varnothing$ \hfill $\forall t,t' \in T$
+    \end{enumerate}
+    
+    % \item For each node $v$ in HBG
+    % \begin{enumerate}[label*=\arabic*.]
+    %     \item Let $(t, i) = loc(v)$
+    %     \item For each $t' \in T$
+    %     \begin{enumerate}[label*=\arabic*.]
+    %         \item ${havc}_{t,i}(t') \gets +\infty$
+    %         \item ${hbvc}_{t,i}(t') \gets -\infty$
+    %         \item ${pbvc}_{t,i}(t') \gets -\infty$
+    %     \end{enumerate}
+    % \end{enumerate}
+    % \item Initialize ${havc}_{t,i}(t') \gets \infty \ \forall t' \in T and v \in V such that loc(v) = (t, i)$
+
+    % Happens-After VC
+    \item For each node $v$ in HBG in post-order
+    \begin{enumerate}[label*=\arabic*.]
+        \item Let $(t, i) = loc(v)$
+        \item Set ${havc}_{t,i}(t) \gets i$
+        \item For each parent node $p$ such that $(p, v) \in E$
+        \begin{enumerate}[label*=\arabic*.]
+            \item Let $(t_p, i_p) = loc(p)$
+            \item For each $t' \in T$
+            \begin{enumerate}[label*=\arabic*.]
+                \item ${havc}_{t_p,i_p}(t') \gets \min\left({havc}_{t_p,i_p}(t'), {havc}_{t,i}(t')\right)$
+            \end{enumerate}
+        \end{enumerate}
+    \end{enumerate}
+    
+    % \item Initialize ${hbvc}_{t,i}(t') \gets -\infty $
+    % \item Initialize ${pbvc}_{t,i}(t') \gets -\infty $
+    
+    % Happens-Before and Persisted-Before VC
+    \item For each node $v$ in HBG in reversed post-order
+    \begin{enumerate}[label*=\arabic*.]
+        \item Let $(t, i) = loc(v)$, $\alpha = var(v)$
+
+        % RW
+        \item If $op(v) \in \{R, W\}$
+        \begin{enumerate}[label*=\arabic*.]
+            \item ${hbvc}_{t,i}(t,\alpha) \gets i$
+        \end{enumerate}
+
+        % F
+        \item If $op(v) \in \{F\}$
+        \begin{enumerate}[label*=\arabic*.]
+            % \item ${pbvc}_{t,i}(t',\alpha) \gets {hbvc}_{t,i}(t',\alpha) \ \forall t' \in T$
+            \item For each $t' \in T$
+            \begin{enumerate}[label*=\arabic*.]
+                \item ${pbvc}_{t,i}(t',\alpha) \gets {hbvc}_{t,i}(t',\alpha)$
+            \end{enumerate}
+        \end{enumerate}
+
+        % Pass to children
+        \item For each child node $c$ such that $(v, c) \in E$
+        \begin{enumerate}[label*=\arabic*.]
+            \item Let $(t_c, i_c) = loc(c)$
+            \item For each $t' \in T$ and for each $\beta \in {Vars}$
+            \begin{enumerate}[label*=\arabic*.]
+                \item ${hbvc}_{t_c,i_c}(t',\beta) \gets \max\left({hbvc}_{t_c,i_c}(t',\beta), {hbvc}_{t,i}(t',\beta)\right)$
+                \item ${pbvc}_{t_c,i_c}(t',\beta) \gets \max\left({pbvc}_{t_c,i_c}(t',\beta), {pbvc}_{t,i}(t',\beta)\right)$
+            \end{enumerate}
+        \end{enumerate}
+
+        % If W, find bugs
+        \item If $op(v) \in \{W\}$
+        \begin{enumerate}[label*=\arabic*.]
+            \item Let $v \overset{pd}{\to} r$ a dependency in PDG, \\ such that $op(r) = R, (t, j) = loc(r)$
+            \item Call \texttt{find\_bugs($var(r)$, ${havc}_{t,j}$, ${pbvc}_{t,i}$)}
+        \end{enumerate}
+    \end{enumerate}
+\end{enumerate}
+
+
+Proof of step 1
+
+claim: after visiting node $v$ with $loc(v) = (t, i)$, \\ ${havc}_{t,i}(t') = {HAVC}_{t,i}(t') \ \forall t' \in T$
+
+HBG post-order: $v_1, v_2, \ldots, v_n$
+
+for $v_1$: \\
+$v_1$ has no children since there are no nodes before it in the post-order.
+This means ${HAVC}_{t,i}(t) = i$ and ${HAVC}_{t,i}(t') = \infty \ \forall t' \in T \neq t$.
+After visiting node $v_1$, in step $1.2$ we set ${havc}_{t,i}(t) \gets i$. Afterwards, we don't change ${havc}_{t,i}(t') \ \forall t' \in T$ since step $1.3$ won't happen, and $v_1$ is no parent of any other node.
+
+for $v_k$: \\
+We assume that for all children of $v_k$ the claim holds. \\
+First we set ${{havc}_{t,i}(t) \gets i}$. \\
+For each child of $v_k$ we merge
+
+
+\end{document}
