@@ -121,6 +121,22 @@ A persisted node is a node that happens-before a Flush event (on the same variab
 \subsection{Concurrent Persistence Race}
 We say there is a Concurrent Persistence Race between read node $r$ and write node $w$ if
 
+% \[
+%     {PersistenceRaces} = \left\{ (r, w) \middle| \ 
+%     \begin{aligned}
+%         & r, w \in V \\
+%         & lbl(r) = R(\alpha), lbl(w) = W(\alpha) \\
+%         & \exists v \in V. \;\; lbl(v) = W(\beta)\\
+%         & \text{such that:} \\
+%         & \begin{aligned}
+%             & && loc(v_1) = (t', j), \ loc(v_k) = (t, i) \\
+%             & && lbl(v_1) \in \{ R(\alpha), W(\alpha) \} \\
+%             & && \exists 1 < f \leq k. \;\; lbl(v_f) = F(\alpha)
+%         \end{aligned}
+%     \end{aligned}
+%     \right\}
+% \]
+
 \[
     {PersistenceRaces} = \left\{ (r, w) \middle| \ 
     \begin{aligned}
@@ -140,6 +156,147 @@ We say there is a Concurrent Persistence Race between read node $r$ and write no
 \]
 
 \subsection{Algorithm}
+
+\DontPrintSemicolon
+\SetNoFillComment
+\SetKwComment{Comment}{/* }{ */}
+% \SetKwInOut{Input}{inputs}
+% \SetKwInOut{Output}{output}
+\SetKw{Continue}{continue}
+\SetKw{Assert}{assert}
+\SetKwProg{Fn}{Function}{:}{}
+\SetKwFunction{FHAVC}{HAVC-Builder}
+\SetKwFunction{FPBVC}{PBVC-Builder}
+\SetKwFunction{FCPRD}{CPRD}
+
+\begin{algorithm}[H]
+    \caption{Happens-After Vector Clocks Builder}
+    \Fn{\FHAVC{$HBG$}}{
+        \BlankLine
+        Set default ${havc}_{t,i}(t') \gets +\infty$ \hfill $\forall t,t' \in T, i \in \mathbb{N}$ \;
+        \BlankLine
+        \ForEach{node $v$ in HBG in post-order}{
+            $(t, i) \gets loc(v)$\;
+            ${havc}_{t,i}(t) \gets i$\;
+            \BlankLine
+            \ForEach{parent node $p$ such that $(p, v) \in E$}{
+                $(t_p, i_p) \gets loc(p)$\;
+                \ForEach{$t' \in T$}{
+                    ${havc}_{t_p,i_p}(t') \gets \min\left({havc}_{t_p,i_p}(t'), {havc}_{t,i}(t')\right)$
+                }
+            }
+        }
+        \BlankLine
+        \KwRet ${havc}$\;
+    } 
+\end{algorithm}
+
+\begin{algorithm}[H]
+    \caption{Persisted-Before Vector Clocks Builder}
+    \Fn{\FPBVC{$HBG$}}{
+        \BlankLine
+        Set default ${hbvc}_{t,i}(t', \alpha) \gets -\infty$ \hfill $\forall t,t' \in T, i \in \mathbb{N}, \alpha \in {Vars}$ \;
+        Set default ${pbvc}_{t,i}(t', \alpha) \gets -\infty$ \hfill $\forall t,t' \in T, i \in \mathbb{N}, \alpha \in {Vars}$ \;
+        \BlankLine
+        \ForEach{node $v$ in HBG in reversed post-order}{
+            $(t, i) \gets loc(v)$, $\alpha \gets var(v)$\;
+        
+            % RW
+            \BlankLine
+            \Comment*[l]{Handle Read and Write nodes}
+            \If{$op(v) \in \{R, W\}$}{
+                ${hbvc}_{t,i}(t,\alpha) \gets i$\;
+            }
+        
+            % F
+            \BlankLine
+            \Comment*[l]{Handle Flush nodes}
+            \If{$op(v) \in \{F\}$}{
+                \ForEach{$t' \in T$}{
+                    ${pbvc}_{t,i}(t',\alpha) \gets {hbvc}_{t,i}(t',\alpha)$\;
+                }
+            }
+        
+            % Pass to children
+            \BlankLine
+            \Comment*[l]{Handle children nodes}
+            \ForEach{child node $c$ such that $(v, c) \in E$}{
+                $(t_c, i_c) \gets loc(c)$\;
+                \ForEach{$t' \in T$}{
+                    \ForEach{$\beta \in {Vars}$}{
+                        ${hbvc}_{t_c,i_c}(t',\beta) \gets \max\left({hbvc}_{t_c,i_c}(t',\beta), {hbvc}_{t,i}(t',\beta)\right)$\;
+                        ${pbvc}_{t_c,i_c}(t',\beta) \gets \max\left({pbvc}_{t_c,i_c}(t',\beta), {pbvc}_{t,i}(t',\beta)\right)$\;
+                    }
+                }
+            }
+        }
+        \BlankLine
+        \KwRet ${pbvc}$\;
+    }
+\end{algorithm}
+
+\begin{algorithm}[H]
+    \caption{Concurrent Persistence Race Detector}
+    \Fn{\FCPRD{$HBG$, $PDG$}}{
+        ${havc} \gets \FHAVC{HBG}$\;
+        ${pbvc} \gets \FPBVC{HBG}$\;
+        \BlankLine
+        \ForEach{write node $v$ in HBG}{
+            $(t, i) \gets loc(v)$, $\alpha \gets var(v)$\;
+
+            \BlankLine
+            \ForEach{read node $r$ in $PDG$ such that $v \overset{pd}{\to} r$}{
+                $(t', j) \gets loc(r)$, $\beta \gets var(r)$\;
+                \Assert{$t' \neq t$}\;
+                % TODO: explain that t wasn't changed or something
+                
+                \BlankLine
+                \Comment*[l]{If the dependent node and the read node are of the same variable, there is not bug}
+                \If{$\alpha = \beta$}{
+                    \Continue\;
+                }
+                
+                \BlankLine
+                \Comment*[l]{If the read node is persisted, there is not bug}
+                \If{$j \leq {pbvc}_{t,i}(t)$}{
+                    \Continue\;
+                }
+                
+                \BlankLine
+                \Comment*[l]{If the read node is persisted, there is not bug}
+                \If{$j \leq {pbvc}_{t,i}(t)$}{
+                    \Continue\;
+                }
+
+                \BlankLine
+                \ForEach{write node $w \in W_\alpha$}{
+                    $(t_w, i_w) \gets loc(w)$
+                    \BlankLine
+                    \If{${pbvc}_{t,i}(t_w) < i_w < {havc}_{t,j}$}{
+                        Report bug!\;
+                    }
+                }
+            }
+            
+        
+        }
+        \BlankLine
+        % \KwRet\;
+    }
+\end{algorithm}
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 \begin{algorithm}[H]
     \caption{CPRD}
