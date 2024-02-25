@@ -36,16 +36,9 @@ class AbstractNode(ABC):
         """Return the thread ID"""
         return self._tid
 
-    # @property
-    # def tindex(self):
-    #     """Return the index of the node in the thread"""
-    #     return self._tindex
-
     def __repr__(self) -> str:
         itype = self.itype
         tid = self.tid
-        # tindex = self.tindex
-        # return f'{self.__class__.__name__}({itype=}, {tid=}, {tindex=})'
         return f'{self.__class__.__name__}({itype=}, {tid=})'
 
 
@@ -81,6 +74,8 @@ class InstructionNode(AbstractNode):
         self._info = info
         self._trace_line_number = trace_line_number
 
+        assert size, "Size can't be 0"
+
     @property
     def instruction(self):
         return self.itype
@@ -105,13 +100,21 @@ class InstructionNode(AbstractNode):
     def info(self):
         return self._info
     
-    def is_overlap(self, other: 'InstructionNode') -> bool:
+    def is_interval_overlap(self, other: 'InstructionNode') -> bool:
         """
         Return True if the instructions' variables overlap
         """
         i1 = self.interval
         i2 = other.interval
         return max(i1[0], i2[0]) < min(i1[1], i2[1])
+    
+    def is_interval_contains(self, other: 'InstructionNode') -> bool:
+        """
+        Return True if other's variable is contained in self's interval
+        """
+        i1 = self.interval
+        i2 = other.interval
+        return i1[0] <= i2[0] < i2[1] <= i1[1]
 
     def get_cacheline_address(self, cacheline_size=utils.DEFAULT_CACHELINE_SIZE):
         return utils.get_cacheline_address(self.address, cacheline_size=cacheline_size)

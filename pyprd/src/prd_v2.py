@@ -180,7 +180,7 @@ class PersistencyRaceDetector:
                     write_node: WriteNode
 
                     # Is a different var
-                    if not write_node.is_overlap(read_node):
+                    if not write_node.is_interval_overlap(read_node):
                         continue
 
                     write_node_loc = self._hbg.get_node_location(write_node)
@@ -272,3 +272,45 @@ class PersistencyRaceDetector:
 
         with utils.timeit('Bug detection O(N*V*T^2 + B) ~ O(N*(B+V))'):
             return list(self._do_persisted_before_vector_clocks_analysis(vc_per_read_node, show_first_bug_only))
+        
+    def is_bug(self, race: PersistencyRace):
+        assert race.read_node.itype == NodeType.READ
+        assert race.write_node.itype == NodeType.WRITE
+        assert race.dependent_node.itype == NodeType.WRITE
+
+        # If W(X) and R(X) are of different vars, then this is not a bug
+        if not race.read_node.is_interval_overlap(race.write_node):
+            return False
+
+        # Find happens-after group
+        happens_after_group = {n for n in self._hbg.bfs_successors(race.read_node) if NodeType.is_instruction_type(n.itype)}
+
+        assert race.dependent_node in happens_after_group, "W(Y) isn't happening after R(X)"
+
+        # If W(X) happens after R(X), there is no bug
+        if race.write_node in happens_after_group:
+            return False
+
+        # Find last known FLUSH from each thread
+        last_known_flushes = {}
+        for n in self._hbg.bfs_predecessors(race.dependent_node):
+            if n.tid in last_known_flushes:
+                continue
+            if n.itype == NodeType.FLUSH and n.is_interval_contains(race.read_node):
+                last_known_flushes[n.tid] = n
+
+        # Find persisted-before group
+        persisted_before = set()
+        for flush_node in last_known_flushes.values():
+            persisted_before |= {n for n in self._hbg.bfs_predecessors(flush_node) if NodeType.is_instruction_type(n.itype)}
+
+        # If R(X) is persisted before W(Y), there is no bug
+        if race.read_node in persisted_before:
+            return False
+
+        # If W(X) is persisted before W(Y), there is no bug
+        if race.write_node in persisted_before:
+            return False
+        
+        return True
+        

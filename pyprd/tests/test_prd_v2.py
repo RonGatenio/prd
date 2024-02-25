@@ -111,6 +111,22 @@ def test_races_sanity():
             PersistencyRace(r1_00, w2_03, w1_04),
             PersistencyRace(r2_04, w1_04, w2_05),
         }
+    
+    assert not prd.is_bug(PersistencyRace(r1_00, w0_00, w1_04, validate=False))
+    assert     prd.is_bug(PersistencyRace(r1_00, w0_01, w1_04, validate=False))
+    assert not prd.is_bug(PersistencyRace(r1_00, w0_05, w1_04, validate=False))
+    assert not prd.is_bug(PersistencyRace(r1_00, w1_04, w1_04, validate=False))
+    assert not prd.is_bug(PersistencyRace(r1_00, w2_00, w1_04, validate=False))
+    assert     prd.is_bug(PersistencyRace(r1_00, w2_03, w1_04, validate=False))
+    assert not prd.is_bug(PersistencyRace(r1_00, w2_05, w1_04, validate=False))
+
+    assert not prd.is_bug(PersistencyRace(r2_04, w0_00, w2_05, validate=False))
+    assert not prd.is_bug(PersistencyRace(r2_04, w0_01, w2_05, validate=False))
+    assert not prd.is_bug(PersistencyRace(r2_04, w0_05, w2_05, validate=False))
+    assert     prd.is_bug(PersistencyRace(r2_04, w1_04, w2_05, validate=False))
+    assert not prd.is_bug(PersistencyRace(r2_04, w2_00, w2_05, validate=False))
+    assert not prd.is_bug(PersistencyRace(r2_04, w2_03, w2_05, validate=False))
+    assert not prd.is_bug(PersistencyRace(r2_04, w2_05, w2_05, validate=False))
 
 
 def test_races_sanity2():

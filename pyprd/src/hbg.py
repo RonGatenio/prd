@@ -354,7 +354,7 @@ class HBG:
         child, = children
         return child
 
-    def get_intra_parent(self, node) -> nodes.AbstractNode:
+    def get_intra_parent(self, node: nodes.AbstractNode) -> nodes.AbstractNode:
         parents = list(self.intra.predecessors(node))
 
         if not parents:
@@ -402,6 +402,12 @@ class HBG:
 
     def reverse_postorder(self) -> Generator[nodes.AbstractNode, None, None]:
         return nx.topological_sort(self._graph)
+    
+    def bfs_successors(self, source: nodes.AbstractNode) -> Generator[nodes.AbstractNode, None, None]:
+        return (successor for _, successor in nx.bfs_edges(self._graph, source))
+
+    def bfs_predecessors(self, source: nodes.AbstractNode) -> Generator[nodes.AbstractNode, None, None]:
+        return (predecessor for _, predecessor in nx.bfs_edges(self._graph, source, reverse=True))
 
     def get_pc_info(self, pc: int) -> str | None:
         return self._pc_info.get(pc)
