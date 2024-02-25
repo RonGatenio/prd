@@ -5,6 +5,9 @@
 \usepackage{amsmath}
 \usepackage{amsfonts}
 \usepackage{amssymb}
+% \usepackage{algorithm2e}
+\usepackage[ruled,linesnumbered]{algorithm2e}
+\usepackage{float}
 %\usepackage{stackengine}
 
 \usepackage{calc}
@@ -137,6 +140,85 @@ We say there is a Concurrent Persistence Race between read node $r$ and write no
 \]
 
 \subsection{Algorithm}
+
+\begin{algorithm}[H]
+    \caption{CPRD}
+    \DontPrintSemicolon
+    \SetNoFillComment
+    \SetKwComment{Comment}{/* }{ */}
+    \SetKwInOut{Input}{inputs}
+    \SetKwInOut{Output}{output}
+    \SetKwProg{Fn}{Function}{}{}
+
+    % \Fn{\FCPRD{$HBG = (V, E)$, $PDG = (V, E')$}}{
+    % }
+    
+    \Input{$HBG = (V, E)$, $PDG = (V, E')$}
+    \Output{Concurrent Persistence Races}
+
+    \BlankLine
+    \BlankLine
+    \Comment*[l]{Initialization}    
+    Set default ${havc}_{t,i}(t') \gets +\infty$ \hfill $\forall t,t' \in T, i \in \mathbb{N}$ \;
+    Set default ${hbvc}_{t,i}(t', \alpha) \gets -\infty$ \hfill $\forall t,t' \in T, i \in \mathbb{N}, \alpha \in {Vars}$ \;
+    Set default ${pbvc}_{t,i}(t', \alpha) \gets -\infty$ \hfill $\forall t,t' \in T, i \in \mathbb{N}, \alpha \in {Vars}$ \;
+
+    \BlankLine
+    \BlankLine
+    \Comment*[l]{Happens-After Vector Clocks}    
+    \ForEach{node $v$ in HBG in post-order}{
+        $(t, i) \gets loc(v)$\;
+        ${havc}_{t,i}(t) \gets i$\;
+        \ForEach{parent node $p$ such that $(p, v) \in E$}{
+            $(t_p, i_p) \gets loc(p)$\;
+            \ForEach{$t' \in T$}{
+                ${havc}_{t_p,i_p}(t') \gets \min\left({havc}_{t_p,i_p}(t'), {havc}_{t,i}(t')\right)$
+            }
+        }
+    }
+
+    \BlankLine
+    \BlankLine
+    \Comment*[l]{Happens-Before and Persisted-Before Vector Clocks}
+    \ForEach{node $v$ in HBG in reversed post-order}{
+        $(t, i) \gets loc(v)$, $\alpha = var(v)$\;
+    
+        % RW
+        \BlankLine
+        \Comment*[l]{Handle Read and Write nodes}
+        \If{$op(v) \in \{R, W\}$}{
+            ${hbvc}_{t,i}(t,\alpha) \gets i$\;
+        }
+    
+        % F
+        \BlankLine
+        \Comment*[l]{Handle Flush nodes}
+        \If{$op(v) \in \{F\}$}{
+            \ForEach{$t' \in T$}{
+                ${pbvc}_{t,i}(t',\alpha) \gets {hbvc}_{t,i}(t',\alpha)$\;
+            }
+        }
+    
+        % Pass to children
+        \BlankLine
+        \Comment*[l]{Handle children nodes}
+        \ForEach{child node $c$ such that $(v, c) \in E$}{
+            $(t_c, i_c) \gets loc(c)$\;
+            \ForEach{$t' \in T$ and for each $\beta \in {Vars}$}{
+                ${hbvc}_{t_c,i_c}(t',\beta) \gets \max\left({hbvc}_{t_c,i_c}(t',\beta), {hbvc}_{t,i}(t',\beta)\right)$\;
+                ${pbvc}_{t_c,i_c}(t',\beta) \gets \max\left({pbvc}_{t_c,i_c}(t',\beta), {pbvc}_{t,i}(t',\beta)\right)$\;
+            }
+        }
+    
+        % If W, find bugs
+        \BlankLine
+        \Comment*[l]{Find bugs}
+        \If{$op(v) \in \{W\}$}{
+            Let $v \overset{pd}{\to} r$ a dependency in PDG, \\ such that $op(r) = R, (t, j) = loc(r)$\;
+            Call \texttt{find\_bugs($var(r)$, ${havc}_{t,j}$, ${pbvc}_{t,i}$)}\;
+        }
+    }
+\end{algorithm}
 
 \begin{enumerate}[label*=\arabic*.]
     \item Initialize
