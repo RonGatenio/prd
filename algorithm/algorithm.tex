@@ -21,15 +21,6 @@
 
 \begin{document}
 
-% \begin{equation}
-% V := \{v | c\in E\}
-% \end{equation}
-\[Vars := \{All variables in the trace\}\]
-\[T := \{All threads in the trace\}\]
-\[Ops := \{R, W, F\}\]
-\[HBG := (V, E)\]
-\[V := \{o(\alpha) | o \in Ops \wedge \alpha \in Vars\}\]
-\[V := \{v | c\in E\}\]
 
 Definitions:
 
@@ -58,6 +49,22 @@ $$a\overset{pd}{\to}a$$
 \section{Algorithm}
 
 \subsection{Definitions}
+\subsubsection{Happens-Before Graph}
+Let $HBG = (V, E)$ be a Happens-Before graph where $V$ is the set of the trace events and $E$ is the set of Happens-Before edges derived from the program trace log.
+
+We will denote Happens-Before relation with $\prec$
+
+$$
+    \begin{aligned}
+        & Vars && := && \{\text{All variables in the trace}\} \\
+        & T && := && \{\text{All threads in the trace}\} \\
+        & Ops && := && \{R, W, F\} \\
+        & HBG && := && (V, E) \\
+        & V && := && \{o(\alpha) | o \in Ops \wedge \alpha \in Vars\} \\
+        & V && := && \{v | c\in E\}
+    \end{aligned}
+$$
+
 
 \subsubsection{Happens-After Vector Clock}
 ${HAVC}_{t,i}(t')$ will be the first node's index in thread $t'$ that happens-after the $i^{th}$ node in thread $t$.
@@ -82,7 +89,8 @@ ${HBVC}_{t,i}(t',\alpha)$ will be the last node's index in thread $t'$ of variab
         & \text{such that:} \\
         & \begin{aligned}
             & && loc(v_1) = (t', j), \ loc(v_k) = (t, i) \\
-            & && lbl(v_1) \in \{ R(\alpha), W(\alpha) \}
+            % & && lbl(v_1) \in \{ R(\alpha), W(\alpha) \} \\
+            & && v_1 \in R_\alpha \cup W_\alpha \\
         \end{aligned}
     \end{aligned}
     \right\} \right)
@@ -98,8 +106,10 @@ A persisted node is a node that happens-before a Flush event (on the same variab
         & \text{such that:} \\
         & \begin{aligned}
             & && loc(v_1) = (t', j), \ loc(v_k) = (t, i) \\
-            & && lbl(v_1) \in \{ R(\alpha), W(\alpha) \} \\
-            & && \exists 1 < f \leq k. \;\; lbl(v_f) = F(\alpha)
+            % & && lbl(v_1) \in \{ R(\alpha), W(\alpha) \} \\
+            & && v_1 \in R_\alpha \cup W_\alpha \\
+            % & && \exists 1 < f \leq k. \;\; lbl(v_f) = F(\alpha)
+            & && \exists 1 < f \leq k. \;\; v_f \in F_\alpha
         \end{aligned}
     \end{aligned}
     \right\} \right)
@@ -111,14 +121,16 @@ We say there is a Concurrent Persistence Race between read node $r$ and write no
 \[
     {PersistenceRaces} = \left\{ (r, w) \middle| \ 
     \begin{aligned}
-        & r, w \in V \\
-        & lbl(r) = R(\alpha), lbl(w) = W(\alpha) \\
-        & \exists v \in V. \;\; lbl(v) = W(\beta)\\
+        % & r, w \in V \\
+        % & lbl(r) = R(\alpha), lbl(w) = W(\alpha) \\
+        & r \in R_\alpha, w \in W_\alpha \\
+        & loc(w) = (t_w, i_w) \\
+        % & \exists v \in V. \;\; lbl(v) = W(\beta)\\
+        & \exists v \in W_\beta, \;\; \beta \neq \alpha \\
         & \text{such that:} \\
         & \begin{aligned}
-            & && loc(v_1) = (t', j), \ loc(v_k) = (t, i) \\
-            & && lbl(v_1) \in \{ R(\alpha), W(\alpha) \} \\
-            & && \exists 1 < f \leq k. \;\; lbl(v_f) = F(\alpha)
+            & && v \overset{pd}{\to} r \\
+            & && {PBVC}_{loc(v)}(t_w, \alpha) < i_w < {HAVC}_{loc(r)}(t_w)
         \end{aligned}
     \end{aligned}
     \right\}
