@@ -5,68 +5,78 @@
 \usepackage{amsmath}
 \usepackage{amsfonts}
 \usepackage{amssymb}
-% \usepackage{algorithm2e}
 \usepackage[ruled,linesnumbered]{algorithm2e}
 \usepackage{float}
-%\usepackage{stackengine}
-
 \usepackage{calc}
 
-\newcommand*{\WidestText}{}%
-\newcommand*{\MakeBox}[1]{\makebox[\widthof{\WidestText}][l]{#1}}
-
-\newenvironment{AlignedItemize}[1]{%
-    \renewcommand*{\WidestText}{#1}%
-    \begin{itemize}
-}{%
-    \end{itemize}%
-}%
-
 \begin{document}
-
-
-Definitions:
-
-Let $HBG = (V, E)$ be a Happens-Before graph where $V$ is the set of the trace events and $E$ is the set of Happens-Before edges derived from the program trace log.
-
-We will denote a path $P \in V^i$ in the graph of length as
-
-% let V be all of the events in the program trace \\
-% let E be the Happens-Before edges calculated in the program trace \\
-We will denote Happens-Before relation with $\prec$
-$$v \prec u \iff \exists P = (v, w_1), (w_1, w_2), ..., (w_i, u) \in E^{i+1}. i>0 $$
-We will denote $v \to u \iff (v,u)\in E$ \\
-We will denote path $P \in E^{i}$ of length $i$ as 
-
-$$HBG := (V, E)$$
-
-$$PDG := (V, E')$$
-
-$$a\overset{\Delta}{=}a$$
-$$a\overset{pd}{\to}a$$
-
-% \noindent\makebox[\linewidth]{\rule{\paperwidth}{0.4pt}}
-
-\newpage
+\setlength\parskip{0.5em}
+\setlength{\parindent}{0em}
 
 \section{Algorithm}
 
 \subsection{Definitions}
+
+\subsubsection{General Notations}
+The program trace contains events and relations between them. \\
+Each event has a type: Read, Write, or Flush. \\
+Each event operates on a variable (a memory address in PM space).
+
+We will define some groups on the collection of data from the program trace:
+\begin{itemize}
+    \item Let $V$ be all event nodes in the trace.
+    \item Let $Vars$ be all variables in the trace.
+    \item Let $T$ be all threads in the trace.
+    \item Let $Ops = \{R, W, F\}$ be the event types in the trace: Read, Write, and Flush respectively.
+    \item Let $lbl(v \in V) = o(\alpha)$  where $o \in {Ops}, \alpha \in {Vars}$, be the label of event $v$. Signifying that $v$ is of type $o$ and operates on  variable $\alpha$.
+    \item Let $loc(v \in V) = (t, i) \in T \times \mathbb{N}$. Signifying that $v$ is the $i^{th}$ node in thread $t$.
+    
+\end{itemize}
+% $$
+%     \begin{aligned}
+%         & V && := && \{\text{All event nodes in the trace}\} \\
+%         & Vars && := && \{\text{All variables in the trace}\} \\
+%         & T && := && \{\text{All threads in the trace}\} \\
+%         & Ops && := && \{R, W, F\} \\
+%         % & HBG && := && (V, E) \\
+%         % & PDG && := && (V, E') \\
+%         & lbl(v \in V) && := && o(\alpha) \text{ where } o \in {Ops}, \alpha \in {Vars} \\
+%         & loc(v \in V) && := && (t, i) \in T \times \mathbb{N}. \text{ Meaning } v \text{ is the } i^{th} \text{ node in thread } t
+%     \end{aligned}
+% $$
+
 \subsubsection{Happens-Before Graph}
+
 Let $HBG = (V, E)$ be a Happens-Before graph where $V$ is the set of the trace events and $E$ is the set of Happens-Before edges derived from the program trace log.
 
-We will denote Happens-Before relation with $\prec$
+We will denote Happens-Before relation with $\prec$.
+
+The $HBG$ ensures that:
+$$v_1 \prec v_k \iff \exists P = (v_1, \ldots, v_k) \in V^k \text{ where } P \text{ is a path in } HBG$$
+
+\subsubsection{Program Dependency Graph (TODO)}
+Let $PDG = (V, E')$ be a Program Dependency graph where $V$ is the set of the trace events and $E'$ is the set of Program Dependency edges derived from the program dependency analysis.
+
+For each read node $r \in V$, we will store in $E'$ only the earliest write node $w \in V$ such that $w \overset{pd}{\to} r$.
 
 $$
+    E' = \left\{ (w, r) \middle| \
     \begin{aligned}
-        & Vars && := && \{\text{All variables in the trace}\} \\
-        & T && := && \{\text{All threads in the trace}\} \\
-        & Ops && := && \{R, W, F\} \\
-        & HBG && := && (V, E) \\
-        & V && := && \{o(\alpha) | o \in Ops \wedge \alpha \in Vars\} \\
-        & V && := && \{v | c\in E\}
+        & w,r \in V \\
+        & w \overset{pd}{\to} r \\
+        & \text{let } 
     \end{aligned}
+    \right\}
 $$
+
+The edges in $E'$ will only hold 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% TODO: define E' correctly
+% TODO: add claim that most bugs are found in the first dependency, add proof (where should this be?)
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
 
 
 \subsubsection{Happens-After Vector Clock}
@@ -296,166 +306,6 @@ We say there is a Concurrent Persistence Race between read node $r$ and write no
 
 
 
-
-
-\begin{algorithm}[H]
-    \caption{CPRD}
-    \DontPrintSemicolon
-    \SetNoFillComment
-    \SetKwComment{Comment}{/* }{ */}
-    \SetKwInOut{Input}{inputs}
-    \SetKwInOut{Output}{output}
-    \SetKwProg{Fn}{Function}{}{}
-
-    % \Fn{\FCPRD{$HBG = (V, E)$, $PDG = (V, E')$}}{
-    % }
-    
-    \Input{$HBG = (V, E)$, $PDG = (V, E')$}
-    \Output{Concurrent Persistence Races}
-
-    \BlankLine
-    \BlankLine
-    \Comment*[l]{Initialization}    
-    Set default ${havc}_{t,i}(t') \gets +\infty$ \hfill $\forall t,t' \in T, i \in \mathbb{N}$ \;
-    Set default ${hbvc}_{t,i}(t', \alpha) \gets -\infty$ \hfill $\forall t,t' \in T, i \in \mathbb{N}, \alpha \in {Vars}$ \;
-    Set default ${pbvc}_{t,i}(t', \alpha) \gets -\infty$ \hfill $\forall t,t' \in T, i \in \mathbb{N}, \alpha \in {Vars}$ \;
-
-    \BlankLine
-    \BlankLine
-    \Comment*[l]{Happens-After Vector Clocks}    
-    \ForEach{node $v$ in HBG in post-order}{
-        $(t, i) \gets loc(v)$\;
-        ${havc}_{t,i}(t) \gets i$\;
-        \ForEach{parent node $p$ such that $(p, v) \in E$}{
-            $(t_p, i_p) \gets loc(p)$\;
-            \ForEach{$t' \in T$}{
-                ${havc}_{t_p,i_p}(t') \gets \min\left({havc}_{t_p,i_p}(t'), {havc}_{t,i}(t')\right)$
-            }
-        }
-    }
-
-    \BlankLine
-    \BlankLine
-    \Comment*[l]{Happens-Before and Persisted-Before Vector Clocks}
-    \ForEach{node $v$ in HBG in reversed post-order}{
-        $(t, i) \gets loc(v)$, $\alpha = var(v)$\;
-    
-        % RW
-        \BlankLine
-        \Comment*[l]{Handle Read and Write nodes}
-        \If{$op(v) \in \{R, W\}$}{
-            ${hbvc}_{t,i}(t,\alpha) \gets i$\;
-        }
-    
-        % F
-        \BlankLine
-        \Comment*[l]{Handle Flush nodes}
-        \If{$op(v) \in \{F\}$}{
-            \ForEach{$t' \in T$}{
-                ${pbvc}_{t,i}(t',\alpha) \gets {hbvc}_{t,i}(t',\alpha)$\;
-            }
-        }
-    
-        % Pass to children
-        \BlankLine
-        \Comment*[l]{Handle children nodes}
-        \ForEach{child node $c$ such that $(v, c) \in E$}{
-            $(t_c, i_c) \gets loc(c)$\;
-            \ForEach{$t' \in T$ and for each $\beta \in {Vars}$}{
-                ${hbvc}_{t_c,i_c}(t',\beta) \gets \max\left({hbvc}_{t_c,i_c}(t',\beta), {hbvc}_{t,i}(t',\beta)\right)$\;
-                ${pbvc}_{t_c,i_c}(t',\beta) \gets \max\left({pbvc}_{t_c,i_c}(t',\beta), {pbvc}_{t,i}(t',\beta)\right)$\;
-            }
-        }
-    
-        % If W, find bugs
-        \BlankLine
-        \Comment*[l]{Find bugs}
-        \If{$op(v) \in \{W\}$}{
-            Let $v \overset{pd}{\to} r$ a dependency in PDG, \\ such that $op(r) = R, (t, j) = loc(r)$\;
-            Call \texttt{find\_bugs($var(r)$, ${havc}_{t,j}$, ${pbvc}_{t,i}$)}\;
-        }
-    }
-\end{algorithm}
-
-\begin{enumerate}[label*=\arabic*.]
-    \item Initialize
-    \begin{enumerate}[label*=\arabic*.]
-        \item Set default ${havc}_{t,i}(t') \gets +\infty$ \hfill $\forall t,t' \in T, i \in \mathbb{N}$
-        \item Set default ${hbvc}_{t,i}(t', \alpha) \gets -\infty$ \hfill $\forall t,t' \in T, i \in \mathbb{N}, \alpha \in {Vars}$
-        \item Set default ${pbvc}_{t,i}(t', \alpha) \gets -\infty$ \hfill $\forall t,t' \in T, i \in \mathbb{N}, \alpha \in {Vars}$
-        % \item Set default ${dirty}(t,t') \gets \varnothing$ \hfill $\forall t,t' \in T$
-    \end{enumerate}
-    
-    % \item For each node $v$ in HBG
-    % \begin{enumerate}[label*=\arabic*.]
-    %     \item Let $(t, i) = loc(v)$
-    %     \item For each $t' \in T$
-    %     \begin{enumerate}[label*=\arabic*.]
-    %         \item ${havc}_{t,i}(t') \gets +\infty$
-    %         \item ${hbvc}_{t,i}(t') \gets -\infty$
-    %         \item ${pbvc}_{t,i}(t') \gets -\infty$
-    %     \end{enumerate}
-    % \end{enumerate}
-    % \item Initialize ${havc}_{t,i}(t') \gets \infty \ \forall t' \in T and v \in V such that loc(v) = (t, i)$
-
-    % Happens-After VC
-    \item For each node $v$ in HBG in post-order
-    \begin{enumerate}[label*=\arabic*.]
-        \item Let $(t, i) = loc(v)$
-        \item Set ${havc}_{t,i}(t) \gets i$
-        \item For each parent node $p$ such that $(p, v) \in E$
-        \begin{enumerate}[label*=\arabic*.]
-            \item Let $(t_p, i_p) = loc(p)$
-            \item For each $t' \in T$
-            \begin{enumerate}[label*=\arabic*.]
-                \item ${havc}_{t_p,i_p}(t') \gets \min\left({havc}_{t_p,i_p}(t'), {havc}_{t,i}(t')\right)$
-            \end{enumerate}
-        \end{enumerate}
-    \end{enumerate}
-    
-    % \item Initialize ${hbvc}_{t,i}(t') \gets -\infty $
-    % \item Initialize ${pbvc}_{t,i}(t') \gets -\infty $
-    
-    % Happens-Before and Persisted-Before VC
-    \item For each node $v$ in HBG in reversed post-order
-    \begin{enumerate}[label*=\arabic*.]
-        \item Let $(t, i) = loc(v)$, $\alpha = var(v)$
-
-        % RW
-        \item If $op(v) \in \{R, W\}$
-        \begin{enumerate}[label*=\arabic*.]
-            \item ${hbvc}_{t,i}(t,\alpha) \gets i$
-        \end{enumerate}
-
-        % F
-        \item If $op(v) \in \{F\}$
-        \begin{enumerate}[label*=\arabic*.]
-            % \item ${pbvc}_{t,i}(t',\alpha) \gets {hbvc}_{t,i}(t',\alpha) \ \forall t' \in T$
-            \item For each $t' \in T$
-            \begin{enumerate}[label*=\arabic*.]
-                \item ${pbvc}_{t,i}(t',\alpha) \gets {hbvc}_{t,i}(t',\alpha)$
-            \end{enumerate}
-        \end{enumerate}
-
-        % Pass to children
-        \item For each child node $c$ such that $(v, c) \in E$
-        \begin{enumerate}[label*=\arabic*.]
-            \item Let $(t_c, i_c) = loc(c)$
-            \item For each $t' \in T$ and for each $\beta \in {Vars}$
-            \begin{enumerate}[label*=\arabic*.]
-                \item ${hbvc}_{t_c,i_c}(t',\beta) \gets \max\left({hbvc}_{t_c,i_c}(t',\beta), {hbvc}_{t,i}(t',\beta)\right)$
-                \item ${pbvc}_{t_c,i_c}(t',\beta) \gets \max\left({pbvc}_{t_c,i_c}(t',\beta), {pbvc}_{t,i}(t',\beta)\right)$
-            \end{enumerate}
-        \end{enumerate}
-
-        % If W, find bugs
-        \item If $op(v) \in \{W\}$
-        \begin{enumerate}[label*=\arabic*.]
-            \item Let $v \overset{pd}{\to} r$ a dependency in PDG, \\ such that $op(r) = R, (t, j) = loc(r)$
-            \item Call \texttt{find\_bugs($var(r)$, ${havc}_{t,j}$, ${pbvc}_{t,i}$)}
-        \end{enumerate}
-    \end{enumerate}
-\end{enumerate}
 
 
 Proof of step 1
