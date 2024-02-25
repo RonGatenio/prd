@@ -9,27 +9,42 @@
 \usepackage{float}
 \usepackage{calc}
 
+\usepackage[bottom=0.5cm, right=1.5cm, left=1.5cm, top=1.5cm]{geometry}
+
 \begin{document}
 \setlength\parskip{0.5em}
 \setlength{\parindent}{0em}
 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Algorithm}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{Definitions}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsubsection{General Notations}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 The program trace contains events and relations between them. \\
 Each event has a type: Read, Write, or Flush. \\
 Each event operates on a variable (a memory address in PM space).
 
 We will define some groups on the collection of data from the program trace:
 \begin{itemize}
-    \item Let $V$ be all event nodes in the trace.
     \item Let $Vars$ be all variables in the trace.
     \item Let $T$ be all threads in the trace.
-    \item Let $Ops = \{R, W, F\}$ be the event types in the trace: Read, Write, and Flush respectively.
-    \item Let $lbl(v \in V) = o(\alpha)$  where $o \in {Ops}, \alpha \in {Vars}$, be the label of event $v$. Signifying that $v$ is of type $o$ and operates on  variable $\alpha$.
-    \item Let $loc(v \in V) = (t, i) \in T \times \mathbb{N}$. Signifying that $v$ is the $i^{th}$ node in thread $t$.
+    \item Let $V$ be all event nodes in the trace.
+    \item Let $R, W, F$ be all the Read, Write, and Flush nodes in the trace respectively.
+    \item Let $R_\alpha, W_\alpha, F_\alpha$ be all the Read, Write, and Flush nodes in the trace respectively such that the variable operated by the node is $\alpha$.
+    % \item Let $Ops = \{R, W, F\}$ be the event types in the trace: Read, Write, and Flush respectively.
+    % \item Let $lbl(v \in V) = o(\alpha)$  where $o \in {Ops}, \alpha \in {Vars}$, be the label of event $v$. Signifying that $v$ is of type $o$ and operates on  variable $\alpha$.
+    \item Let $var(v \in V) = \alpha \in Vars$ be the variable operated by node $v$.
+    \item Let $loc(v \in V) = (t, i) \in T \times \mathbb{N}$ be the location of node $v$, meaning that $v$ is the $i^{th}$ node in thread $t$.
     
 \end{itemize}
 % $$
@@ -45,7 +60,10 @@ We will define some groups on the collection of data from the program trace:
 %     \end{aligned}
 % $$
 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsubsection{Happens-Before Graph}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 Let $HBG = (V, E)$ be a Happens-Before graph where $V$ is the set of the trace events and $E$ is the set of Happens-Before edges derived from the program trace log.
 
@@ -54,7 +72,11 @@ We will denote Happens-Before relation with $\prec$.
 The $HBG$ ensures that:
 $$v_1 \prec v_k \iff \exists P = (v_1, \ldots, v_k) \in V^k \text{ where } P \text{ is a path in } HBG$$
 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsubsection{Program Dependency Graph (TODO)}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 Let $PDG = (V, E')$ be a Program Dependency graph where $V$ is the set of the trace events and $E'$ is the set of Program Dependency edges derived from the program dependency analysis.
 
 For each read node $r \in V$, we will store in $E'$ only the earliest write node $w \in V$ such that $w \overset{pd}{\to} r$.
@@ -78,8 +100,10 @@ The edges in $E'$ will only hold
 
 
 
-
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsubsection{Happens-After Vector Clock}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 ${HAVC}_{t,i}(t')$ will be the first node's index in thread $t'$ that happens-after the $i^{th}$ node in thread $t$.
 \[
     {HAVC}_{t,i}(t') = \min \left( \left\{ j \middle| \ 
@@ -93,7 +117,11 @@ ${HAVC}_{t,i}(t')$ will be the first node's index in thread $t'$ that happens-af
     \right\} \right)
 \]
 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsubsection{Happens-Before Vector Clock}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 ${HBVC}_{t,i}(t',\alpha)$ will be the last node's index in thread $t'$ of variable $\alpha$ that happens-before the $i^{th}$ node in thread $t$.
 \[
     {HBVC}_{t,i}(t',\alpha) = \max \left( \left\{ j \middle| \ 
@@ -109,7 +137,11 @@ ${HBVC}_{t,i}(t',\alpha)$ will be the last node's index in thread $t'$ of variab
     \right\} \right)
 \]
 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsubsection{Happens-Before Vector Clock}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 ${PBVC}_{t,i}(t',\alpha)$ will be the last node's index in thread $t'$ of variable $\alpha$ that was persisted before the $i^{th}$ node in thread $t$. \\
 A persisted node is a node that happens-before a Flush event (on the same variable).
 \[
@@ -128,7 +160,11 @@ A persisted node is a node that happens-before a Flush event (on the same variab
     \right\} \right)
 \]
 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{Concurrent Persistence Race}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 We say there is a Concurrent Persistence Race between read node $r$ and write node $w$ if
 
 % \[
@@ -165,7 +201,10 @@ We say there is a Concurrent Persistence Race between read node $r$ and write no
     \right\}
 \]
 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{Algorithm}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \DontPrintSemicolon
 \SetNoFillComment
@@ -214,14 +253,14 @@ We say there is a Concurrent Persistence Race between read node $r$ and write no
             % RW
             \BlankLine
             \Comment*[l]{Handle Read and Write nodes}
-            \If{$op(v) \in \{R, W\}$}{
+            \If{$v \in R \cup W$}{
                 ${hbvc}_{t,i}(t,\alpha) \gets i$\;
             }
         
             % F
             \BlankLine
             \Comment*[l]{Handle Flush nodes}
-            \If{$op(v) \in \{F\}$}{
+            \If{$v \in F$}{
                 \ForEach{$t' \in T$}{
                     ${pbvc}_{t,i}(t',\alpha) \gets {hbvc}_{t,i}(t',\alpha)$\;
                 }
@@ -296,17 +335,9 @@ We say there is a Concurrent Persistence Race between read node $r$ and write no
 \end{algorithm}
 
 
-
-
-
-
-
-
-
-
-
-
-
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Proof (TODO)}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 Proof of step 1
 
