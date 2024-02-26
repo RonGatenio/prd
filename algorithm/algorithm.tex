@@ -5,9 +5,11 @@
 \usepackage{amsmath}
 \usepackage{amsfonts}
 \usepackage{amssymb}
+\usepackage{sansmath}
 \usepackage[ruled,linesnumbered]{algorithm2e}
 \usepackage{float}
 \usepackage{calc}
+\usepackage{xspace}
 
 \usepackage[bottom=0.5cm, right=1.5cm, left=1.5cm, top=1.5cm]{geometry}
 
@@ -15,6 +17,61 @@
 \setlength\parskip{0.5em}
 \setlength{\parindent}{0em}
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\iffalse
+notes from Guy
+
+- use mathsf or mathcal for the fonts
+    - i.e. mathhfs{HBG}
+    - use fonts for graph names as well
+- HBG = (Ev, HBEdges) ?
+    - rename V since it symbolizes an events group
+- Define range of arguments of a function separately
+    - i.e. instead of $loc(v \in V) = ...$, do $loc(v) = .... .... \forall v \in V$
+- Rethink about the indexing of HAVC etc.
+    - They seem confusing
+% - Add in persistence race definition $\exists \alpha$
+- Add an explanation of the algorithm in simple words
+
+\fi
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Parameters
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\newcommand{\test}{\ensuremath{\mathfont{{Var}\;abcd\;V\;v\;e\;E\;R_\alpha\;\forall\;\exists} \\ }}
+
+% Fonts %
+\newcommand{\mathfont}[1]{\ensuremath{\mathsf{#1}}}
+% \test
+% \renewcommand{\mathfont}[1]{\ensuremath{\mathcal{#1}}}
+% \test
+% \renewcommand{\mathfont}[1]{\ensuremath{\mathbf{#1}}}
+% \test
+% \renewcommand{\mathfont}[1]{\ensuremath{\mathrm{#1}}}
+% \test
+% \renewcommand{\mathfont}[1]{\ensuremath{#1}}
+% \test
+
+% Groups %
+\newcommand{\Nodes}{\ensuremath{\mathfont{V}}}
+\newcommand{\HBEdges}{\ensuremath{E}}
+\newcommand{\PDEdges}{\ensuremath{E'}}
+\newcommand{\HBG}{\ensuremath{HBG}}
+\newcommand{\PDG}{\ensuremath{PDG}}
+\newcommand{\GraphDef}[3]{\ensuremath{#1(#2, #3)}}
+
+\newcommand{\Vars}{\ensuremath{\mathfont{Vars}}}
+\newcommand{\Threads}{\ensuremath{\mathfont{T}}}
+
+
+% Functions %
+\newcommand{\var}[1]{\ensuremath{\mathfont{var}(#1)}}
+
+$\HBG(\Nodes, \HBEdges)$ \\
+\GraphDef{\HBG}{\Nodes}{\HBEdges}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Algorithm}
@@ -36,14 +93,14 @@ Each event operates on a variable (a memory address in PM space).
 
 We will define some groups on the collection of data from the program trace:
 \begin{itemize}
-    \item Let $Vars$ be all variables in the trace.
-    \item Let $T$ be all threads in the trace.
-    \item Let $V$ be all event nodes in the trace.
+    \item Let $\Vars$ be all variables in the trace.
+    \item Let $\Threads$ be all threads in the trace.
+    \item Let $\Nodes$ be all event nodes in the trace.
     \item Let $R, W, F$ be all the Read, Write, and Flush nodes in the trace respectively.
     \item Let $R_\alpha, W_\alpha, F_\alpha$ be all the Read, Write, and Flush nodes in the trace respectively such that the variable operated by the node is $\alpha$.
     % \item Let $Ops = \{R, W, F\}$ be the event types in the trace: Read, Write, and Flush respectively.
     % \item Let $lbl(v \in V) = o(\alpha)$  where $o \in {Ops}, \alpha \in {Vars}$, be the label of event $v$. Signifying that $v$ is of type $o$ and operates on  variable $\alpha$.
-    \item Let $var(v \in V) = \alpha \in Vars$ be the variable operated by node $v$.
+    \item Let $\var{v \in V} = \alpha \in \Vars$ be the variable operated by node $v$.
     \item Let $loc(v \in V) = (t, i) \in T \times \mathbb{N}$ be the location of node $v$, meaning that $v$ is the $i^{th}$ node in thread $t$.
     
 \end{itemize}
@@ -139,7 +196,7 @@ ${HBVC}_{t,i}(t',\alpha)$ will be the last node's index in thread $t'$ of variab
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\subsubsection{Happens-Before Vector Clock}
+\subsubsection{Persisted-Before Vector Clock}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 ${PBVC}_{t,i}(t',\alpha)$ will be the last node's index in thread $t'$ of variable $\alpha$ that was persisted before the $i^{th}$ node in thread $t$. \\
@@ -188,7 +245,7 @@ We say there is a Concurrent Persistence Race between read node $r$ and write no
     \begin{aligned}
         % & r, w \in V \\
         % & lbl(r) = R(\alpha), lbl(w) = W(\alpha) \\
-        & r \in R_\alpha, w \in W_\alpha \\
+        & \exists \alpha \in {Vars}. \; r \in R_\alpha, w \in W_\alpha \\
         & loc(w) = (t_w, i_w) \\
         % & \exists v \in V. \;\; lbl(v) = W(\beta)\\
         & \exists v \in W_\beta, \;\; \beta \neq \alpha \\
@@ -289,12 +346,13 @@ We say there is a Concurrent Persistence Race between read node $r$ and write no
     \Fn{\FCPRD{$HBG$, $PDG$}}{
         ${havc} \gets \FHAVC{HBG}$\;
         ${pbvc} \gets \FPBVC{HBG}$\;
+        ${races} \gets \varnothing$\;
         \BlankLine
-        \ForEach{write node $v$ in HBG}{
+        \ForEach{write node $v \in W$ in HBG}{
             $(t, i) \gets loc(v)$, $\alpha \gets var(v)$\;
 
             \BlankLine
-            \ForEach{read node $r$ in $PDG$ such that $v \overset{pd}{\to} r$}{
+            \ForEach{read node $r \in R$ such that $v \overset{pd}{\to} r$ in $PDG$}{
                 $(t', j) \gets loc(r)$, $\beta \gets var(r)$\;
                 \Assert{$t' \neq t$}\;
                 % TODO: explain that t wasn't changed or something
@@ -322,7 +380,7 @@ We say there is a Concurrent Persistence Race between read node $r$ and write no
                     $(t_w, i_w) \gets loc(w)$
                     \BlankLine
                     \If{${pbvc}_{t,i}(t_w) < i_w < {havc}_{t,j}$}{
-                        Report bug!\;
+                        ${races} \gets {races} \cup {(r, w)}$\;
                     }
                 }
             }
@@ -330,7 +388,7 @@ We say there is a Concurrent Persistence Race between read node $r$ and write no
         
         }
         \BlankLine
-        % \KwRet\;
+        \KwRet ${races}$\;
     }
 \end{algorithm}
 
