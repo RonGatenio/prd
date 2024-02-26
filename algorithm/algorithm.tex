@@ -265,10 +265,10 @@ $\HAVC{\Thread,\IndexI}{\ThreadOther}$ will be the first node's index in thread 
 \[
     \HAVC{\Thread,\IndexI}{\ThreadOther} = \min \left( \left\{ \IndexJ \middle| \ 
     \begin{aligned}
-        & \exists \Path = (v_1, \ldots, v_k) \in \Nodes^k, k \geq 1 \text{ a path in \HBG} \\
+        & \exists \Path = (\NodeV_1, \ldots, \NodeV_k) \in \Nodes^k, k \geq 1 \text{ a path in \HBG} \\
         & \text{such that:} \\
         & \begin{aligned}
-            & && \loc{v_1} = (\Thread, \IndexI), \ \loc{v_k} = (\ThreadOther, \IndexJ)
+            & && \loc{\NodeV_1} = (\Thread, \IndexI), \ \loc{\NodeV_k} = (\ThreadOther, \IndexJ)
         \end{aligned}
     \end{aligned}
     \right\} \right)
@@ -283,12 +283,12 @@ $\HBVC{\Thread,\IndexI}{\ThreadOther,\VarX}$ will be the last node's index in th
 \[
     \HBVC{\Thread,\IndexI}{\ThreadOther,\VarX} = \max \left( \left\{ \IndexJ \middle| \ 
     \begin{aligned}
-        & \exists \Path = (v_1, \ldots, v_k) \in \Nodes^k, k \geq 1 \text{ a path in \HBG} \\
+        & \exists \Path = (\NodeV_1, \ldots, \NodeV_k) \in \Nodes^k, k \geq 1 \text{ a path in \HBG} \\
         & \text{such that:} \\
         & \begin{aligned}
-            & && \loc{v_1} = (\ThreadOther, \IndexJ), \ \loc{v_k} = (\Thread, \IndexI) \\
-            % & && lbl(v_1) \in \{ R(\VarX), W(\VarX) \} \\
-            & && v_1 \in \ReadNodes[\VarX] \cup \WriteNodes[\VarX] \\
+            & && \loc{\NodeV_1} = (\ThreadOther, \IndexJ), \ \loc{\NodeV_k} = (\Thread, \IndexI) \\
+            % & && lbl(\NodeV_1) \in \{ R(\VarX), W(\VarX) \} \\
+            & && \NodeV_1 \in \ReadNodes[\VarX] \cup \WriteNodes[\VarX] \\
         \end{aligned}
     \end{aligned}
     \right\} \right)
@@ -304,14 +304,14 @@ A persisted node is a node that happens-before a Flush event (on the same variab
 \[
     \PBVC{\Thread,\IndexI}{\ThreadOther,\VarX} = \max \left( \left\{ \IndexJ \middle| \ 
     \begin{aligned}
-        & \exists \Path = (v_1, \ldots, v_k) \in \Nodes^k, k \geq 1 \text{ a path in \HBG} \\
+        & \exists \Path = (\NodeV_1, \ldots, \NodeV_k) \in \Nodes^k, k \geq 1 \text{ a path in \HBG} \\
         & \text{such that:} \\
         & \begin{aligned}
-            & && \loc{v_1} = (\ThreadOther, \IndexJ), \ \loc{v_k} = (\Thread, \IndexI) \\
-            % & && lbl(v_1) \in \{ R(\VarX), W(\VarX) \} \\
-            & && v_1 \in \ReadNodes[\VarX] \cup \WriteNodes[\VarX] \\
-            % & && \exists 1 < f \leq k. \;\; lbl(v_f) = F(\VarX)
-            & && \exists 1 < f \leq k. \;\; v_f \in \FlushNodes[\VarX]
+            & && \loc{\NodeV_1} = (\ThreadOther, \IndexJ), \ \loc{\NodeV_k} = (\Thread, \IndexI) \\
+            % & && lbl(\NodeV_1) \in \{ R(\VarX), W(\VarX) \} \\
+            & && \NodeV_1 \in \ReadNodes[\VarX] \cup \WriteNodes[\VarX] \\
+            % & && \exists 1 < f \leq k. \;\; lbl(\NodeV_f) = F(\VarX)
+            & && \exists 1 < f \leq k. \;\; \NodeV_f \in \FlushNodes[\VarX]
         \end{aligned}
     \end{aligned}
     \right\} \right)
@@ -332,9 +332,9 @@ We say there is a Concurrent Persistence Race between read node $r$ and write no
 %         & \exists v \in \Nodes. \;\; lbl(v) = W(\VarY)\\
 %         & \text{such that:} \\
 %         & \begin{aligned}
-%             & && \loc{v_1} = (\ThreadOther, \IndexJ), \ \loc{v_k} = (\Thread, \IndexI) \\
-%             & && lbl(v_1) \in \{ R(\VarX), W(\VarX) \} \\
-%             & && \exists 1 < f \leq k. \;\; lbl(v_f) = F(\VarX)
+%             & && \loc{\NodeV_1} = (\ThreadOther, \IndexJ), \ \loc{\NodeV_k} = (\Thread, \IndexI) \\
+%             & && lbl(\NodeV_1) \in \{ R(\VarX), W(\VarX) \} \\
+%             & && \exists 1 < f \leq k. \;\; lbl(\NodeV_f) = F(\VarX)
 %         \end{aligned}
 %     \end{aligned}
 %     \right\}
@@ -501,17 +501,17 @@ Proof of step 1
 
 claim: after visiting node $v$ with $\loc{v} = (\Thread, \IndexI)$, \\ $\havc{\Thread,\IndexI}{\ThreadOther} = \HAVC{\Thread,\IndexI}{\ThreadOther} \ \forall \ThreadOther \in \Threads$
 
-\HBG post-order: $v_1, v_2, \ldots, v_n$
+\HBG post-order: $\NodeV_1, \NodeV_2, \ldots, \NodeV_n$
 
-for $v_1$: \\
-$v_1$ has no children since there are no nodes before it in the post-order.
+for $\NodeV_1$: \\
+$\NodeV_1$ has no children since there are no nodes before it in the post-order.
 This means $\HAVC{\Thread,\IndexI}{\Thread} = \IndexI$ and $\HAVC{\Thread,\IndexI}{\ThreadOther} = \infty \ \forall \ThreadOther \in \Threads \neq \Thread$.
-After visiting node $v_1$, in step $1.2$ we set $\havc{\Thread,\IndexI}{\Thread} \gets \IndexI$. Afterwards, we don't change $\havc{\Thread,\IndexI}{\ThreadOther} \ \forall \ThreadOther \in \Threads$ since step $1.3$ won't happen, and $v_1$ is no parent of any other node.
+After visiting node $\NodeV_1$, in step $1.2$ we set $\havc{\Thread,\IndexI}{\Thread} \gets \IndexI$. Afterwards, we don't change $\havc{\Thread,\IndexI}{\ThreadOther} \ \forall \ThreadOther \in \Threads$ since step $1.3$ won't happen, and $\NodeV_1$ is no parent of any other node.
 
-for $v_k$: \\
-We assume that for all children of $v_k$ the claim holds. \\
+for $\NodeV_k$: \\
+We assume that for all children of $\NodeV_k$ the claim holds. \\
 First we set ${\havc{\Thread,\IndexI}{\Thread} \gets \IndexI}$. \\
-For each child of $v_k$ we merge
+For each child of $\NodeV_k$ we merge
 
 
 \end{document}
