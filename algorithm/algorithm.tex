@@ -19,10 +19,10 @@
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \iffalse
-notes from Guy
+todos
 
-- HBG = (Ev, HBEdges) ?
-    - rename V since it symbolizes an events group
+% - HBG = (Ev, HBEdges) ?
+%     - rename V since it symbolizes an events group
 - Define range of arguments of a function separately
     - i.e. instead of $loc(v \in V) = ...$, do $loc(v) = .... .... \forall v \in V$
 - Rethink about the indexing of HAVC etc.
@@ -50,9 +50,9 @@ notes from Guy
     }}
 
 % Sets %
-\newcommand{\Nodes}{\DefSet{V}}
-\newcommand{\HBEdges}{\DefSet{E}}
-\newcommand{\PDEdges}{\DefSet{E'}}
+\newcommand{\Nodes}{\DefSet{Ev}}
+\newcommand{\HBEdges}{\DefSet{E_{hb}}}
+\newcommand{\PDEdges}{\DefSet{E_pd}}
 \newcommand{\HBG}{\DefSet{HBG}}
 \newcommand{\PDG}{\DefSet{PDG}}
 \newcommand{\DefGraph}[3]{\DefSet{#1(#2, #3)}}
@@ -69,8 +69,6 @@ notes from Guy
 \newcommand{\PersistenceRaces}{\DefSet{PersistenceRaces}}
 
 % Functions %
-% \newcommand{\var}[1][]{\DefFunc{var}{}{#1}}
-% \newcommand{\loc}[1][]{\DefFunc{loc}{}{#1}}
 \newcommand{\var}[1]{\DefFunc{var}{}{#1}}
 \newcommand{\loc}[1]{\DefFunc{loc}{}{#1}}
 
@@ -296,7 +294,7 @@ We say there is a Concurrent Persistence Race between read node $r$ and write no
         \BlankLine
         Set default $\havc{t,i}{t'} \gets +\infty$ \hfill $\forall t,t' \in \Threads, i \in \mathbb{N}$ \;
         \BlankLine
-        \ForEach{node $v$ in \HBG in post-order}{
+        \ForEach{node $v$ in $\HBG$ in post-order}{
             $(t, i) \gets \loc{v}$\;
             $\havc{t,i}{t} \gets i$\;
             \BlankLine
@@ -319,7 +317,7 @@ We say there is a Concurrent Persistence Race between read node $r$ and write no
         Set default $\hbvc{t,i}{t', \alpha} \gets -\infty$ \hfill $\forall t,t' \in \Threads, i \in \mathbb{N}, \alpha \in {\Vars}$ \;
         Set default $\pbvc{t,i}{t', \alpha} \gets -\infty$ \hfill $\forall t,t' \in \Threads, i \in \mathbb{N}, \alpha \in {\Vars}$ \;
         \BlankLine
-        \ForEach{node $v$ in \HBG in reversed post-order}{
+        \ForEach{node $v$ in $\HBG$ in reversed post-order}{
             $(t, i) \gets \loc{v}$, $\alpha \gets \var{v}$\;
         
             % RW
@@ -363,7 +361,7 @@ We say there is a Concurrent Persistence Race between read node $r$ and write no
         $\pbvc{}{} \gets \FPBVC{\HBG}$\;
         ${races} \gets \varnothing$\;
         \BlankLine
-        \ForEach{write node $v \in W$ in \HBG}{
+        \ForEach{write node $v \in \WriteNodes$ in $\HBG$}{
             $(t, i) \gets \loc{v}$, $\alpha \gets \var{v}$\;
 
             \BlankLine
