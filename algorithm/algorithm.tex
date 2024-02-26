@@ -9,7 +9,7 @@
 \usepackage[ruled,linesnumbered]{algorithm2e}
 \usepackage{float}
 \usepackage{calc}
-\usepackage{xspace}
+\usepackage{xifthen}
 
 \usepackage[bottom=0.5cm, right=1.5cm, left=1.5cm, top=1.5cm]{geometry}
 
@@ -43,20 +43,12 @@ notes from Guy
 
 % Fonts %
 \newcommand{\FontSet}[1]{\ensuremath{\mathsf{#1}}}
-% \test
-% \renewcommand{\mathfont}[1]{\ensuremath{\mathcal{#1}}}
-% \test
-% \renewcommand{\mathfont}[1]{\ensuremath{\mathbf{#1}}}
-% \test
-% \renewcommand{\mathfont}[1]{\ensuremath{\mathrm{#1}}}
-% \test
-% \renewcommand{\mathfont}[1]{\ensuremath{#1}}
-% \test
 
-\newcommand{\DefSet}[1]{\ensuremath{\FontSet{#1}}}
-\newcommand{\DefSetSub}[2]{\ensuremath{\DefSet{#1}_{#2}}}
+% Aux %
+\newcommand{\DefSet}[2][]{\ensuremath{\FontSet{#2}\ifthenelse{\isempty{#1}}{}{_{#1}}}}
+\newcommand{\DefFunc}[2][]{\ensuremath{\FontSet{#2}\ifthenelse{\isempty{#1}}{}{({#1})}}}
 
-% Groups %
+% Sets %
 \newcommand{\Nodes}{\DefSet{V}}
 \newcommand{\HBEdges}{\DefSet{E}}
 \newcommand{\PDEdges}{\DefSet{E'}}
@@ -67,16 +59,14 @@ notes from Guy
 \newcommand{\Vars}{\DefSet{Vars}}
 \newcommand{\Threads}{\DefSet{T}}
 
-\newcommand{\ReadNodes}[1][]{\DefSetSub{R}{#1}}
-\newcommand{\WriteNodes}[1][]{\DefSetSub{W}{#1}}
-\newcommand{\FlushNodes}[1][]{\DefSetSub{F}{#1}}
+\newcommand{\ReadNodes}[1][]{\DefSet[#1]{R}}
+\newcommand{\WriteNodes}[1][]{\DefSet[#1]{W}}
+\newcommand{\FlushNodes}[1][]{\DefSet[#1]{F}}
 
 % Functions %
-\newcommand{\var}[1]{\DefSet{var}(#1)}
-\newcommand{\loc}[1]{\DefSet{loc}(#1)}
+\newcommand{\var}[1][]{\DefFunc[#1]{var}}
+\newcommand{\loc}[1][]{\DefFunc[#1]{loc}}
 
-$\HBG(\Nodes, \HBEdges)$ \\
-\DefGraph{\HBG}{\Nodes}{\HBEdges}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Algorithm}
@@ -105,8 +95,8 @@ We will define some groups on the collection of data from the program trace:
     \item Let $\ReadNodes[\alpha], \WriteNodes[\alpha], \FlushNodes[\alpha]$ be all the Read, Write, and Flush nodes in the trace respectively such that the variable operated by the node is $\alpha$.
     % \item Let $Ops = \{R, W, F\}$ be the event types in the trace: Read, Write, and Flush respectively.
     % \item Let $lbl(v \in \Nodes) = o(\alpha)$  where $o \in {Ops}, \alpha \in {Vars}$, be the label of event $v$. Signifying that $v$ is of type $o$ and operates on  variable $\alpha$.
-    \item Let $\var{v \in \Nodes} = \alpha \in \Vars$ be the variable operated by node $v$.
-    \item Let $\loc{v \in \Nodes} = (t, i) \in \Threads \times \mathbb{N}$ be the location of node $v$, meaning that $v$ is the $i^{th}$ node in thread $t$.
+    \item Let $\var[v \in \Nodes] = \alpha \in \Vars$ be the variable operated by node $v$.
+    \item Let $\loc[v \in \Nodes] = (t, i) \in \Threads \times \mathbb{N}$ be the location of node $v$, meaning that $v$ is the $i^{th}$ node in thread $t$.
     
 \end{itemize}
 % $$
