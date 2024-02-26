@@ -27,7 +27,7 @@ todos
 %     - i.e. instead of $loc(v \in V) = ...$, do $loc(v) = .... .... \forall v \in V$
 - Rethink about the indexing of HAVC etc.
     - They seem confusing
-% - Add in persistence race definition $\exists \alpha$
+% - Add in persistence race definition $\exists \VarX$
 - Add an explanation of the algorithm in simple words
 
 
@@ -93,10 +93,17 @@ Points to talk about
 % Macros
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% Fonts %
+% ---------------------------------------------------------
+% Fonts
+% ---------------------------------------------------------
+
 \newcommand{\FontSet}[1]{\ensuremath{\mathsf{#1}}}
 
-% Aux %
+
+% ---------------------------------------------------------
+% Aux
+% ---------------------------------------------------------
+
 \newcommand{\DefSet}[2][]{\ensuremath{\FontSet{#2}\ifthenelse{\isempty{#1}}{}{_{#1}}}}
 \newcommand{\DefFunc}[3]{\ensuremath{
         \FontSet{#1}
@@ -104,7 +111,13 @@ Points to talk about
         \ifthenelse{\isempty{#3}}{}{({#3})}
     }}
 
-% Sets %
+
+% ---------------------------------------------------------
+% Sets
+% ---------------------------------------------------------
+
+\newcommand{\N}{\DefSet{\mathbb{N}}}
+
 \newcommand{\Nodes}{\DefSet{Ev}}
 \newcommand{\HBEdges}{\DefSet{E_{hb}}}
 \newcommand{\PDEdges}{\DefSet{E_{pd}}}
@@ -119,13 +132,18 @@ Points to talk about
 \newcommand{\WriteNodes}[1][]{\DefSet[#1]{W}}
 \newcommand{\FlushNodes}[1][]{\DefSet[#1]{F}}
 
-\newcommand{\Path}{\DefSet{P}}
+% \newcommand{\Path}{\DefSet{P}}
+\newcommand{\Path}{\overset{\to}{\DefSet{p}}}
 
 \newcommand{\PersistenceRaces}{\DefSet{PersistenceRaces}}
 % \newcommand{\races}{\DefSet{Races}}
 \newcommand{\races}{\ensuremath{Races}} % TODO: choose
 
-% Functions %
+
+% ---------------------------------------------------------
+% Functions
+% ---------------------------------------------------------
+
 \newcommand{\var}[1]{\DefFunc{var}{}{#1}}
 \newcommand{\loc}[1]{\DefFunc{loc}{}{#1}}
 
@@ -137,13 +155,37 @@ Points to talk about
 \newcommand{\hbvc}[2]{\DefFunc{hbvc}{#1}{#2}}
 \newcommand{\pbvc}[2]{\DefFunc{pbvc}{#1}{#2}}
 
-% Relations %
+
+% ---------------------------------------------------------
+% Relations
+% ---------------------------------------------------------
+
 % \newcommand{\HBSign}{\prec}
 \newcommand{\HBSign}{\overset{hb}{\prec}}
 \newcommand{\HB}[2]{\ensuremath{{#1} \HBSign {#2}}}
 
 \newcommand{\PDSign}{\overset{pd}{\to}}
 \newcommand{\PD}[2]{\ensuremath{{#1} \PDSign {#2}}}
+
+
+% ---------------------------------------------------------
+% Variables
+% ---------------------------------------------------------
+
+\newcommand{\VarX}{\ensuremath{x}}
+\newcommand{\VarY}{\ensuremath{y}}
+
+\newcommand{\Thread}{\ensuremath{t}}
+\newcommand{\ThreadOther}{\ensuremath{t'}}
+
+\newcommand{\IndexI}{\ensuremath{i}}
+\newcommand{\IndexJ}{\ensuremath{j}}
+
+\newcommand{\NodeV}{\ensuremath{v}}
+\newcommand{\NodeU}{\ensuremath{u}}
+\newcommand{\NodeR}{\ensuremath{r}}
+\newcommand{\NodeW}{\ensuremath{w}}
+\newcommand{\NodeF}{\ensuremath{f}}
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -170,27 +212,10 @@ We will define some groups on the collection of data from the program trace:
     \item Let $\Threads$ be all threads in the trace.
     \item Let $\Nodes$ be all event nodes in the trace.
     \item Let $\ReadNodes, \WriteNodes, \FlushNodes$ be all the Read, Write, and Flush nodes in the trace respectively.
-    \item Let $\ReadNodes[\alpha], \WriteNodes[\alpha], \FlushNodes[\alpha]$ be all the Read, Write, and Flush nodes in the trace respectively such that the variable operated by the node is $\alpha$.
-    % \item Let $Ops = \{R, W, F\}$ be the event types in the trace: Read, Write, and Flush respectively.
-    % \item Let $lbl(v \in \Nodes) = o(\alpha)$  where $o \in {Ops}, \alpha \in {\Vars}$, be the label of event $v$. Signifying that $v$ is of type $o$ and operates on  variable $\alpha$.
-    % \item Let $\var{v \in \Nodes} = \alpha \in \Vars$ be the variable operated by node $v$.
-    \item Let $\var{v} = \alpha$ be the variable operated by node $v$. \hfill $v \in \Nodes, \alpha \in \Vars$
-    % \item Let $\loc{v \in \Nodes} = (t, i) \in \Threads \times \mathbb{N}$ be the location of node $v$, meaning that $v$ is the $i^{th}$ node in thread $t$.
-    \item Let $\loc{v} = (t, i)$ be the location of node $v$, the $i^{th}$ node in thread $t$. \hfill $v \in \Nodes, t \in \Threads, i \in \mathbb{N}$
-    
+    \item Let $\ReadNodes[\VarX], \WriteNodes[\VarX], \FlushNodes[\VarX]$ be all the Read, Write, and Flush nodes in the trace respectively such that the variable operated by the node is $\VarX$.
+    \item Let $\var{\NodeV} = \VarX$ be the variable operated by node $\NodeV$. \hfill $\NodeV \in \Nodes, \VarX \in \Vars$
+    \item Let $\loc{\NodeV} = (\Thread, \IndexI)$ be the location of node $\NodeV$, the $\IndexI^{th}$ node in thread $\Thread$. \hfill $\NodeV \in \Nodes, \Thread \in \Threads, \IndexI \in \N$
 \end{itemize}
-% $$
-%     \begin{aligned}
-%         & \Nodes && := && \{\text{All event nodes in the trace}\} \\
-%         & \Vars && := && \{\text{All variables in the trace}\} \\
-%         & \Threads && := && \{\text{All threads in the trace}\} \\
-%         & Ops && := && \{R, W, F\} \\
-%         % & \HBG && := && (\Nodes, \HBEdges) \\
-%         % & \PDG && := && (\Nodes, \PDEdges) \\
-%         & lbl(v \in \Nodes) && := && o(\alpha) \text{ where } o \in {Ops}, \alpha \in {\Vars} \\
-%         & \loc{v \in \Nodes} && := && (t, i) \in \Threads \times \mathbb{N}. \text{ Meaning } v \text{ is the } i^{th} \text{ node in thread } t
-%     \end{aligned}
-% $$
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -202,7 +227,7 @@ Let $\HBG = (\Nodes, \HBEdges)$ be a Happens-Before graph where $\Nodes$ is the 
 We will denote Happens-Before relation with $\HBSign$.
 
 The $\HBG$ ensures that:
-$$\HB{v_1}{v_k} \iff \exists \Path = (v_1, \ldots, v_k) \in \Nodes^k \text{ where } \Path \text{ is a path in } \HBG$$
+$$\HB{\NodeV_1}{\NodeV_k} \iff \exists \Path = (\NodeV_1, \ldots, \NodeV_k) \in \Nodes^k \text{ where } \Path \text{ is a path in } \HBG$$
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -211,13 +236,13 @@ $$\HB{v_1}{v_k} \iff \exists \Path = (v_1, \ldots, v_k) \in \Nodes^k \text{ wher
 
 Let $\PDG = (\Nodes, \PDEdges)$ be a Program Dependency graph where $\Nodes$ is the set of the trace events and $\PDEdges$ is the set of Program Dependency edges derived from the program dependency analysis.
 
-For each read node $r \in \Nodes$, we will store in $\PDEdges$ only the earliest write node $w \in \Nodes$ such that $\PD{w}{r}$.
+For each read node $\NodeR \in \Nodes$, we will store in $\PDEdges$ only the earliest write node $\NodeW \in \Nodes$ such that $\PD{\NodeW}{\NodeR}$.
 
 $$
-    \PDEdges = \left\{ (w, r) \middle| \
+    \PDEdges = \left\{ (\NodeW, \NodeR) \middle| \
     \begin{aligned}
-        & w,r \in \Nodes \\
-        & \PD{w}{r} \\
+        & \NodeW,\NodeR \in \Nodes \\
+        & \PD{\NodeW}{\NodeR} \\
         & \text{let } 
     \end{aligned}
     \right\}
@@ -236,14 +261,14 @@ The edges in $\PDEdges$ will only hold
 \subsubsection{Happens-After Vector Clock}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-$\HAVC{t,i}{t'}$ will be the first node's index in thread $t'$ that happens-after the $i^{th}$ node in thread $t$.
+$\HAVC{\Thread,\IndexI}{\ThreadOther}$ will be the first node's index in thread $\ThreadOther$ that happens-after the $\IndexI^{th}$ node in thread $\Thread$.
 \[
-    \HAVC{t,i}{t'} = \min \left( \left\{ j \middle| \ 
+    \HAVC{\Thread,\IndexI}{\ThreadOther} = \min \left( \left\{ \IndexJ \middle| \ 
     \begin{aligned}
         & \exists \Path = (v_1, \ldots, v_k) \in \Nodes^k, k \geq 1 \text{ a path in \HBG} \\
         & \text{such that:} \\
         & \begin{aligned}
-            & && \loc{v_1} = (t, i), \ \loc{v_k} = (t', j)
+            & && \loc{v_1} = (\Thread, \IndexI), \ \loc{v_k} = (\ThreadOther, \IndexJ)
         \end{aligned}
     \end{aligned}
     \right\} \right)
@@ -254,16 +279,16 @@ $\HAVC{t,i}{t'}$ will be the first node's index in thread $t'$ that happens-afte
 \subsubsection{Happens-Before Vector Clock}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-$\HBVC{t,i}{t',\alpha}$ will be the last node's index in thread $t'$ of variable $\alpha$ that happens-before the $i^{th}$ node in thread $t$.
+$\HBVC{\Thread,\IndexI}{\ThreadOther,\VarX}$ will be the last node's index in thread $\ThreadOther$ of variable $\VarX$ that happens-before the $\IndexI^{th}$ node in thread $\Thread$.
 \[
-    \HBVC{t,i}{t',\alpha} = \max \left( \left\{ j \middle| \ 
+    \HBVC{\Thread,\IndexI}{\ThreadOther,\VarX} = \max \left( \left\{ \IndexJ \middle| \ 
     \begin{aligned}
         & \exists \Path = (v_1, \ldots, v_k) \in \Nodes^k, k \geq 1 \text{ a path in \HBG} \\
         & \text{such that:} \\
         & \begin{aligned}
-            & && \loc{v_1} = (t', j), \ \loc{v_k} = (t, i) \\
-            % & && lbl(v_1) \in \{ R(\alpha), W(\alpha) \} \\
-            & && v_1 \in \ReadNodes[\alpha] \cup \WriteNodes[\alpha] \\
+            & && \loc{v_1} = (\ThreadOther, \IndexJ), \ \loc{v_k} = (\Thread, \IndexI) \\
+            % & && lbl(v_1) \in \{ R(\VarX), W(\VarX) \} \\
+            & && v_1 \in \ReadNodes[\VarX] \cup \WriteNodes[\VarX] \\
         \end{aligned}
     \end{aligned}
     \right\} \right)
@@ -274,19 +299,19 @@ $\HBVC{t,i}{t',\alpha}$ will be the last node's index in thread $t'$ of variable
 \subsubsection{Persisted-Before Vector Clock}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-$\PBVC{t,i}{t',\alpha}$ will be the last node's index in thread $t'$ of variable $\alpha$ that was persisted before the $i^{th}$ node in thread $t$. \\
+$\PBVC{\Thread,\IndexI}{\ThreadOther,\VarX}$ will be the last node's index in thread $\ThreadOther$ of variable $\VarX$ that was persisted before the $\IndexI^{th}$ node in thread $\Thread$. \\
 A persisted node is a node that happens-before a Flush event (on the same variable).
 \[
-    \PBVC{t,i}{t',\alpha} = \max \left( \left\{ j \middle| \ 
+    \PBVC{\Thread,\IndexI}{\ThreadOther,\VarX} = \max \left( \left\{ \IndexJ \middle| \ 
     \begin{aligned}
         & \exists \Path = (v_1, \ldots, v_k) \in \Nodes^k, k \geq 1 \text{ a path in \HBG} \\
         & \text{such that:} \\
         & \begin{aligned}
-            & && \loc{v_1} = (t', j), \ \loc{v_k} = (t, i) \\
-            % & && lbl(v_1) \in \{ R(\alpha), W(\alpha) \} \\
-            & && v_1 \in \ReadNodes[\alpha] \cup \WriteNodes[\alpha] \\
-            % & && \exists 1 < f \leq k. \;\; lbl(v_f) = F(\alpha)
-            & && \exists 1 < f \leq k. \;\; v_f \in \FlushNodes[\alpha]
+            & && \loc{v_1} = (\ThreadOther, \IndexJ), \ \loc{v_k} = (\Thread, \IndexI) \\
+            % & && lbl(v_1) \in \{ R(\VarX), W(\VarX) \} \\
+            & && v_1 \in \ReadNodes[\VarX] \cup \WriteNodes[\VarX] \\
+            % & && \exists 1 < f \leq k. \;\; lbl(v_f) = F(\VarX)
+            & && \exists 1 < f \leq k. \;\; v_f \in \FlushNodes[\VarX]
         \end{aligned}
     \end{aligned}
     \right\} \right)
@@ -303,13 +328,13 @@ We say there is a Concurrent Persistence Race between read node $r$ and write no
 %     {PersistenceRaces} = \left\{ (r, w) \middle| \ 
 %     \begin{aligned}
 %         & r, w \in \Nodes \\
-%         & lbl(r) = R(\alpha), lbl(w) = W(\alpha) \\
-%         & \exists v \in \Nodes. \;\; lbl(v) = W(\beta)\\
+%         & lbl(r) = R(\VarX), lbl(w) = W(\VarX) \\
+%         & \exists v \in \Nodes. \;\; lbl(v) = W(\VarY)\\
 %         & \text{such that:} \\
 %         & \begin{aligned}
-%             & && \loc{v_1} = (t', j), \ \loc{v_k} = (t, i) \\
-%             & && lbl(v_1) \in \{ R(\alpha), W(\alpha) \} \\
-%             & && \exists 1 < f \leq k. \;\; lbl(v_f) = F(\alpha)
+%             & && \loc{v_1} = (\ThreadOther, \IndexJ), \ \loc{v_k} = (\Thread, \IndexI) \\
+%             & && lbl(v_1) \in \{ R(\VarX), W(\VarX) \} \\
+%             & && \exists 1 < f \leq k. \;\; lbl(v_f) = F(\VarX)
 %         \end{aligned}
 %     \end{aligned}
 %     \right\}
@@ -319,15 +344,15 @@ We say there is a Concurrent Persistence Race between read node $r$ and write no
     {\PersistenceRaces} = \left\{ (r, w) \middle| \ 
     \begin{aligned}
         % & r, w \in \Nodes \\
-        % & lbl(r) = R(\alpha), lbl(w) = W(\alpha) \\
-        & \exists \alpha \in {\Vars}. \; r \in \ReadNodes[\alpha], w \in \WriteNodes[\alpha] \\
+        % & lbl(r) = R(\VarX), lbl(w) = W(\VarX) \\
+        & \exists \VarX \in {\Vars}. \; r \in \ReadNodes[\VarX], w \in \WriteNodes[\VarX] \\
         & \loc{w} = (t_w, i_w) \\
-        % & \exists v \in \Nodes. \;\; lbl(v) = W(\beta)\\
-        & \exists v \in \WriteNodes[\beta], \;\; \beta \neq \alpha \\
+        % & \exists v \in \Nodes. \;\; lbl(v) = W(\VarY)\\
+        & \exists v \in \WriteNodes[\VarY], \;\; \VarY \neq \VarX \\
         & \text{such that:} \\
         & \begin{aligned}
             & && \PD{v}{r} \\
-            & && \PBVC{\loc{v}}{t_w, \alpha} < i_w < \HAVC{\loc{r}}{t_w}
+            & && \PBVC{\loc{v}}{t_w, \VarX} < i_w < \HAVC{\loc{r}}{t_w}
         \end{aligned}
     \end{aligned}
     \right\}
@@ -354,16 +379,16 @@ We say there is a Concurrent Persistence Race between read node $r$ and write no
     \caption{Happens-After Vector Clocks Builder}
     \Fn{\FHAVC{$\HBG$}}{
         \BlankLine
-        Set default $\havc{t,i}{t'} \gets +\infty$ \hfill $\forall t,t' \in \Threads, i \in \mathbb{N}$ \;
+        Set default $\havc{\Thread,\IndexI}{\ThreadOther} \gets +\infty$ \hfill $\forall \Thread,\ThreadOther \in \Threads, \IndexI \in \N$ \;
         \BlankLine
         \ForEach{node $v$ in $\HBG$ in post-order}{
-            $(t, i) \gets \loc{v}$\;
-            $\havc{t,i}{t} \gets i$\;
+            $(\Thread, \IndexI) \gets \loc{v}$\;
+            $\havc{\Thread,\IndexI}{\Thread} \gets \IndexI$\;
             \BlankLine
             \ForEach{parent node $p$ such that $(p, v) \in \HBEdges$}{
                 $(t_p, i_p) \gets \loc{p}$\;
-                \ForEach{$t' \in \Threads$}{
-                    $\havc{t_p,i_p}{t'} \gets \min \left( \havc{t_p,i_p}{t'}, \havc{t,i}{t'} \right)$
+                \ForEach{$\ThreadOther \in \Threads$}{
+                    $\havc{t_p,i_p}{\ThreadOther} \gets \min \left( \havc{t_p,i_p}{\ThreadOther}, \havc{\Thread,\IndexI}{\ThreadOther} \right)$
                 }
             }
         }
@@ -376,25 +401,25 @@ We say there is a Concurrent Persistence Race between read node $r$ and write no
     \caption{Persisted-Before Vector Clocks Builder}
     \Fn{\FPBVC{$\HBG$}}{
         \BlankLine
-        Set default $\hbvc{t,i}{t', \alpha} \gets -\infty$ \hfill $\forall t,t' \in \Threads, i \in \mathbb{N}, \alpha \in {\Vars}$ \;
-        Set default $\pbvc{t,i}{t', \alpha} \gets -\infty$ \hfill $\forall t,t' \in \Threads, i \in \mathbb{N}, \alpha \in {\Vars}$ \;
+        Set default $\hbvc{\Thread,\IndexI}{\ThreadOther, \VarX} \gets -\infty$ \hfill $\forall \Thread,\ThreadOther \in \Threads, \IndexI \in \N, \VarX \in {\Vars}$ \;
+        Set default $\pbvc{\Thread,\IndexI}{\ThreadOther, \VarX} \gets -\infty$ \hfill $\forall \Thread,\ThreadOther \in \Threads, \IndexI \in \N, \VarX \in {\Vars}$ \;
         \BlankLine
         \ForEach{node $v$ in $\HBG$ in reversed post-order}{
-            $(t, i) \gets \loc{v}$, $\alpha \gets \var{v}$\;
+            $(\Thread, \IndexI) \gets \loc{v}$, $\VarX \gets \var{v}$\;
         
             % RW
             \BlankLine
             \Comment*[l]{Handle Read and Write nodes}
             \If{$v \in R \cup W$}{
-                $\hbvc{t,i}{t,\alpha} \gets i$\;
+                $\hbvc{\Thread,\IndexI}{\Thread,\VarX} \gets \IndexI$\;
             }
         
             % F
             \BlankLine
             \Comment*[l]{Handle Flush nodes}
             \If{$v \in F$}{
-                \ForEach{$t' \in \Threads$}{
-                    $\pbvc{t,i}{t',\alpha} \gets \hbvc{t,i}{t',\alpha}$\;
+                \ForEach{$\ThreadOther \in \Threads$}{
+                    $\pbvc{\Thread,\IndexI}{\ThreadOther,\VarX} \gets \hbvc{\Thread,\IndexI}{\ThreadOther,\VarX}$\;
                 }
             }
         
@@ -403,10 +428,10 @@ We say there is a Concurrent Persistence Race between read node $r$ and write no
             \Comment*[l]{Handle children nodes}
             \ForEach{child node $c$ such that $(v, c) \in \HBEdges$}{
                 $(t_c, i_c) \gets \loc{c}$\;
-                \ForEach{$t' \in \Threads$}{
-                    \ForEach{$\beta \in {\Vars}$}{
-                        $\hbvc{t_c,i_c}{t',\beta} \gets \max \left( \hbvc{t_c,i_c}{t',\beta}, \hbvc{t,i}{t',\beta} \right)$\;
-                        $\pbvc{t_c,i_c}{t',\beta} \gets \max \left( \pbvc{t_c,i_c}{t',\beta}, \pbvc{t,i}{t',\beta} \right)$\;
+                \ForEach{$\ThreadOther \in \Threads$}{
+                    \ForEach{$\VarY \in {\Vars}$}{
+                        $\hbvc{t_c,i_c}{\ThreadOther,\VarY} \gets \max \left( \hbvc{t_c,i_c}{\ThreadOther,\VarY}, \hbvc{\Thread,\IndexI}{\ThreadOther,\VarY} \right)$\;
+                        $\pbvc{t_c,i_c}{\ThreadOther,\VarY} \gets \max \left( \pbvc{t_c,i_c}{\ThreadOther,\VarY}, \pbvc{\Thread,\IndexI}{\ThreadOther,\VarY} \right)$\;
                     }
                 }
             }
@@ -424,37 +449,37 @@ We say there is a Concurrent Persistence Race between read node $r$ and write no
         $\races \gets \varnothing$\;
         \BlankLine
         \ForEach{write node $v \in \WriteNodes$ in $\HBG$}{
-            $(t, i) \gets \loc{v}$, $\alpha \gets \var{v}$\;
+            $(\Thread, \IndexI) \gets \loc{v}$, $\VarX \gets \var{v}$\;
 
             \BlankLine
             \ForEach{read node $r \in R$ such that $\PD{v}{r}$ in $\PDG$}{
-                $(t', j) \gets \loc{r}$, $\beta \gets \var{r}$\;
-                \Assert{$t' \neq t$}\;
+                $(\ThreadOther, \IndexJ) \gets \loc{r}$, $\VarY \gets \var{r}$\;
+                \Assert{$\ThreadOther \neq \Thread$}\;
                 % TODO: explain that t wasn't changed or something
                 
                 \BlankLine
                 \Comment*[l]{If the dependent node and the read node are of the same variable, there is not bug}
-                \If{$\alpha = \beta$}{
+                \If{$\VarX = \VarY$}{
                     \Continue\;
                 }
                 
                 \BlankLine
                 \Comment*[l]{If the read node is persisted, there is not bug}
-                \If{$j \leq \pbvc{t,i}{t}$}{
+                \If{$\IndexJ \leq \pbvc{\Thread,\IndexI}{\Thread}$}{
                     \Continue\;
                 }
                 
                 \BlankLine
                 \Comment*[l]{If the read node is persisted, there is not bug}
-                \If{$j \leq \pbvc{t,i}{t}$}{
+                \If{$\IndexJ \leq \pbvc{\Thread,\IndexI}{\Thread}$}{
                     \Continue\;
                 }
 
                 \BlankLine
-                \ForEach{write node $w \in \WriteNodes[\alpha]$}{
+                \ForEach{write node $w \in \WriteNodes[\VarX]$}{
                     $(t_w, i_w) \gets \loc{w}$
                     \BlankLine
-                    \If{$\pbvc{t,i}{t_w} < i_w < \havc{t,j}{}$}{
+                    \If{$\pbvc{\Thread,\IndexI}{t_w} < i_w < \havc{\Thread,\IndexJ}{}$}{
                         $\races \gets \races \cup {(r, w)}$\;
                     }
                 }
@@ -474,18 +499,18 @@ We say there is a Concurrent Persistence Race between read node $r$ and write no
 
 Proof of step 1
 
-claim: after visiting node $v$ with $\loc{v} = (t, i)$, \\ $\havc{t,i}{t'} = \HAVC{t,i}{t'} \ \forall t' \in \Threads$
+claim: after visiting node $v$ with $\loc{v} = (\Thread, \IndexI)$, \\ $\havc{\Thread,\IndexI}{\ThreadOther} = \HAVC{\Thread,\IndexI}{\ThreadOther} \ \forall \ThreadOther \in \Threads$
 
 \HBG post-order: $v_1, v_2, \ldots, v_n$
 
 for $v_1$: \\
 $v_1$ has no children since there are no nodes before it in the post-order.
-This means $\HAVC{t,i}{t} = i$ and $\HAVC{t,i}{t'} = \infty \ \forall t' \in \Threads \neq t$.
-After visiting node $v_1$, in step $1.2$ we set $\havc{t,i}{t} \gets i$. Afterwards, we don't change $\havc{t,i}{t'} \ \forall t' \in \Threads$ since step $1.3$ won't happen, and $v_1$ is no parent of any other node.
+This means $\HAVC{\Thread,\IndexI}{\Thread} = \IndexI$ and $\HAVC{\Thread,\IndexI}{\ThreadOther} = \infty \ \forall \ThreadOther \in \Threads \neq \Thread$.
+After visiting node $v_1$, in step $1.2$ we set $\havc{\Thread,\IndexI}{\Thread} \gets \IndexI$. Afterwards, we don't change $\havc{\Thread,\IndexI}{\ThreadOther} \ \forall \ThreadOther \in \Threads$ since step $1.3$ won't happen, and $v_1$ is no parent of any other node.
 
 for $v_k$: \\
 We assume that for all children of $v_k$ the claim holds. \\
-First we set ${\havc{t,i}{t} \gets i}$. \\
+First we set ${\havc{\Thread,\IndexI}{\Thread} \gets \IndexI}$. \\
 For each child of $v_k$ we merge
 
 
