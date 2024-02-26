@@ -48,7 +48,11 @@ Points to talk about
 
 
 
-- set default -> initialize
+
+
+
+
+% - set default -> initialize
 - loc maybe change to thread an index or write location
 - list of bullets -> sentences
 - all definitions under algorithm, and under overview
@@ -84,6 +88,11 @@ Points to talk about
     - see erez notes in pdf in mail
 
 - remove such that
+
+
+- Go over other articles
+- Use ACM template
+- Read related articles
 
 \fi
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -146,6 +155,8 @@ Points to talk about
 
 \newcommand{\var}[1]{\DefFunc{var}{}{#1}}
 \newcommand{\loc}[1]{\DefFunc{loc}{}{#1}}
+\newcommand{\thread}[1]{\DefFunc{t}{}{#1}}
+\newcommand{\index}[1]{\DefFunc{idx}{}{#1}}
 
 \newcommand{\HAVC}[2]{\DefFunc{HAVC}{#1}{#2}}
 \newcommand{\HBVC}[2]{\DefFunc{HBVC}{#1}{#2}}
@@ -215,6 +226,8 @@ We will define some groups on the collection of data from the program trace:
     \item Let $\ReadNodes[\VarX], \WriteNodes[\VarX], \FlushNodes[\VarX]$ be all the Read, Write, and Flush nodes in the trace respectively such that the variable operated by the node is $\VarX$.
     \item Let $\var{\NodeV} = \VarX$ be the variable operated by node $\NodeV$. \hfill $\NodeV \in \Nodes, \VarX \in \Vars$
     \item Let $\loc{\NodeV} = (\Thread, \IndexI)$ be the location of node $\NodeV$, the $\IndexI^{th}$ node in thread $\Thread$. \hfill $\NodeV \in \Nodes, \Thread \in \Threads, \IndexI \in \N$
+    \item Let $\thread{\NodeV}$ be the thread the event $\NodeV \in \Nodes$ occurred on.
+    \item Let $\index{\NodeV}$ be the index of the event $\NodeV \in \Nodes$ in the program trace.
 \end{itemize}
 
 
@@ -324,22 +337,6 @@ A persisted node is a node that happens-before a Flush event (on the same variab
 
 We say there is a Concurrent Persistence Race between read node $r$ and write node $w$ if
 
-% \[
-%     {PersistenceRaces} = \left\{ (r, w) \middle| \ 
-%     \begin{aligned}
-%         & r, w \in \Nodes \\
-%         & lbl(r) = R(\VarX), lbl(w) = W(\VarX) \\
-%         & \exists v \in \Nodes. \;\; lbl(v) = W(\VarY)\\
-%         & \text{such that:} \\
-%         & \begin{aligned}
-%             & && \loc{\NodeV_1} = (\ThreadOther, \IndexJ), \ \loc{\NodeV_k} = (\Thread, \IndexI) \\
-%             & && lbl(\NodeV_1) \in \{ R(\VarX), W(\VarX) \} \\
-%             & && \exists 1 < f \leq k. \;\; lbl(\NodeV_f) = F(\VarX)
-%         \end{aligned}
-%     \end{aligned}
-%     \right\}
-% \]
-
 \[
     {\PersistenceRaces} = \left\{ (r, w) \middle| \ 
     \begin{aligned}
@@ -366,8 +363,6 @@ We say there is a Concurrent Persistence Race between read node $r$ and write no
 \DontPrintSemicolon
 \SetNoFillComment
 \SetKwComment{Comment}{/* }{ */}
-% \SetKwInOut{Input}{inputs}
-% \SetKwInOut{Output}{output}
 \SetKw{Continue}{continue}
 \SetKw{Assert}{assert}
 \SetKwProg{Fn}{Function}{:}{}
@@ -379,7 +374,7 @@ We say there is a Concurrent Persistence Race between read node $r$ and write no
     \caption{Happens-After Vector Clocks Builder}
     \Fn{\FHAVC{$\HBG$}}{
         \BlankLine
-        Set default $\havc{\Thread,\IndexI}{\ThreadOther} \gets +\infty$ \hfill $\forall \Thread,\ThreadOther \in \Threads, \IndexI \in \N$ \;
+        Initialize $\havc{\Thread,\IndexI}{\ThreadOther} \gets +\infty$ \hfill $\forall \Thread,\ThreadOther \in \Threads, \IndexI \in \N$ \;
         \BlankLine
         \ForEach{node $v$ in $\HBG$ in post-order}{
             $(\Thread, \IndexI) \gets \loc{v}$\;
@@ -401,8 +396,8 @@ We say there is a Concurrent Persistence Race between read node $r$ and write no
     \caption{Persisted-Before Vector Clocks Builder}
     \Fn{\FPBVC{$\HBG$}}{
         \BlankLine
-        Set default $\hbvc{\Thread,\IndexI}{\ThreadOther, \VarX} \gets -\infty$ \hfill $\forall \Thread,\ThreadOther \in \Threads, \IndexI \in \N, \VarX \in {\Vars}$ \;
-        Set default $\pbvc{\Thread,\IndexI}{\ThreadOther, \VarX} \gets -\infty$ \hfill $\forall \Thread,\ThreadOther \in \Threads, \IndexI \in \N, \VarX \in {\Vars}$ \;
+        Initialize $\hbvc{\Thread,\IndexI}{\ThreadOther, \VarX} \gets -\infty$ \hfill $\forall \Thread,\ThreadOther \in \Threads, \IndexI \in \N, \VarX \in {\Vars}$ \;
+        Initialize $\pbvc{\Thread,\IndexI}{\ThreadOther, \VarX} \gets -\infty$ \hfill $\forall \Thread,\ThreadOther \in \Threads, \IndexI \in \N, \VarX \in {\Vars}$ \;
         \BlankLine
         \ForEach{node $v$ in $\HBG$ in reversed post-order}{
             $(\Thread, \IndexI) \gets \loc{v}$, $\VarX \gets \var{v}$\;
