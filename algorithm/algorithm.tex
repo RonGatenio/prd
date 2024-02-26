@@ -172,9 +172,9 @@ The edges in $\PDEdges$ will only hold
 \subsubsection{Happens-After Vector Clock}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-${HAVC}_{t,i}(t')$ will be the first node's index in thread $t'$ that happens-after the $i^{th}$ node in thread $t$.
+$\HAVC{t,i}{t'}$ will be the first node's index in thread $t'$ that happens-after the $i^{th}$ node in thread $t$.
 \[
-    {HAVC}_{t,i}(t') = \min \left( \left\{ j \middle| \ 
+    \HAVC{t,i}{t'} = \min \left( \left\{ j \middle| \ 
     \begin{aligned}
         & \exists \Path = (v_1, \ldots, v_k) \in \Nodes^k, k \geq 1 \text{ a path in \HBG} \\
         & \text{such that:} \\
@@ -190,9 +190,9 @@ ${HAVC}_{t,i}(t')$ will be the first node's index in thread $t'$ that happens-af
 \subsubsection{Happens-Before Vector Clock}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-${HBVC}_{t,i}(t',\alpha)$ will be the last node's index in thread $t'$ of variable $\alpha$ that happens-before the $i^{th}$ node in thread $t$.
+$\HBVC{t,i}{t',\alpha}$ will be the last node's index in thread $t'$ of variable $\alpha$ that happens-before the $i^{th}$ node in thread $t$.
 \[
-    {HBVC}_{t,i}(t',\alpha) = \max \left( \left\{ j \middle| \ 
+    \HBVC{t,i}{t',\alpha} = \max \left( \left\{ j \middle| \ 
     \begin{aligned}
         & \exists \Path = (v_1, \ldots, v_k) \in \Nodes^k, k \geq 1 \text{ a path in \HBG} \\
         & \text{such that:} \\
@@ -210,10 +210,10 @@ ${HBVC}_{t,i}(t',\alpha)$ will be the last node's index in thread $t'$ of variab
 \subsubsection{Persisted-Before Vector Clock}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-${PBVC}_{t,i}(t',\alpha)$ will be the last node's index in thread $t'$ of variable $\alpha$ that was persisted before the $i^{th}$ node in thread $t$. \\
+$\PBVC{t,i}{t',\alpha}$ will be the last node's index in thread $t'$ of variable $\alpha$ that was persisted before the $i^{th}$ node in thread $t$. \\
 A persisted node is a node that happens-before a Flush event (on the same variable).
 \[
-    {PBVC}_{t,i}(t',\alpha) = \max \left( \left\{ j \middle| \ 
+    \PBVC{t,i}{t',\alpha} = \max \left( \left\{ j \middle| \ 
     \begin{aligned}
         & \exists \Path = (v_1, \ldots, v_k) \in \Nodes^k, k \geq 1 \text{ a path in \HBG} \\
         & \text{such that:} \\
@@ -263,7 +263,7 @@ We say there is a Concurrent Persistence Race between read node $r$ and write no
         & \text{such that:} \\
         & \begin{aligned}
             & && \PD{v}{r} \\
-            & && {PBVC}_{\loc{v}}(t_w, \alpha) < i_w < {HAVC}_{\loc{r}}(t_w)
+            & && \PBVC{\loc{v}}{t_w, \alpha} < i_w < \HAVC{\loc{r}}{t_w}
         \end{aligned}
     \end{aligned}
     \right\}
@@ -410,13 +410,13 @@ We say there is a Concurrent Persistence Race between read node $r$ and write no
 
 Proof of step 1
 
-claim: after visiting node $v$ with $\loc{v} = (t, i)$, \\ ${havc}_{t,i}(t') = {HAVC}_{t,i}(t') \ \forall t' \in \Threads$
+claim: after visiting node $v$ with $\loc{v} = (t, i)$, \\ ${havc}_{t,i}(t') = \HAVC{t,i}{t'} \ \forall t' \in \Threads$
 
 \HBG post-order: $v_1, v_2, \ldots, v_n$
 
 for $v_1$: \\
 $v_1$ has no children since there are no nodes before it in the post-order.
-This means ${HAVC}_{t,i}(t) = i$ and ${HAVC}_{t,i}(t') = \infty \ \forall t' \in \Threads \neq t$.
+This means $\HAVC{t,i}{t} = i$ and $\HAVC{t,i}{t'} = \infty \ \forall t' \in \Threads \neq t$.
 After visiting node $v_1$, in step $1.2$ we set ${havc}_{t,i}(t) \gets i$. Afterwards, we don't change ${havc}_{t,i}(t') \ \forall t' \in \Threads$ since step $1.3$ won't happen, and $v_1$ is no parent of any other node.
 
 for $v_k$: \\
