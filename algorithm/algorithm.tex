@@ -78,6 +78,10 @@ notes from Guy
 \newcommand{\HBVC}[2]{\DefFunc{HBVC}{#1}{#2}}
 \newcommand{\PBVC}[2]{\DefFunc{PBVC}{#1}{#2}}
 
+\newcommand{\havc}[2]{\DefFunc{havc}{#1}{#2}}
+\newcommand{\hbvc}[2]{\DefFunc{hbvc}{#1}{#2}}
+\newcommand{\pbvc}[2]{\DefFunc{pbvc}{#1}{#2}}
+
 % Relations %
 \newcommand{\HBSign}{\prec}
 \newcommand{\HB}[2]{\ensuremath{{#1} \HBSign {#2}}}
@@ -290,21 +294,21 @@ We say there is a Concurrent Persistence Race between read node $r$ and write no
     \caption{Happens-After Vector Clocks Builder}
     \Fn{\FHAVC{$\HBG$}}{
         \BlankLine
-        Set default ${havc}_{t,i}(t') \gets +\infty$ \hfill $\forall t,t' \in \Threads, i \in \mathbb{N}$ \;
+        Set default $\havc{t,i}{t'} \gets +\infty$ \hfill $\forall t,t' \in \Threads, i \in \mathbb{N}$ \;
         \BlankLine
         \ForEach{node $v$ in \HBG in post-order}{
             $(t, i) \gets \loc{v}$\;
-            ${havc}_{t,i}(t) \gets i$\;
+            $\havc{t,i}{t} \gets i$\;
             \BlankLine
             \ForEach{parent node $p$ such that $(p, v) \in \HBEdges$}{
                 $(t_p, i_p) \gets \loc{p}$\;
                 \ForEach{$t' \in \Threads$}{
-                    ${havc}_{t_p,i_p}(t') \gets \min\left({havc}_{t_p,i_p}(t'), {havc}_{t,i}(t')\right)$
+                    $\havc{t_p,i_p}{t'} \gets \min \left( \havc{t_p,i_p}{t'}, \havc{t,i}{t'} \right)$
                 }
             }
         }
         \BlankLine
-        \KwRet ${havc}$\;
+        \KwRet $\havc{}{}$\;
     } 
 \end{algorithm}
 
@@ -312,8 +316,8 @@ We say there is a Concurrent Persistence Race between read node $r$ and write no
     \caption{Persisted-Before Vector Clocks Builder}
     \Fn{\FPBVC{$\HBG$}}{
         \BlankLine
-        Set default ${hbvc}_{t,i}(t', \alpha) \gets -\infty$ \hfill $\forall t,t' \in \Threads, i \in \mathbb{N}, \alpha \in {\Vars}$ \;
-        Set default ${pbvc}_{t,i}(t', \alpha) \gets -\infty$ \hfill $\forall t,t' \in \Threads, i \in \mathbb{N}, \alpha \in {\Vars}$ \;
+        Set default $\hbvc{t,i}{t', \alpha} \gets -\infty$ \hfill $\forall t,t' \in \Threads, i \in \mathbb{N}, \alpha \in {\Vars}$ \;
+        Set default $\pbvc{t,i}{t', \alpha} \gets -\infty$ \hfill $\forall t,t' \in \Threads, i \in \mathbb{N}, \alpha \in {\Vars}$ \;
         \BlankLine
         \ForEach{node $v$ in \HBG in reversed post-order}{
             $(t, i) \gets \loc{v}$, $\alpha \gets \var{v}$\;
@@ -322,7 +326,7 @@ We say there is a Concurrent Persistence Race between read node $r$ and write no
             \BlankLine
             \Comment*[l]{Handle Read and Write nodes}
             \If{$v \in R \cup W$}{
-                ${hbvc}_{t,i}(t,\alpha) \gets i$\;
+                $\hbvc{t,i}{t,\alpha} \gets i$\;
             }
         
             % F
@@ -330,7 +334,7 @@ We say there is a Concurrent Persistence Race between read node $r$ and write no
             \Comment*[l]{Handle Flush nodes}
             \If{$v \in F$}{
                 \ForEach{$t' \in \Threads$}{
-                    ${pbvc}_{t,i}(t',\alpha) \gets {hbvc}_{t,i}(t',\alpha)$\;
+                    $\pbvc{t,i}{t',\alpha} \gets \hbvc{t,i}{t',\alpha}$\;
                 }
             }
         
@@ -341,22 +345,22 @@ We say there is a Concurrent Persistence Race between read node $r$ and write no
                 $(t_c, i_c) \gets \loc{c}$\;
                 \ForEach{$t' \in \Threads$}{
                     \ForEach{$\beta \in {\Vars}$}{
-                        ${hbvc}_{t_c,i_c}(t',\beta) \gets \max\left({hbvc}_{t_c,i_c}(t',\beta), {hbvc}_{t,i}(t',\beta)\right)$\;
-                        ${pbvc}_{t_c,i_c}(t',\beta) \gets \max\left({pbvc}_{t_c,i_c}(t',\beta), {pbvc}_{t,i}(t',\beta)\right)$\;
+                        $\hbvc{t_c,i_c}{t',\beta} \gets \max \left( \hbvc{t_c,i_c}{t',\beta}, \hbvc{t,i}{t',\beta} \right)$\;
+                        $\pbvc{t_c,i_c}{t',\beta} \gets \max \left( \pbvc{t_c,i_c}{t',\beta}, \pbvc{t,i}{t',\beta} \right)$\;
                     }
                 }
             }
         }
         \BlankLine
-        \KwRet ${pbvc}$\;
+        \KwRet $\pbvc{}{}$\;
     }
 \end{algorithm}
 
 \begin{algorithm}[H]
     \caption{Concurrent Persistence Race Detector}
     \Fn{\FCPRD{$\HBG$, $\PDG$}}{
-        ${havc} \gets \FHAVC{\HBG}$\;
-        ${pbvc} \gets \FPBVC{\HBG}$\;
+        $\havc{}{} \gets \FHAVC{\HBG}$\;
+        $\pbvc{}{} \gets \FPBVC{\HBG}$\;
         ${races} \gets \varnothing$\;
         \BlankLine
         \ForEach{write node $v \in W$ in \HBG}{
@@ -376,13 +380,13 @@ We say there is a Concurrent Persistence Race between read node $r$ and write no
                 
                 \BlankLine
                 \Comment*[l]{If the read node is persisted, there is not bug}
-                \If{$j \leq {pbvc}_{t,i}(t)$}{
+                \If{$j \leq \pbvc{t,i}{t}$}{
                     \Continue\;
                 }
                 
                 \BlankLine
                 \Comment*[l]{If the read node is persisted, there is not bug}
-                \If{$j \leq {pbvc}_{t,i}(t)$}{
+                \If{$j \leq \pbvc{t,i}{t}$}{
                     \Continue\;
                 }
 
@@ -390,7 +394,7 @@ We say there is a Concurrent Persistence Race between read node $r$ and write no
                 \ForEach{write node $w \in \WriteNodes[\alpha]$}{
                     $(t_w, i_w) \gets \loc{w}$
                     \BlankLine
-                    \If{${pbvc}_{t,i}(t_w) < i_w < {havc}_{t,j}$}{
+                    \If{$\pbvc{t,i}{t_w} < i_w < \havc{t,j}{}$}{
                         ${races} \gets {races} \cup {(r, w)}$\;
                     }
                 }
@@ -410,18 +414,18 @@ We say there is a Concurrent Persistence Race between read node $r$ and write no
 
 Proof of step 1
 
-claim: after visiting node $v$ with $\loc{v} = (t, i)$, \\ ${havc}_{t,i}(t') = \HAVC{t,i}{t'} \ \forall t' \in \Threads$
+claim: after visiting node $v$ with $\loc{v} = (t, i)$, \\ $\havc{t,i}{t'} = \HAVC{t,i}{t'} \ \forall t' \in \Threads$
 
 \HBG post-order: $v_1, v_2, \ldots, v_n$
 
 for $v_1$: \\
 $v_1$ has no children since there are no nodes before it in the post-order.
 This means $\HAVC{t,i}{t} = i$ and $\HAVC{t,i}{t'} = \infty \ \forall t' \in \Threads \neq t$.
-After visiting node $v_1$, in step $1.2$ we set ${havc}_{t,i}(t) \gets i$. Afterwards, we don't change ${havc}_{t,i}(t') \ \forall t' \in \Threads$ since step $1.3$ won't happen, and $v_1$ is no parent of any other node.
+After visiting node $v_1$, in step $1.2$ we set $\havc{t,i}{t} \gets i$. Afterwards, we don't change $\havc{t,i}{t'} \ \forall t' \in \Threads$ since step $1.3$ won't happen, and $v_1$ is no parent of any other node.
 
 for $v_k$: \\
 We assume that for all children of $v_k$ the claim holds. \\
-First we set ${{havc}_{t,i}(t) \gets i}$. \\
+First we set ${\havc{t,i}{t} \gets i}$. \\
 For each child of $v_k$ we merge
 
 
