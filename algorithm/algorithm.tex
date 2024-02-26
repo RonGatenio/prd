@@ -23,8 +23,8 @@ todos
 
 % - HBG = (Ev, HBEdges) ?
 %     - rename V since it symbolizes an events group
-- Define range of arguments of a function separately
-    - i.e. instead of $loc(v \in V) = ...$, do $loc(v) = .... .... \forall v \in V$
+% - Define range of arguments of a function separately
+%     - i.e. instead of $loc(v \in V) = ...$, do $loc(v) = .... .... \forall v \in V$
 - Rethink about the indexing of HAVC etc.
     - They seem confusing
 % - Add in persistence race definition $\exists \alpha$
@@ -52,7 +52,7 @@ todos
 % Sets %
 \newcommand{\Nodes}{\DefSet{Ev}}
 \newcommand{\HBEdges}{\DefSet{E_{hb}}}
-\newcommand{\PDEdges}{\DefSet{E_pd}}
+\newcommand{\PDEdges}{\DefSet{E_{pd}}}
 \newcommand{\HBG}{\DefSet{HBG}}
 \newcommand{\PDG}{\DefSet{PDG}}
 \newcommand{\DefGraph}[3]{\DefSet{#1(#2, #3)}}
@@ -67,6 +67,8 @@ todos
 \newcommand{\Path}{\DefSet{P}}
 
 \newcommand{\PersistenceRaces}{\DefSet{PersistenceRaces}}
+% \newcommand{\races}{\DefSet{Races}}
+\newcommand{\races}{\ensuremath{Races}} % TODO: choose
 
 % Functions %
 \newcommand{\var}[1]{\DefFunc{var}{}{#1}}
@@ -81,9 +83,12 @@ todos
 \newcommand{\pbvc}[2]{\DefFunc{pbvc}{#1}{#2}}
 
 % Relations %
-\newcommand{\HBSign}{\prec}
+% \newcommand{\HBSign}{\prec}
+\newcommand{\HBSign}{\overset{hb}{\prec}}
 \newcommand{\HB}[2]{\ensuremath{{#1} \HBSign {#2}}}
-\newcommand{\PD}[2]{\ensuremath{{#1} \overset{pd}{\to} {#2}}}
+
+\newcommand{\PDSign}{\overset{pd}{\to}}
+\newcommand{\PD}[2]{\ensuremath{{#1} \PDSign {#2}}}
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -113,8 +118,10 @@ We will define some groups on the collection of data from the program trace:
     \item Let $\ReadNodes[\alpha], \WriteNodes[\alpha], \FlushNodes[\alpha]$ be all the Read, Write, and Flush nodes in the trace respectively such that the variable operated by the node is $\alpha$.
     % \item Let $Ops = \{R, W, F\}$ be the event types in the trace: Read, Write, and Flush respectively.
     % \item Let $lbl(v \in \Nodes) = o(\alpha)$  where $o \in {Ops}, \alpha \in {\Vars}$, be the label of event $v$. Signifying that $v$ is of type $o$ and operates on  variable $\alpha$.
-    \item Let $\var{v \in \Nodes} = \alpha \in \Vars$ be the variable operated by node $v$.
-    \item Let $\loc{v \in \Nodes} = (t, i) \in \Threads \times \mathbb{N}$ be the location of node $v$, meaning that $v$ is the $i^{th}$ node in thread $t$.
+    % \item Let $\var{v \in \Nodes} = \alpha \in \Vars$ be the variable operated by node $v$.
+    \item Let $\var{v} = \alpha$ be the variable operated by node $v$. \hfill $v \in \Nodes, \alpha \in \Vars$
+    % \item Let $\loc{v \in \Nodes} = (t, i) \in \Threads \times \mathbb{N}$ be the location of node $v$, meaning that $v$ is the $i^{th}$ node in thread $t$.
+    \item Let $\loc{v} = (t, i)$ be the location of node $v$, the $i^{th}$ node in thread $t$. \hfill $v \in \Nodes, t \in \Threads, i \in \mathbb{N}$
     
 \end{itemize}
 % $$
@@ -359,7 +366,7 @@ We say there is a Concurrent Persistence Race between read node $r$ and write no
     \Fn{\FCPRD{$\HBG$, $\PDG$}}{
         $\havc{}{} \gets \FHAVC{\HBG}$\;
         $\pbvc{}{} \gets \FPBVC{\HBG}$\;
-        ${races} \gets \varnothing$\;
+        $\races \gets \varnothing$\;
         \BlankLine
         \ForEach{write node $v \in \WriteNodes$ in $\HBG$}{
             $(t, i) \gets \loc{v}$, $\alpha \gets \var{v}$\;
@@ -393,7 +400,7 @@ We say there is a Concurrent Persistence Race between read node $r$ and write no
                     $(t_w, i_w) \gets \loc{w}$
                     \BlankLine
                     \If{$\pbvc{t,i}{t_w} < i_w < \havc{t,j}{}$}{
-                        ${races} \gets {races} \cup {(r, w)}$\;
+                        $\races \gets \races \cup {(r, w)}$\;
                     }
                 }
             }
@@ -401,7 +408,7 @@ We say there is a Concurrent Persistence Race between read node $r$ and write no
         
         }
         \BlankLine
-        \KwRet ${races}$\;
+        \KwRet $\races$\;
     }
 \end{algorithm}
 
