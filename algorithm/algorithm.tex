@@ -183,7 +183,8 @@ Points to talk about
 \newcommand{\HBSign}{\overset{hb}{\prec}}
 \newcommand{\HB}[2]{\ensuremath{{#1} \HBSign {#2}}}
 
-\newcommand{\PDSign}{\overset{pd}{\to}}
+% \newcommand{\PDSign}{\overset{pd}{\to}}
+\newcommand{\PDSign}{\overset{depends}{\to}}
 \newcommand{\PD}[2]{\ensuremath{{#1} \PDSign {#2}}}
 
 
@@ -202,9 +203,12 @@ Points to talk about
 
 \newcommand{\NodeV}{\ensuremath{v}}
 \newcommand{\NodeU}{\ensuremath{u}}
+\newcommand{\NodeE}{\ensuremath{e}}
 \newcommand{\NodeR}{\ensuremath{r}}
 \newcommand{\NodeW}{\ensuremath{w}}
 \newcommand{\NodeF}{\ensuremath{f}}
+
+\newcommand{\NodeWEx}{\ensuremath{w'}}
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -283,21 +287,15 @@ The edges in $\PDEdges$ will only hold
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 $\HAVC{\NodeV}{\Thread}$ will be the first node's index in thread $\Thread$ that happens-after node $\NodeV$.
-\[
+$$
     \HAVC{\NodeV}{\Thread} = \min \left( \left\{ \IndexI \middle| \ 
     \begin{aligned}
-        % & \exists \Path = (\NodeV, \ldots, \NodeU), \text{ a path in } \HBG \text{ of length } k \geq 1 \\
-        & \exists \NodeU \in \Nodes \such \thread{\NodeU} = t \\
+        & \exists \NodeU \in \Nodes \such \thread{\NodeU} = \Thread \\
         & \exists \Path = (\NodeV, \ldots, \NodeU), \text{ path of length } k \geq 1 \\
         & \idx{\NodeV} = \IndexI
-        % & \thread{\NodeV} = t
-        % & \text{such that:} \\
-        % & \begin{aligned}
-        %     & && \loc{\NodeV_1} = (\Thread, \IndexI), \ \loc{\NodeV_k} = (\ThreadOther, \IndexJ)
-        % \end{aligned}
     \end{aligned}
     \right\} \right)
-\]
+$$
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -305,72 +303,75 @@ $\HAVC{\NodeV}{\Thread}$ will be the first node's index in thread $\Thread$ that
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 $\HBVC{\NodeV}{\Thread,\VarX}$ will be the last node's index in thread $\Thread$ of variable $\VarX$ that happens-before the node $\NodeV$.
-\[
+$$
     \HBVC{\NodeV}{\Thread,\VarX} = \max \left( \left\{ \IndexI \middle| \ 
     \begin{aligned}
-        & \exists \NodeU \in \ReadNodes \cup \WriteNodes. \; \thread{\NodeU} = t \land \var{\NodeU} = \VarX \\
+        & \exists \NodeU \in \ReadNodes \cup \WriteNodes \such \thread{\NodeU} = \Thread \land \var{\NodeU} = \VarX \\
         & \exists \Path = (\NodeU, \ldots, \NodeV), \text{ a path of length } k \geq 1 \\
         & \idx{\NodeV} = \IndexI
-        % & \thread{\NodeU} = t \\
-        % & \NodeU \in \ReadNodes[\VarX] \cup \WriteNodes[\VarX] \\
-        % & \NodeU \in \ReadNodes \cup \WriteNodes \\
-        % & \text{such that:} \\
-        % & \begin{aligned}
-        %     & && \loc{\NodeV_1} = (\ThreadOther, \IndexJ), \ \loc{\NodeV_k} = (\Thread, \IndexI) \\
-        %     % & && lbl(\NodeV_1) \in \{ R(\VarX), W(\VarX) \} \\
-        %     & && \NodeU \in \ReadNodes[\VarX] \cup \WriteNodes[\VarX] \\
-        % \end{aligned}
     \end{aligned}
     \right\} \right)
-\]
+$$
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsubsection{Persisted-Before Vector Clock}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-$\PBVC{\Thread,\IndexI}{\ThreadOther,\VarX}$ will be the last node's index in thread $\ThreadOther$ of variable $\VarX$ that was persisted before the $\IndexI^{th}$ node in thread $\Thread$. \\
+$\PBVC{\NodeV}{\Thread,\VarX}$ will be the last node's index in thread $\Thread$ of variable $\VarX$ that was persisted before the node $\NodeV$. \\
 A persisted node is a node that happens-before a Flush event (on the same variable).
-\[
-    \PBVC{\Thread,\IndexI}{\ThreadOther,\VarX} = \max \left( \left\{ \IndexJ \middle| \ 
+$$
+    \PBVC{\NodeV}{\Thread,\VarX} = \max \left( \left\{ \IndexI \middle| \ 
     \begin{aligned}
-        & \exists \Path = (\NodeV_1, \ldots, \NodeV_k) \in \Nodes^k, k \geq 1 \text{ a path in \HBG} \\
-        & \text{such that:} \\
-        & \begin{aligned}
-            & && \loc{\NodeV_1} = (\ThreadOther, \IndexJ), \ \loc{\NodeV_k} = (\Thread, \IndexI) \\
-            % & && lbl(\NodeV_1) \in \{ R(\VarX), W(\VarX) \} \\
-            & && \NodeV_1 \in \ReadNodes[\VarX] \cup \WriteNodes[\VarX] \\
-            % & && \exists 1 < f \leq k. \;\; lbl(\NodeV_f) = F(\VarX)
-            & && \exists 1 < f \leq k. \;\; \NodeV_f \in \FlushNodes[\VarX]
-        \end{aligned}
+        & \exists \NodeU \in \ReadNodes \cup \WriteNodes \such \thread{\NodeU} = \Thread \land \var{\NodeU} = \VarX \\
+        % & \exists \Path = (\NodeE_1=\NodeU, \ldots, \NodeE_k=\NodeV), \text{ a path of length } k \geq 1 \\
+        & \exists \Path = (\NodeU, \ldots, \NodeV), \text{ a path of length } k \geq 1 \\
+        % & \exists \Path = (\NodeE_1=\NodeU, \ldots, \NodeE_f, \ldots, \NodeE_k=\NodeV), \text{ a path of length } k \geq 1 \\
+        % & \exists \NodeF \in \FlushNodes \text{ at index } 1 < \IndexJ \leq k \text{ in } \Path \such \NodeE_f \in \Path \land \NodeE_f \in \FlushNodes \land \var{\NodeE_f} = \VarX \\
+        & \exists \NodeF \in \FlushNodes \such \var{\NodeF} = \VarX \land \Path(\IndexJ) = \NodeF, 1 < \IndexJ \leq k \\
+        % & \exists 1 < f \leq k \such \NodeE_f \in \Path \land \NodeE_f \in \FlushNodes \land \var{\NodeE_f} = \VarX \\
+        & \idx{\NodeV} = \IndexI
+        % & \exists \Path = (\NodeV_1, \ldots, \NodeV_k) \in \Nodes^k, k \geq 1 \text{ a path in \HBG} \\
+        % & \text{such that:} \\
+        % & \begin{aligned}
+        %     & && \loc{\NodeV_1} = (\ThreadOther, \IndexJ), \ \loc{\NodeV_k} = (\Thread, \IndexI) \\
+        %     % & && lbl(\NodeV_1) \in \{ R(\VarX), W(\VarX) \} \\
+        %     & && \NodeV_1 \in \ReadNodes[\VarX] \cup \WriteNodes[\VarX] \\
+        %     % & && \exists 1 < f \leq k. \;\; lbl(\NodeV_f) = F(\VarX)
+        %     & && \exists 1 < f \leq k. \;\; \NodeV_f \in \FlushNodes[\VarX]
+        % \end{aligned}
     \end{aligned}
     \right\} \right)
-\]
+$$
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{Concurrent Persistence Race}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-We say there is a Concurrent Persistence Race between read node $r$ and write node $w$ if
+We say there is a Concurrent Persistence Race between read node $\NodeR$ and write node $\NodeW$ if
 
-\[
-    {\PersistenceRaces} = \left\{ (r, w) \middle| \ 
+$$
+    {\PersistenceRaces} = \left\{ (\NodeR, \NodeW) \middle| \ 
     \begin{aligned}
-        % & r, w \in \Nodes \\
-        % & lbl(r) = R(\VarX), lbl(w) = W(\VarX) \\
-        & \exists \VarX \in {\Vars}. \; r \in \ReadNodes[\VarX], w \in \WriteNodes[\VarX] \\
-        & \loc{w} = (t_w, i_w) \\
-        % & \exists v \in \Nodes. \;\; lbl(v) = W(\VarY)\\
-        & \exists v \in \WriteNodes[\VarY], \;\; \VarY \neq \VarX \\
-        & \text{such that:} \\
-        & \begin{aligned}
-            & && \PD{v}{r} \\
-            & && \PBVC{\loc{v}}{t_w, \VarX} < i_w < \HAVC{\loc{r}}{t_w}
-        \end{aligned}
+        & \NodeR \in \ReadNodes, \NodeW \in \WriteNodes, \var{\NodeR} = \var{\NodeW} \\
+        & \exists \NodeWEx \in \WriteNodes \such \var{\NodeR} \neq \var{\NodeWEx} \land \thread{\NodeR} = \thread{\NodeWEx} \\
+        & \PD{\NodeWEx}{\NodeR} \\
+        & \PBVC{\NodeWEx}{\thread{\NodeW}, \var{\NodeW}} < \idx{\NodeW} < \HAVC{\NodeR}{\thread{\NodeW}} \\
+        % % & r, w \in \Nodes \\
+        % % & lbl(r) = R(\VarX), lbl(w) = W(\VarX) \\
+        % & \exists \VarX \in {\Vars}. \; r \in \ReadNodes[\VarX], w \in \WriteNodes[\VarX] \\
+        % & \loc{w} = (t_w, i_w) \\
+        % % & \exists v \in \Nodes. \;\; lbl(v) = W(\VarY)\\
+        % & \exists v \in \WriteNodes[\VarY], \;\; \VarY \neq \VarX \\
+        % & \text{such that:} \\
+        % & \begin{aligned}
+        %     & && \PD{v}{r} \\
+        %     & && \PBVC{\loc{v}}{t_w, \VarX} < i_w < \HAVC{\loc{r}}{t_w}
+        % \end{aligned}
     \end{aligned}
     \right\}
-\]
+$$
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
