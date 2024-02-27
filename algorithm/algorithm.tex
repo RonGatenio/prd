@@ -122,6 +122,13 @@ Points to talk about
 
 
 % ---------------------------------------------------------
+% Formal Notation
+% ---------------------------------------------------------
+
+\newcommand{\such}{\ensuremath{.\;}}
+
+
+% ---------------------------------------------------------
 % Sets
 % ---------------------------------------------------------
 
@@ -155,8 +162,9 @@ Points to talk about
 
 \newcommand{\var}[1]{\DefFunc{var}{}{#1}}
 \newcommand{\loc}[1]{\DefFunc{loc}{}{#1}}
-\newcommand{\thread}[1]{\DefFunc{t}{}{#1}}
-\newcommand{\index}[1]{\DefFunc{idx}{}{#1}}
+% \newcommand{\thread}[1]{\DefFunc{t}{}{#1}}
+\newcommand{\thread}[1]{\DefFunc{thread}{}{#1}}
+\newcommand{\idx}[1]{\DefFunc{idx}{}{#1}}
 
 \newcommand{\HAVC}[2]{\DefFunc{HAVC}{#1}{#2}}
 \newcommand{\HBVC}[2]{\DefFunc{HBVC}{#1}{#2}}
@@ -227,7 +235,7 @@ We will define some groups on the collection of data from the program trace:
     \item Let $\var{\NodeV} = \VarX$ be the variable operated by node $\NodeV$. \hfill $\NodeV \in \Nodes, \VarX \in \Vars$
     \item Let $\loc{\NodeV} = (\Thread, \IndexI)$ be the location of node $\NodeV$, the $\IndexI^{th}$ node in thread $\Thread$. \hfill $\NodeV \in \Nodes, \Thread \in \Threads, \IndexI \in \N$
     \item Let $\thread{\NodeV}$ be the thread the event $\NodeV \in \Nodes$ occurred on.
-    \item Let $\index{\NodeV}$ be the index of the event $\NodeV \in \Nodes$ in the program trace.
+    \item Let $\idx{\NodeV}$ be the index of the event $\NodeV \in \Nodes$ in the program trace.
 \end{itemize}
 
 
@@ -274,15 +282,19 @@ The edges in $\PDEdges$ will only hold
 \subsubsection{Happens-After Vector Clock}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-$\HAVC{\Thread,\IndexI}{\ThreadOther}$ will be the first node's index in thread $\ThreadOther$ that happens-after the $\IndexI^{th}$ node in thread $\Thread$.
+$\HAVC{\NodeV}{\Thread}$ will be the first node's index in thread $\Thread$ that happens-after node $\NodeV$.
 \[
-    \HAVC{\Thread,\IndexI}{\ThreadOther} = \min \left( \left\{ \IndexJ \middle| \ 
+    \HAVC{\NodeV}{\Thread} = \min \left( \left\{ \IndexI \middle| \ 
     \begin{aligned}
-        & \exists \Path = (\NodeV_1, \ldots, \NodeV_k) \in \Nodes^k, k \geq 1 \text{ a path in \HBG} \\
-        & \text{such that:} \\
-        & \begin{aligned}
-            & && \loc{\NodeV_1} = (\Thread, \IndexI), \ \loc{\NodeV_k} = (\ThreadOther, \IndexJ)
-        \end{aligned}
+        % & \exists \Path = (\NodeV, \ldots, \NodeU), \text{ a path in } \HBG \text{ of length } k \geq 1 \\
+        & \exists \NodeU \in \Nodes \such \thread{\NodeU} = t \\
+        & \exists \Path = (\NodeV, \ldots, \NodeU), \text{ path of length } k \geq 1 \\
+        & \idx{\NodeV} = \IndexI
+        % & \thread{\NodeV} = t
+        % & \text{such that:} \\
+        % & \begin{aligned}
+        %     & && \loc{\NodeV_1} = (\Thread, \IndexI), \ \loc{\NodeV_k} = (\ThreadOther, \IndexJ)
+        % \end{aligned}
     \end{aligned}
     \right\} \right)
 \]
@@ -292,17 +304,22 @@ $\HAVC{\Thread,\IndexI}{\ThreadOther}$ will be the first node's index in thread 
 \subsubsection{Happens-Before Vector Clock}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-$\HBVC{\Thread,\IndexI}{\ThreadOther,\VarX}$ will be the last node's index in thread $\ThreadOther$ of variable $\VarX$ that happens-before the $\IndexI^{th}$ node in thread $\Thread$.
+$\HBVC{\NodeV}{\Thread,\VarX}$ will be the last node's index in thread $\Thread$ of variable $\VarX$ that happens-before the node $\NodeV$.
 \[
-    \HBVC{\Thread,\IndexI}{\ThreadOther,\VarX} = \max \left( \left\{ \IndexJ \middle| \ 
+    \HBVC{\NodeV}{\Thread,\VarX} = \max \left( \left\{ \IndexI \middle| \ 
     \begin{aligned}
-        & \exists \Path = (\NodeV_1, \ldots, \NodeV_k) \in \Nodes^k, k \geq 1 \text{ a path in \HBG} \\
-        & \text{such that:} \\
-        & \begin{aligned}
-            & && \loc{\NodeV_1} = (\ThreadOther, \IndexJ), \ \loc{\NodeV_k} = (\Thread, \IndexI) \\
-            % & && lbl(\NodeV_1) \in \{ R(\VarX), W(\VarX) \} \\
-            & && \NodeV_1 \in \ReadNodes[\VarX] \cup \WriteNodes[\VarX] \\
-        \end{aligned}
+        & \exists \NodeU \in \ReadNodes \cup \WriteNodes. \; \thread{\NodeU} = t \land \var{\NodeU} = \VarX \\
+        & \exists \Path = (\NodeU, \ldots, \NodeV), \text{ a path of length } k \geq 1 \\
+        & \idx{\NodeV} = \IndexI
+        % & \thread{\NodeU} = t \\
+        % & \NodeU \in \ReadNodes[\VarX] \cup \WriteNodes[\VarX] \\
+        % & \NodeU \in \ReadNodes \cup \WriteNodes \\
+        % & \text{such that:} \\
+        % & \begin{aligned}
+        %     & && \loc{\NodeV_1} = (\ThreadOther, \IndexJ), \ \loc{\NodeV_k} = (\Thread, \IndexI) \\
+        %     % & && lbl(\NodeV_1) \in \{ R(\VarX), W(\VarX) \} \\
+        %     & && \NodeU \in \ReadNodes[\VarX] \cup \WriteNodes[\VarX] \\
+        % \end{aligned}
     \end{aligned}
     \right\} \right)
 \]
