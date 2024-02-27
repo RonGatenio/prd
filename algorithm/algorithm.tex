@@ -324,22 +324,9 @@ $$
     \PBVC{\NodeV}{\Thread,\VarX} = \max \left( \left\{ \IndexI \middle| \ 
     \begin{aligned}
         & \exists \NodeU \in \ReadNodes \cup \WriteNodes \such \thread{\NodeU} = \Thread \land \var{\NodeU} = \VarX \\
-        % & \exists \Path = (\NodeE_1=\NodeU, \ldots, \NodeE_k=\NodeV), \text{ a path of length } k \geq 1 \\
         & \exists \Path = (\NodeU, \ldots, \NodeV), \text{ a path of length } k \geq 1 \\
-        % & \exists \Path = (\NodeE_1=\NodeU, \ldots, \NodeE_f, \ldots, \NodeE_k=\NodeV), \text{ a path of length } k \geq 1 \\
-        % & \exists \NodeF \in \FlushNodes \text{ at index } 1 < \IndexJ \leq k \text{ in } \Path \such \NodeE_f \in \Path \land \NodeE_f \in \FlushNodes \land \var{\NodeE_f} = \VarX \\
         & \exists \NodeF \in \FlushNodes \such \var{\NodeF} = \VarX \land \Path(\IndexJ) = \NodeF, 1 < \IndexJ \leq k \\
-        % & \exists 1 < f \leq k \such \NodeE_f \in \Path \land \NodeE_f \in \FlushNodes \land \var{\NodeE_f} = \VarX \\
         & \idx{\NodeV} = \IndexI
-        % & \exists \Path = (\NodeV_1, \ldots, \NodeV_k) \in \Nodes^k, k \geq 1 \text{ a path in \HBG} \\
-        % & \text{such that:} \\
-        % & \begin{aligned}
-        %     & && \loc{\NodeV_1} = (\ThreadOther, \IndexJ), \ \loc{\NodeV_k} = (\Thread, \IndexI) \\
-        %     % & && lbl(\NodeV_1) \in \{ R(\VarX), W(\VarX) \} \\
-        %     & && \NodeV_1 \in \ReadNodes[\VarX] \cup \WriteNodes[\VarX] \\
-        %     % & && \exists 1 < f \leq k. \;\; lbl(\NodeV_f) = F(\VarX)
-        %     & && \exists 1 < f \leq k. \;\; \NodeV_f \in \FlushNodes[\VarX]
-        % \end{aligned}
     \end{aligned}
     \right\} \right)
 $$
@@ -357,18 +344,7 @@ $$
         & \NodeR \in \ReadNodes, \NodeW \in \WriteNodes, \var{\NodeR} = \var{\NodeW} \\
         & \exists \NodeWEx \in \WriteNodes \such \var{\NodeR} \neq \var{\NodeWEx} \land \thread{\NodeR} = \thread{\NodeWEx} \\
         & \PD{\NodeWEx}{\NodeR} \\
-        & \PBVC{\NodeWEx}{\thread{\NodeW}, \var{\NodeW}} < \idx{\NodeW} < \HAVC{\NodeR}{\thread{\NodeW}} \\
-        % % & r, w \in \Nodes \\
-        % % & lbl(r) = R(\VarX), lbl(w) = W(\VarX) \\
-        % & \exists \VarX \in {\Vars}. \; r \in \ReadNodes[\VarX], w \in \WriteNodes[\VarX] \\
-        % & \loc{w} = (t_w, i_w) \\
-        % % & \exists v \in \Nodes. \;\; lbl(v) = W(\VarY)\\
-        % & \exists v \in \WriteNodes[\VarY], \;\; \VarY \neq \VarX \\
-        % & \text{such that:} \\
-        % & \begin{aligned}
-        %     & && \PD{v}{r} \\
-        %     & && \PBVC{\loc{v}}{t_w, \VarX} < i_w < \HAVC{\loc{r}}{t_w}
-        % \end{aligned}
+        & \PBVC{\NodeWEx}{\thread{\NodeW}, \var{\NodeW}} < \idx{\NodeW} < \HAVC{\NodeR}{\thread{\NodeW}}
     \end{aligned}
     \right\}
 $$
