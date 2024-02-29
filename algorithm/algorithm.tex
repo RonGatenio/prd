@@ -107,6 +107,7 @@ Points to talk about
 % ---------------------------------------------------------
 
 \newcommand{\FontSet}[1]{\ensuremath{\mathsf{#1}}}
+% \renewcommand{\FontSet}[1]{\ensuremath{#1}}
 
 
 % ---------------------------------------------------------
@@ -129,12 +130,20 @@ Points to talk about
 
 
 % ---------------------------------------------------------
-% Sets
+% Math Sets
 % ---------------------------------------------------------
 
 \newcommand{\N}{\DefSet{\mathbb{N}}}
+% \newcommand{\EmptySet}{\DefSet{\emptyset}}
+\newcommand{\EmptySet}{\DefSet{\varnothing}}
+
+
+% ---------------------------------------------------------
+% Sets
+% ---------------------------------------------------------
 
 \newcommand{\Nodes}{\DefSet{Ev}}
+% \renewcommand{\Nodes}{\DefSet{Events}}
 \newcommand{\HBEdges}{\DefSet{E_{hb}}}
 \newcommand{\PDEdges}{\DefSet{E_{pd}}}
 \newcommand{\HBG}{\DefSet{HBG}}
@@ -152,8 +161,8 @@ Points to talk about
 \newcommand{\Path}{\overset{\to}{\DefSet{p}}}
 
 \newcommand{\PersistenceRaces}{\DefSet{PersistenceRaces}}
-% \newcommand{\races}{\DefSet{Races}}
-\newcommand{\races}{\ensuremath{Races}} % TODO: choose
+\newcommand{\races}{\DefSet{Races}}
+% \newcommand{\races}{\ensuremath{Races}} % TODO: choose
 
 
 % ---------------------------------------------------------
@@ -164,6 +173,7 @@ Points to talk about
 \newcommand{\loc}[1]{\DefFunc{loc}{}{#1}}
 % \newcommand{\thread}[1]{\DefFunc{t}{}{#1}}
 \newcommand{\thread}[1]{\DefFunc{thread}{}{#1}}
+% \renewcommand{\thread}[1]{\DefFunc{thr}{}{#1}}
 \newcommand{\idx}[1]{\DefFunc{idx}{}{#1}}
 
 \newcommand{\HAVC}[2]{\DefFunc{HAVC}{#1}{#2}}
@@ -203,12 +213,22 @@ Points to talk about
 
 \newcommand{\NodeV}{\ensuremath{v}}
 \newcommand{\NodeU}{\ensuremath{u}}
+\newcommand{\NodeParent}{\ensuremath{p}}
+\newcommand{\NodeChild}{\ensuremath{c}}
 \newcommand{\NodeE}{\ensuremath{e}}
 \newcommand{\NodeR}{\ensuremath{r}}
 \newcommand{\NodeW}{\ensuremath{w}}
 \newcommand{\NodeF}{\ensuremath{f}}
 
 \newcommand{\NodeWEx}{\ensuremath{w'}}
+
+
+% ---------------------------------------------------------
+% Text Constatnts
+% ---------------------------------------------------------
+
+\newcommand{\EventNode}{event\xspace}
+\newcommand{\EventNodes}{{\EventNode}s\xspace}
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
