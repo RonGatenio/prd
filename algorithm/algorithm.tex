@@ -17,9 +17,14 @@
 \setlength\parskip{0.5em}
 \setlength{\parindent}{0em}
 
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \iffalse
-todos
+\section{TODOs}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%
+% Guy
+%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % - HBG = (Ev, HBEdges) ?
 %     - rename V since it symbolizes an events group
@@ -31,7 +36,9 @@ todos
 - Add an explanation of the algorithm in simple words
 
 
-Points to talk about
+%%%%%%%%%%%%%%%%%%%%%%%%%
+% Points to talk about with Erez
+%%%%%%%%%%%%%%%%%%%%%%%%%
 - overall structure
 - formatting
     - font
@@ -50,10 +57,12 @@ Points to talk about
 
 
 
-
+%%%%%%%%%%%%%%%%%%%%%%%%%
+% Erez
+%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % - set default -> initialize
-- loc maybe change to thread an index or write location
+- loc -> thread() and index() OR at least write 'location' instead of loc
 - list of bullets -> sentences
 - all definitions under algorithm, and under overview
 - remove definitions that are used only once or twice
@@ -76,7 +85,7 @@ Points to talk about
 - Don't number the group definition
 
 % IMPORTANT!
-- For all point in the graph we want to know what happens in relation to other events. group the explnation
+- For all point in the graph we want to know what happens in relation to other events. group the explanation
     - combine all 3
 
 - giving all the defintions layed above we can rephrase PR as follows
@@ -94,6 +103,31 @@ Points to talk about
 - Use ACM template
 - Read related articles
 
+
+
+
+
+
+
+
+
+
+
+
+TODO
+- explain what are the events (memory access or flushes)
+- what are the edges and how they were generated
+    - a section for happens-before analysis?
+- HB definition
+    - see FastTrack - Efficient and Precise Dynamic Race Detection [PLDI 2009]
+    - see ThreadSanitizer – data race detection in practice [WBIA 2009]
+        - see their algorithm section
+    - see Efficient On-the-Fly Data Race Detection in Multithreaded C++ Programs [Pozniansky, Assaf Schuster PPoPP 2003]
+        - see Definition of a Data Race
+    - formal definition in the original paper: chrome-extension://efaidnbmnnnibpcajpcglclefindmkaj/https://lamport.azurewebsites.net/pubs/time-clocks.pdf
+        We assume that sending or receiving a message is an event in a process. We can then define the "happened before" relation, denoted by "---~", as follows. Definition. The relation "---->" on the set of events of a system is the smallest relation satisfying the following three conditions: (1) If a and b are events in the same process, and a comes before b, then a ~ b. (2) If a is the sending of a message by one process and b is the receipt of the same message by another process, then a ~ b. (3) If a ~ b and b ~ c then a ---* c. Two distinct events a and b are said to be concurrent if a ~ b and b -/-* a. We assume that a ~ a for any event a. (System
+
+        
 \fi
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -235,6 +269,83 @@ Points to talk about
 \section{Algorithm}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Overview}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+CRPD generates 
+
+CPRD, using the Google's ThreadSanitizer [TODO cite], observes the program execution as a sequence of \textit{memory} and \textit{synchronization} events.
+Memory access events are either Read, Write and Flush operations (almost copied from ThreadSanitizer). Synchronization events are locking events, atomic memory accesses, or other synchronization primitives (TODO) % (see https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/37278.pdf).
+
+In addition, CRPD, will statically analyze program dependencies...
+
+From the trace we construct a happens-before graph 
+
+Let $\HBG = (\Nodes, \HBEdges)$ be a Happens-Before graph where $\Nodes$ is the set of the trace events and $\HBEdges$ is the set of Happens-Before edges derived from the program trace log.
+
+We will denote Happens-Before relation with $\HBSign$.
+
+The $\HBG$ ensures that:
+$$\HB{\NodeV_1}{\NodeV_k} \iff \exists \Path = (\NodeV_1, \ldots, \NodeV_k) \in \Nodes^k \text{ where } \Path \text{ is a path in } \HBG$$
+
+% From the program execution we generate a 
+
+
+
+
+In order to determine if a bug will occur ...
+
+
+% For each node in the happens-before graph
+For each \EventNode in the trace we would like to know its happens-before relation to other \EventNodes in the trace.
+
+
+
+
+
+
+
+
+\iffalse
+
+Thread Sanitizer LLVM implementation: https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/37278.pdf
+
+
+and Write.
+
+
+events (this line is copied).
+generates a program runtime trace of all \textit{memory access}, \textit{flush} and \textit{synchronization} events.
+
+
+, and happens-before relations.
+The happens-before relations are 
+
+
+ThreadSanitizer is implemented as a Valgrind [19] tool2
+.
+It observes the program execution as a sequence of events.
+The most important events are memory access events and
+synchronization events. Memory access events are Read
+and Write. Synchronization events are either locking events
+or happens-before events. Locking events are WrLock, RdLock,
+WrUnlock and RdUnlock. Happens-before events are
+Signal and Wait3
+.
+
+These events, generated by the running program, are ob-
+served by ThreadSanitizer with the help of the underlying bi-
+nary translation framework (Valgrind). The detector keeps
+
+the state based on the history of the observed events and
+
+updates it using a certain state machine. To formally de-
+scribe the state and the state machine we will need some
+
+definitions.
+\fi
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{Definitions}
