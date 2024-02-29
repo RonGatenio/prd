@@ -388,20 +388,19 @@ $$
     \caption{Happens-After Vector Clocks Builder}
     \Fn{\FHAVC{$\HBG$}}{
         \BlankLine
-        Initialize $\havc{\Thread,\IndexI}{\ThreadOther} \gets +\infty$ \hfill $\forall \Thread,\ThreadOther \in \Threads, \IndexI \in \N$ \;
+        Initialize $\havc{\NodeV}{\Thread} \gets +\infty$ \hfill $\forall \NodeV \in \Nodes, \Thread \in \Threads$ \;
         \BlankLine
-        \ForEach{node $v$ in $\HBG$ in post-order}{
-            $(\Thread, \IndexI) \gets \loc{v}$\;
-            $\havc{\Thread,\IndexI}{\Thread} \gets \IndexI$\;
+        \ForEach{node $\NodeV$ in $\HBG$ in post-order}{
+            $\havc{\NodeV}{\thread{\NodeV}} \gets \idx{\NodeV}$\;
             \BlankLine
-            \ForEach{parent node $p$ such that $(p, v) \in \HBEdges$}{
-                $(t_p, i_p) \gets \loc{p}$\;
-                \ForEach{$\ThreadOther \in \Threads$}{
-                    $\havc{t_p,i_p}{\ThreadOther} \gets \min \left( \havc{t_p,i_p}{\ThreadOther}, \havc{\Thread,\IndexI}{\ThreadOther} \right)$
+            \ForEach{parent node $\NodeParent$ such that $(\NodeParent, \NodeV) \in \HBEdges$}{
+                \ForEach{$\Thread \in \Threads$}{
+                    $\havc{\NodeParent}{\Thread} \gets \min \left( \havc{\NodeParent}{\Thread}, \havc{\NodeV}{\thread{\NodeV}} \right)$
                 }
             }
         }
         \BlankLine
+        % \KwRet $\havc{\NodeV}{} \hfill \forall \NodeV \in \Nodes$\;
         \KwRet $\havc{}{}$\;
     } 
 \end{algorithm}
@@ -410,86 +409,81 @@ $$
     \caption{Persisted-Before Vector Clocks Builder}
     \Fn{\FPBVC{$\HBG$}}{
         \BlankLine
-        Initialize $\hbvc{\Thread,\IndexI}{\ThreadOther, \VarX} \gets -\infty$ \hfill $\forall \Thread,\ThreadOther \in \Threads, \IndexI \in \N, \VarX \in {\Vars}$ \;
-        Initialize $\pbvc{\Thread,\IndexI}{\ThreadOther, \VarX} \gets -\infty$ \hfill $\forall \Thread,\ThreadOther \in \Threads, \IndexI \in \N, \VarX \in {\Vars}$ \;
+        Initialize $\hbvc{\NodeV}{\Thread, \VarX} \gets -\infty$ \hfill $\forall \NodeV \in \Nodes, \Thread \in \Threads, \VarX \in \Vars$ \;
+        Initialize $\pbvc{\NodeV}{\Thread, \VarX} \gets -\infty$ \hfill $\forall \NodeV \in \Nodes, \Thread \in \Threads, \VarX \in \Vars$ \;
         \BlankLine
-        \ForEach{node $v$ in $\HBG$ in reversed post-order}{
-            $(\Thread, \IndexI) \gets \loc{v}$, $\VarX \gets \var{v}$\;
+        \ForEach{node $\NodeV$ in $\HBG$ in reversed post-order}{
         
             % RW
             \BlankLine
             \Comment*[l]{Handle Read and Write nodes}
-            \If{$v \in R \cup W$}{
-                $\hbvc{\Thread,\IndexI}{\Thread,\VarX} \gets \IndexI$\;
+            \If{$\NodeV \in \ReadNodes \cup \WriteNodes$}{
+                $\hbvc{\NodeV}{\thread{\NodeV},\var{\NodeV}} \gets \idx{\NodeV}$\;
             }
         
             % F
             \BlankLine
             \Comment*[l]{Handle Flush nodes}
-            \If{$v \in F$}{
-                \ForEach{$\ThreadOther \in \Threads$}{
-                    $\pbvc{\Thread,\IndexI}{\ThreadOther,\VarX} \gets \hbvc{\Thread,\IndexI}{\ThreadOther,\VarX}$\;
+            \If{$\NodeV \in \FlushNodes$}{
+                \ForEach{$\Thread \in \Threads$}{
+                    $\pbvc{\NodeV}{\Thread,\var{\NodeV}} \gets \hbvc{\NodeV}{\Thread,\var{\NodeV}}$\;
                 }
             }
         
             % Pass to children
             \BlankLine
             \Comment*[l]{Handle children nodes}
-            \ForEach{child node $c$ such that $(v, c) \in \HBEdges$}{
-                $(t_c, i_c) \gets \loc{c}$\;
-                \ForEach{$\ThreadOther \in \Threads$}{
+            \ForEach{child node $\NodeChild$ such that $(\NodeV, \NodeChild) \in \HBEdges$}{
+                \ForEach{$\Thread \in \Threads$}{
                     \ForEach{$\VarY \in {\Vars}$}{
-                        $\hbvc{t_c,i_c}{\ThreadOther,\VarY} \gets \max \left( \hbvc{t_c,i_c}{\ThreadOther,\VarY}, \hbvc{\Thread,\IndexI}{\ThreadOther,\VarY} \right)$\;
-                        $\pbvc{t_c,i_c}{\ThreadOther,\VarY} \gets \max \left( \pbvc{t_c,i_c}{\ThreadOther,\VarY}, \pbvc{\Thread,\IndexI}{\ThreadOther,\VarY} \right)$\;
+                        $\hbvc{\NodeChild}{\Thread,\VarY} \gets \max \left( \hbvc{\NodeChild}{\Thread,\VarY}, \hbvc{\NodeV}{\Thread,\VarY} \right)$\;
+                        $\pbvc{\NodeChild}{\Thread,\VarY} \gets \max \left( \pbvc{\NodeChild}{\Thread,\VarY}, \pbvc{\NodeV}{\Thread,\VarY} \right)$\;
                     }
                 }
             }
         }
         \BlankLine
+        % \KwRet $\pbvc{\NodeV}{} \hfill \forall \NodeV \in \Nodes$\;
         \KwRet $\pbvc{}{}$\;
     }
 \end{algorithm}
 
 \begin{algorithm}[H]
     \caption{Concurrent Persistence Race Detector}
+    % \newcommand{\DependentNodeVar}{\NodeV}
+    \newcommand{\DependentNodeVar}{\NodeWEx}
     \Fn{\FCPRD{$\HBG$, $\PDG$}}{
         $\havc{}{} \gets \FHAVC{\HBG}$\;
         $\pbvc{}{} \gets \FPBVC{\HBG}$\;
-        $\races \gets \varnothing$\;
+        $\races \gets \EmptySet$\;
         \BlankLine
-        \ForEach{write node $v \in \WriteNodes$ in $\HBG$}{
-            $(\Thread, \IndexI) \gets \loc{v}$, $\VarX \gets \var{v}$\;
+        \ForEach{write node $\DependentNodeVar \in \WriteNodes$ in $\HBG$}{
+            % $(\Thread, \IndexI) \gets \loc{v}$, $\VarX \gets \var{v}$\;
 
             \BlankLine
-            \ForEach{read node $r \in R$ such that $\PD{v}{r}$ in $\PDG$}{
-                $(\ThreadOther, \IndexJ) \gets \loc{r}$, $\VarY \gets \var{r}$\;
-                \Assert{$\ThreadOther \neq \Thread$}\;
+            \ForEach{read node $\NodeR \in \ReadNodes$ such that $\PD{\DependentNodeVar}{\NodeR}$ in $\PDG$}{
+                % $(\ThreadOther, \IndexJ) \gets \loc{r}$, $\VarY \gets \var{r}$\;
+                % \Assert{$\ThreadOther \neq \Thread$}\;
                 % TODO: explain that t wasn't changed or something
+                \Assert{$\thread{\NodeR} = \thread{\DependentNodeVar}$}\;
                 
                 \BlankLine
                 \Comment*[l]{If the dependent node and the read node are of the same variable, there is not bug}
-                \If{$\VarX = \VarY$}{
+                \If{$\var{\DependentNodeVar} = \var{\NodeR}$}{
                     \Continue\;
                 }
                 
                 \BlankLine
                 \Comment*[l]{If the read node is persisted, there is not bug}
-                \If{$\IndexJ \leq \pbvc{\Thread,\IndexI}{\Thread}$}{
-                    \Continue\;
-                }
-                
-                \BlankLine
-                \Comment*[l]{If the read node is persisted, there is not bug}
-                \If{$\IndexJ \leq \pbvc{\Thread,\IndexI}{\Thread}$}{
+                \If{$\idx{\NodeR} \leq \pbvc{\DependentNodeVar}{\thread{\DependentNodeVar},\var{\NodeR}}$}{
                     \Continue\;
                 }
 
                 \BlankLine
-                \ForEach{write node $w \in \WriteNodes[\VarX]$}{
-                    $(t_w, i_w) \gets \loc{w}$
+                \ForEach{write node $\NodeW \in \WriteNodes$ such that $\var{\NodeW} = \var{\NodeR}$}{
                     \BlankLine
-                    \If{$\pbvc{\Thread,\IndexI}{t_w} < i_w < \havc{\Thread,\IndexJ}{}$}{
-                        $\races \gets \races \cup {(r, w)}$\;
+                    \If{$\pbvc{\DependentNodeVar}{\thread{\NodeW},\var{\NodeW}} < \idx{\NodeW} < \havc{\NodeR}{\thread{\NodeW}}$}{
+                        $\races \gets \races \cup {(\NodeR, \NodeW)}$\;
                     }
                 }
             }
