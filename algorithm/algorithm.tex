@@ -536,16 +536,19 @@ $$
 
 \begin{algorithm}[H]
     \caption{Happens-After Vector Clocks Builder}
+    \label{alg:havc}
     \Fn{\FHAVC{$\HBG$}}{
         \BlankLine
         Initialize $\havc{\NodeV}{\Thread} \gets +\infty$ \hfill $\forall \NodeV \in \Nodes, \Thread \in \Threads$ \;
         \BlankLine
         \ForEach{node $\NodeV$ in $\HBG$ in post-order}{
-            $\havc{\NodeV}{\thread{\NodeV}} \gets \idx{\NodeV}$\;
+            \label{alg:havc:mainloop}
+            $\havc{\NodeV}{\thread{\NodeV}} \gets \idx{\NodeV}$ \label{alg:havc:initialize} \;
             \BlankLine
             \ForEach{parent node $\NodeParent$ such that $(\NodeParent, \NodeV) \in \HBEdges$}{
+                \label{alg:havc:parentloop}
                 \ForEach{$\Thread \in \Threads$}{
-                    $\havc{\NodeParent}{\Thread} \gets \min \left( \havc{\NodeParent}{\Thread}, \havc{\NodeV}{\thread{\NodeV}} \right)$
+                    $\havc{\NodeParent}{\Thread} \gets \min \left( \havc{\NodeParent}{\Thread}, \havc{\NodeV}{\thread{\NodeV}} \right)$ \label{alg:havc:update} \;
                 }
             }
         }
@@ -554,6 +557,40 @@ $$
         \KwRet $\havc{}{}$\;
     } 
 \end{algorithm}
+
+\begin{claim}
+    \algref{alg:havc} returns the set of $\HAVC{\NodeV}{} \hfill \forall \NodeV \in \Nodes$
+\end{claim}
+
+\begin{lemma}
+    After each iteration of node $\NodeV$ in the loop at \lineref{alg:havc:mainloop} in \algref{alg:havc}, $\havc{\NodeV}{} = \HAVC{\NodeV}{}$
+\end{lemma}
+
+\begin{proof}
+    \newcommand{\NodeNext}{\NodeV_{i+1}}
+    
+    Let the nodes $\NodeV_1, \ldots, \NodeV_n$ be the nodes of $\HBG$ in a post-order search.
+    % Let $\NodeV_0$ be the first iterated node in a post-order search on the $\HBG$.
+    In \lineref{alg:havc:initialize} we set $\havc{\NodeV_1}{\thread{\NodeV_1}} \gets \idx{\NodeV_1}$.
+    Since $\NodeV_1$ is the first node in the post-order search, it has no children that would have updated $\havc{\NodeV_1}{}$ before this iteration or after.
+    Therefor, when finishing the iteration, $\havc{\NodeV_1}{}$ won't change.
+    Based on the definition of $\HAVC{}{}$ (ref definition) we can see that $\havc{\NodeV_1}{} = \HAVC{\NodeV_1}{}$ (the index for t and inf for all other threads).
+
+    Assume the lemma holds for all nodes $\NodeV_i$ for $1 \leq i < n$.
+    We can see that $\havc{\NodeV_k}{\thread{\NodeNext}} \neq \HAVC{\NodeV_k}{\thread{\NodeNext}} = \idx{\NodeNext}$. \\
+    Let $\NodeChild_1, \ldots, \NodeChild_k$ be the $k$ children of node $\NodeNext$.
+    Note that for all child nodes the lemma holds based on the assumption, because we visited all children before reaching $\NodeNext$ (post-order).
+    Lets assume that after the iteration on $\NodeNext$, $\havc{\NodeNext}{t} \neq \HAVC{\NodeNext}{t}$ for some $t \neq \thread{\NodeNext} \in \Threads$.
+    We know that $\exists \Path = (\NodeNext, \NodeChild_j, \ldots, \NodeU) \such \thread{\NodeU} = t, \idx{\NodeU} = \HAVC{\NodeNext}{t}$, also $\HAVC{\NodeNext}{t} \leq \HAVC{\NodeChild_j}{t} = \havc{\NodeChild_j}{t}$. When node $\NodeChild_j$ was iterated, in line 
+
+    % choose the child with the minimal HAVC
+    % maybe don't write all of this?
+    % explain the general idea... it is based on the definition.
+    
+    Based on \lineref{alg:havc:update}, $\havc{\NodeNext}{t} = \min \left( \havc{\NodeNext}{\Thread}, \havc{\NodeV}{\thread{\NodeV}} \right)$
+    
+\end{proof}
+
 
 \begin{algorithm}[H]
     \caption{Persisted-Before Vector Clocks Builder}
@@ -643,6 +680,11 @@ $$
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{Proof (TODO)}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+
+
+
 
 Proof of step 1
 
