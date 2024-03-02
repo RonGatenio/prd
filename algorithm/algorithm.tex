@@ -1,5 +1,6 @@
 \documentclass[a4paper,12pt]{article}
 
+\usepackage[hidelinks]{hyperref}
 \usepackage{mathtools}
 \usepackage{enumitem}
 \usepackage{amsmath}
@@ -10,8 +11,10 @@
 \usepackage{float}
 \usepackage{calc}
 \usepackage{xifthen}
+\usepackage[english]{babel}
+\usepackage{amsthm, thmtools}
 
-\usepackage[bottom=0.5cm, right=1.5cm, left=1.5cm, top=1.5cm]{geometry}
+\usepackage[bottom=1.5cm, right=1.5cm, left=1.5cm, top=1.5cm]{geometry}
 
 \begin{document}
 \setlength\parskip{0.5em}
@@ -423,7 +426,7 @@ $$
     \begin{aligned}
         & \exists \NodeU \in \Nodes \such \thread{\NodeU} = \Thread \\
         & \exists \Path = (\NodeV, \ldots, \NodeU), \text{ path of length } k \geq 1 \\
-        & \idx{\NodeV} = \IndexI
+        & \idx{\NodeU} = \IndexI
     \end{aligned}
     \right\} \right)
 $$
@@ -439,7 +442,7 @@ $$
     \begin{aligned}
         & \exists \NodeU \in \ReadNodes \cup \WriteNodes \such \thread{\NodeU} = \Thread \land \var{\NodeU} = \VarX \\
         & \exists \Path = (\NodeU, \ldots, \NodeV), \text{ a path of length } k \geq 1 \\
-        & \idx{\NodeV} = \IndexI
+        & \idx{\NodeU} = \IndexI
     \end{aligned}
     \right\} \right)
 $$
@@ -457,7 +460,7 @@ $$
         & \exists \NodeU \in \ReadNodes \cup \WriteNodes \such \thread{\NodeU} = \Thread \land \var{\NodeU} = \VarX \\
         & \exists \Path = (\NodeU, \ldots, \NodeV), \text{ a path of length } k \geq 1 \\
         & \exists \NodeF \in \FlushNodes \such \var{\NodeF} = \VarX \land \Path(\IndexJ) = \NodeF, 1 < \IndexJ \leq k \\
-        & \idx{\NodeV} = \IndexI
+        & \idx{\NodeU} = \IndexI
     \end{aligned}
     \right\} \right)
 $$
@@ -569,14 +572,9 @@ $$
         $\races \gets \EmptySet$\;
         \BlankLine
         \ForEach{write node $\DependentNodeVar \in \WriteNodes$ in $\HBG$}{
-            % $(\Thread, \IndexI) \gets \loc{v}$, $\VarX \gets \var{v}$\;
-
-            \BlankLine
             \ForEach{read node $\NodeR \in \ReadNodes$ such that $\PD{\DependentNodeVar}{\NodeR}$ in $\PDG$}{
-                % $(\ThreadOther, \IndexJ) \gets \loc{r}$, $\VarY \gets \var{r}$\;
-                % \Assert{$\ThreadOther \neq \Thread$}\;
                 % TODO: explain that t wasn't changed or something
-                \Assert{$\thread{\NodeR} = \thread{\DependentNodeVar}$}\;
+                \Assert{$\thread{\NodeR} = \thread{\DependentNodeVar}$} \; % \Comment*[r]{The 2 nodes are on the same thread}
                 
                 \BlankLine
                 \Comment*[l]{If the dependent node and the read node are of the same variable, there is not bug}
@@ -598,7 +596,6 @@ $$
                     }
                 }
             }
-            
         
         }
         \BlankLine
