@@ -268,6 +268,42 @@ TODO
 \newcommand{\EventNodes}{{\EventNode}s\xspace}
 
 
+% ---------------------------------------------------------
+% Theorems and Proofs
+% ---------------------------------------------------------
+
+% Plain environments:
+\theoremstyle{plain}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{corollary}[theorem]{Corollary}
+\newtheorem{claim}[theorem]{Claim}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{result}[theorem]{Result}
+
+% Definition environments:
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{Definition}
+
+% Remark environments:
+\theoremstyle{remark}
+\newtheorem{remark}[theorem]{Remark}
+
+% QED symbol
+\renewcommand\qedsymbol{$\blacksquare$}
+\renewcommand\qedsymbol{}
+
+
+% ---------------------------------------------------------
+% Hyperlinks
+% ---------------------------------------------------------
+
+\newcommand{\linkref}[2]{\hyperref[#1]{#2~\ref*{#1}}}
+\newcommand{\algref}[1]{\linkref{#1}{Algorithm}}
+\newcommand{\lineref}[1]{\linkref{#1}{Line}}
+
+
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Algorithm}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
