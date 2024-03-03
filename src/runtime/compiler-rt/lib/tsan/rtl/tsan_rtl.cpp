@@ -855,13 +855,17 @@ void MemoryAccess(ThreadState *thr, uptr pc, uptr addr,
   InternalScopedString res(2 * GetPageSizeCached());
   get_symbol_info(res, thr, pc);
 
-  Printf("%d:%s:%p:%p:%d:%s\n", 
+  Printf("%d:%s:%p:%p:%d:%s:", 
          (int)thr->fast_state.tid(), 
          kAccessIsWrite ? "WRITE" : "READ", 
          (void*)pc, 
          (void*)addr,
          (int)(1 << kAccessSizeLog),
          res.data());
+
+  PrintCurrentStack(thr, pc);
+
+  Printf("\n");
 
   DPrintf2("#%d: MemoryAccess: @%p %p size=%d"
       " is_write=%d shadow_mem=%p {%zx, %zx, %zx, %zx}\n",

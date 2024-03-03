@@ -120,9 +120,9 @@ static const char *const kInterposedFunctionPrefix = "wrap_";
 static const char *const kInterposedFunctionPrefix = "__interceptor_";
 #endif
 
-void PrintStack(const ReportStack *ent) {
+void PrintStack(const ReportStack *ent, const char delimiter) {
   if (ent == 0 || ent->frames == 0) {
-    Printf("    [failed to restore the stack]\n\n");
+    Printf("    [failed to restore the stack]%c", delimiter);
     return;
   }
   SymbolizedStack *frame = ent->frames;
@@ -131,9 +131,9 @@ void PrintStack(const ReportStack *ent) {
     RenderFrame(&res, common_flags()->stack_trace_format, i, frame->info,
                 common_flags()->symbolize_vs_style,
                 common_flags()->strip_path_prefix, kInterposedFunctionPrefix);
-    Printf("%s\n", res.data());
+    Printf("%s%c", res.data(), delimiter);
   }
-  Printf("\n");
+  Printf("%c", delimiter);
 }
 
 static void PrintMutexSet(Vector<ReportMopMutex> const& mset) {
