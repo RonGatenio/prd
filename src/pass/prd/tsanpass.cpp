@@ -202,7 +202,7 @@ void insertModuleCtor(Module &M) {
 
 }  // namespace
 
-PreservedAnalyses ThreadSanitizerPass::run(Function &F,
+PreservedAnalyses PrdFunctionPass::run(Function &F,
                                            FunctionAnalysisManager &FAM) {
   ThreadSanitizer TSan;
   if (TSan.sanitizeFunction(F, FAM.getResult<TargetLibraryAnalysis>(F)))
@@ -210,7 +210,7 @@ PreservedAnalyses ThreadSanitizerPass::run(Function &F,
   return PreservedAnalyses::all();
 }
 
-PreservedAnalyses ModuleThreadSanitizerPass::run(Module &M,
+PreservedAnalyses PrdModulePass::run(Module &M,
                                                  ModuleAnalysisManager &MAM) {
   insertModuleCtor(M);
   return PreservedAnalyses::none();
@@ -929,7 +929,8 @@ llvmGetPassPluginInfo() {
         .RegisterPassBuilderCallbacks = [](PassBuilder &PB) {
           PB.registerPipelineEarlySimplificationEPCallback(
             [](ModulePassManager &MPM, auto) {
-              MPM.addPass(ModuleThreadSanitizerPass());
+              MPM.addPass(PrdModulePass());
+              MPM.addPass(createModuleToFunctionPassAdaptor(PrdFunctionPass()));
               return true;
           });
         }
