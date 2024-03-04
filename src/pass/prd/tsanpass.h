@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_TRANSFORMS_INSTRUMENTATION_THREADSANITIZER_H
-#define LLVM_TRANSFORMS_INSTRUMENTATION_THREADSANITIZER_H
+#ifndef PRD_TSANPASS_H
+#define PRD_TSANPASS_H
 
 #include "llvm/IR/PassManager.h"
 #include "llvm/Pass.h"
@@ -41,4 +41,4 @@ struct PrdModulePass : public PassInfoMixin<PrdModulePass> {
 };
 
 } // namespace llvm
-#endif /* LLVM_TRANSFORMS_INSTRUMENTATION_THREADSANITIZER_H */
+#endif /* PRD_TSANPASS_H */

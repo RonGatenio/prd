@@ -202,16 +202,14 @@ void insertModuleCtor(Module &M) {
 
 }  // namespace
 
-PreservedAnalyses PrdFunctionPass::run(Function &F,
-                                           FunctionAnalysisManager &FAM) {
+PreservedAnalyses PrdFunctionPass::run(Function &F, FunctionAnalysisManager &FAM) {
   ThreadSanitizer TSan;
   if (TSan.sanitizeFunction(F, FAM.getResult<TargetLibraryAnalysis>(F)))
     return PreservedAnalyses::none();
   return PreservedAnalyses::all();
 }
 
-PreservedAnalyses PrdModulePass::run(Module &M,
-                                                 ModuleAnalysisManager &MAM) {
+PreservedAnalyses PrdModulePass::run(Module &M, ModuleAnalysisManager &MAM) {
   insertModuleCtor(M);
   return PreservedAnalyses::none();
 }
@@ -562,8 +560,7 @@ void ThreadSanitizer::InsertRuntimeIgnores(Function &F) {
   }
 }
 
-bool ThreadSanitizer::sanitizeFunction(Function &F,
-                                       const TargetLibraryInfo &TLI) {
+bool ThreadSanitizer::sanitizeFunction(Function &F, const TargetLibraryInfo &TLI) {
   // This is required to prevent instrumenting call to __tsan_init from within
   // the module constructor.
   if (F.getName() == kTsanModuleCtorName)
