@@ -712,7 +712,7 @@ void PrintMatchedBenignRaces();
 
 u32 CurrentStackId(ThreadState *thr, uptr pc);
 ReportStack *SymbolizeStackId(u32 stack_id);
-void PrintCurrentStack(ThreadState *thr, uptr pc);
+void PrintCurrentStack(ThreadState *thr, uptr pc, const char delimiter = '\n');
 void PrintCurrentStackSlow(uptr pc);  // uses libunwind
 
 void Initialize(ThreadState *thr);

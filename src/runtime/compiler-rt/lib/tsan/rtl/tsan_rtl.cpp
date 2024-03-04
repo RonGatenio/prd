@@ -863,7 +863,7 @@ void MemoryAccess(ThreadState *thr, uptr pc, uptr addr,
          (int)(1 << kAccessSizeLog),
          res.data());
 
-  PrintCurrentStack(thr, pc);
+  PrintCurrentStack(thr, pc, ';');
 
   Printf("\n");
 

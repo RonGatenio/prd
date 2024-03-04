@@ -711,10 +711,10 @@ void ReportRace(ThreadState *thr) {
 
 }
 
-void PrintCurrentStack(ThreadState *thr, uptr pc) {
+void PrintCurrentStack(ThreadState *thr, uptr pc, const char delimiter) {
   VarSizeStackTrace trace;
   ObtainCurrentStack(thr, pc, &trace);
-  PrintStack(SymbolizeStack(trace));
+  PrintStack(SymbolizeStack(trace), delimiter);
 }
 
 // Always inlining PrintCurrentStackSlow, because LocatePcInTrace assumes
