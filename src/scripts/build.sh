@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e
+
 # Get the scripts dir path
 SCRIPTS_DIR="$(cd "$(dirname "$0")" && pwd)"
 
