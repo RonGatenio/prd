@@ -1,5 +1,6 @@
 import os
 from hbg import HBG, HBGBuilder
+from trace_event_info import TraceEventInfo
 
 
 _any_int = lambda x: int(x, 0)
@@ -27,7 +28,7 @@ class TraceParser:
             return cls(f.readlines(), name)
 
     def _parse_line(self, line, line_number=None):
-        line = line.split('#')[0].strip()
+        # line = line.split('#')[0].strip()
         tid, key, *args = line.split(':')
         tid = int(tid)
 
@@ -46,7 +47,9 @@ class TraceParser:
             pc = _any_int(pc)
             address = _any_int(address)
             size = _any_int(size)
-            self._hbg_builder.add_instruction_node(key, tid, pc, address, size, ':'.join(info) if info else '', line_number)
+            info = ':'.join(info) if info else ''
+            info = TraceEventInfo.from_str(info)
+            self._hbg_builder.add_instruction_node(key, tid, pc, address, size, info, line_number)
 
     @staticmethod
     def _is_comment_line(line):
