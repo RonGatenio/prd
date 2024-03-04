@@ -9,6 +9,8 @@ def mkdir(dirpath):
     if not os.path.isdir(dirpath):
         os.mkdir(dirpath)
 
+    return dirpath
+
 
 def copy_to(container, src, dst):
     tar_buf = io.BytesIO()
@@ -23,7 +25,7 @@ def copy_from(container, src, dst=None):
         dst = os.path.basename(src)
         dst = os.path.join(os.path.dirname(__file__), container.name, dst)
 
-    mkdir(os.path.dirname(dst))
+    dirpath = mkdir(os.path.dirname(dst))
 
     bits, stat = container.get_archive(src)
 
@@ -34,7 +36,9 @@ def copy_from(container, src, dst=None):
     tar_buf.seek(0)
 
     with tarfile.open(fileobj=tar_buf, mode='r') as tar:
-        tar.extractall(os.path.dirname(dst))
+        tar.extractall(dirpath)
+
+    print(f'Files located at {os.path.abspath(dirpath)}')
 
 
 def main():
