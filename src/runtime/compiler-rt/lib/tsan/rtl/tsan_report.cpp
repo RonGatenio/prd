@@ -136,6 +136,22 @@ void PrintStack(const ReportStack *ent, const char delimiter) {
   Printf("%c", delimiter);
 }
 
+void CaptureStack(InternalScopedString *buffer, const ReportStack *ent, const char delimiter) {
+  if (ent == 0 || ent->frames == 0) {
+    buffer->append("    [failed to restore the stack]%c", delimiter);
+    return;
+  }
+  SymbolizedStack *frame = ent->frames;
+  for (int i = 0; frame && frame->info.address; frame = frame->next, i++) {
+    InternalScopedString res(2 * GetPageSizeCached());
+    RenderFrame(&res, common_flags()->stack_trace_format, i, frame->info,
+                common_flags()->symbolize_vs_style,
+                common_flags()->strip_path_prefix, kInterposedFunctionPrefix);
+    buffer->append("%s%c", res.data(), delimiter);
+  }
+  buffer->append("%c", delimiter);
+}
+
 static void PrintMutexSet(Vector<ReportMopMutex> const& mset) {
   for (uptr i = 0; i < mset.Size(); i++) {
     if (i == 0)

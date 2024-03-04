@@ -129,6 +129,7 @@ class ReportDesc {
 // Format and output the report to the console/log. No additional logic.
 void PrintReport(const ReportDesc *rep);
 void PrintStack(const ReportStack *stack, const char delimiter = '\n');
+void CaptureStack(InternalScopedString *buffer, const ReportStack *ent, const char delimiter = '\n');
 
 }  // namespace __tsan
 

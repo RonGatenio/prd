@@ -717,6 +717,12 @@ void PrintCurrentStack(ThreadState *thr, uptr pc, const char delimiter) {
   PrintStack(SymbolizeStack(trace), delimiter);
 }
 
+void CaptureCurrentStack(InternalScopedString* buffer, ThreadState *thr, uptr pc, const char delimiter) {
+  VarSizeStackTrace trace;
+  ObtainCurrentStack(thr, pc, &trace);
+  CaptureStack(buffer, SymbolizeStack(trace), delimiter);
+}
+
 // Always inlining PrintCurrentStackSlow, because LocatePcInTrace assumes
 // __sanitizer_print_stack_trace exists in the actual unwinded stack, but
 // tail-call to PrintCurrentStackSlow breaks this assumption because
