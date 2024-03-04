@@ -833,17 +833,13 @@ void get_symbol_info(InternalScopedString& iss, ThreadState *thr, uptr pc) {
   if ((pc & kExternalPCBit) == 0)
     pc1 = StackTrace::GetPreviousInstructionPc(pc);
   SymbolizedStack *ent_prev_pc = SymbolizeCode(pc1);
-  
-  // VarSizeStackTrace trace;
-  // ObtainCurrentStack(thr, pc, &trace);
-  // PrintStack(SymbolizeStack(trace));   // SymbolizeStack is a static funtion within tsan_rtl_report.cpp
 
   /*
     %f - function name
     %S - file/line/column
     %M - prints module basename and offset, if it is known, or PC.
   */
-  RenderFrame(&iss, "%f %S ", 0, ent_prev_pc->info, false);
+  RenderFrame(&iss, "%f@%S@", 0, ent_prev_pc->info, false);
   RenderFrame(&iss, "%M", 0, ent->info, false);
 }
 
@@ -853,19 +849,23 @@ void MemoryAccess(ThreadState *thr, uptr pc, uptr addr,
   u64 *shadow_mem = (u64*)MemToShadow(addr);
 
   InternalScopedString res(2 * GetPageSizeCached());
+
+  res.append("%d:%s:%p:%p:%d:", 
+            (int)thr->fast_state.tid(), 
+            kAccessIsWrite ? "WRITE" : "READ", 
+            (void*)pc, 
+            (void*)addr,
+            (int)(1 << kAccessSizeLog));
+
   get_symbol_info(res, thr, pc);
 
-  Printf("%d:%s:%p:%p:%d:%s:", 
-         (int)thr->fast_state.tid(), 
-         kAccessIsWrite ? "WRITE" : "READ", 
-         (void*)pc, 
-         (void*)addr,
-         (int)(1 << kAccessSizeLog),
-         res.data());
+  res.append("|");
 
-  PrintCurrentStack(thr, pc, ';');
+  CaptureCurrentStack(&res, thr, pc, ';');
 
-  Printf("\n");
+  res.append("\n");
+
+  Printf(res.data());
 
   DPrintf2("#%d: MemoryAccess: @%p %p size=%d"
       " is_write=%d shadow_mem=%p {%zx, %zx, %zx, %zx}\n",
