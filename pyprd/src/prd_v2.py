@@ -104,6 +104,9 @@ class PersistencyRaceDetector:
         self._pdg = pdg
         self._races = PersistencyRaces()
 
+
+        self._time_first_stage  = None
+        self._time_second_stage = None
     @property
     def hbg(self):
         return self._hbg
@@ -269,12 +272,20 @@ class PersistencyRaceDetector:
     def run(self, show_first_bug_only=False):
         self._races.clear()
 
-        with utils.timeit('build_happens_after_vector_clocks O(N*T^2) ~ O(N)'):
+        with utils.timeit() as t:
             vc_per_read_node = self._build_happens_after_vector_clocks()
+        self._time_first_stage = t.total
+
+        with utils.timeit() as t:
+            races = list(self._do_persisted_before_vector_clocks_analysis(vc_per_read_node))
+        self._time_second_stage = t.total
 
         with utils.timeit('Bug detection O(N*V*T^2 + B) ~ O(N*(B+V))'):
             return list(self._do_persisted_before_vector_clocks_analysis(vc_per_read_node, show_first_bug_only))
         
+
+        return races
+
     def is_bug(self, race: PersistencyRace):
         assert race.read_node.itype == NodeType.READ
         assert race.write_node.itype == NodeType.WRITE

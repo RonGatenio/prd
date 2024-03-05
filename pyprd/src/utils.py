@@ -1,4 +1,5 @@
 import collections
+from dataclasses import dataclass
 import time
 from contextlib import contextmanager
 from config import DEFAULT_CACHELINE_SIZE
@@ -17,11 +18,21 @@ def get_cacheline_interval(address, size, cacheline_size=DEFAULT_CACHELINE_SIZE)
 
 
 @contextmanager
-def timeit(name):
+def timeit(name=None):
+    @dataclass
+    class Time:
+        total: float
+
+    t = Time(0)
+
     s = time.time()
-    yield
+    yield t
     total = time.time() - s
-    print(f'[*] {name:60} {total:.3f} sec')
+
+    t.total = total
+
+    if name:
+        print(f'[*] {name:60} {total:.3f} sec')
 
 
 # TODO: move to another place
