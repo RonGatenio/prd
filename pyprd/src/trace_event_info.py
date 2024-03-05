@@ -11,7 +11,7 @@ class TraceEventInfo:
     line: str = None
     column: str = None
     symbol: str = None
-    callstack: List[str] = None
+    callstack: tuple[str] = tuple()
 
     @classmethod
     def from_str(cls, s: str) -> 'TraceEventInfo':
@@ -20,13 +20,15 @@ class TraceEventInfo:
         
         parts = s.split('|')
         info = parts[0]
-        callstack = parts[1].split(';')[:-2] if len(parts) > 1 else []
+        callstack = parts[1].split(';')[:-2] if len(parts) > 1 else tuple()
 
         function = file = line = column = symbol = None
 
         if '@' in info:
             function, flc, symbol = info.split('@')
-            file, line, column = flc.split(':')
+            file = flc
+            if ':' in flc:
+                file, line, column = flc.split(':')
 
         def callstack_entry_parser(line):
             if not line:
@@ -37,7 +39,7 @@ class TraceEventInfo:
                 file, line, column = flc
                 parts[-2] = ':'.join((os.path.basename(file), line, column))
             return ' '.join(parts)
-        callstack = list(map(callstack_entry_parser, callstack))
+        callstack = tuple(map(callstack_entry_parser, callstack))
 
         return cls(info, function, file, line, column, symbol, callstack)
     
@@ -69,6 +71,9 @@ class TraceEventInfo:
 
         callstack = delim.join(map(trunc, self.callstack[:callstack_limit]))
 
+        if not callstack:
+            return str(self)
+        
         if one_line_callstack:
             return f'{str(self)} | {callstack}'
-        return f'{str(self)}\n{callstack}'
+        return f'{str(self)}\n{callstack}\n'
