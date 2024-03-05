@@ -99,14 +99,56 @@ class PersistencyRaces:
 
 
 class PersistencyRaceDetector:
-    def __init__(self, hbg: HBG, pdg: PDG):
+    def __init__(self, hbg: HBG, pdg: PDG,
+                 ignore_inter_thread_edges=False,
+                 ignore_flush_nodes=False,
+                 ignore_persisted_before_index=False,
+                 ignore_happens_after_index=False,
+                 ignore_read_node_persistency=False,
+                 show_only_first_bug_in_thread=False):
         self._hbg = hbg
         self._pdg = pdg
         self._races = PersistencyRaces()
 
+        self._ignore_inter_thread_edges     = ignore_inter_thread_edges
+        self._ignore_flush_nodes            = ignore_flush_nodes
+        self._ignore_persisted_before_index = ignore_persisted_before_index
+        self._ignore_happens_after_index    = ignore_happens_after_index
+        self._ignore_read_node_persistency  = ignore_read_node_persistency
+        self._show_only_first_bug_in_thread = show_only_first_bug_in_thread
 
         self._time_first_stage  = None
         self._time_second_stage = None
+
+    def stats(self) -> str:
+        lines = []
+        
+        INDENT = ' ' * 2
+
+        # Presets
+        lines.append('Presets')
+        lines.append(f"{INDENT}Ignore inter-thread edges (skipping Epoch nodes)                     {self._ignore_inter_thread_edges}")
+        lines.append(f"{INDENT}Ignore flush nodes                                                   {self._ignore_flush_nodes}")
+        lines.append(f"{INDENT}Ignore Persisted-Before vectors (all Write nodes are unflushed)      {self._ignore_persisted_before_index}")
+        lines.append(f"{INDENT}Ignore Happens-After vectors (no nodes happen-after the read node)   {self._ignore_happens_after_index}")
+        lines.append(f"{INDENT}Ignore read node persistency (the read is never considered flushed)  {self._ignore_read_node_persistency}")
+        lines.append(f"{INDENT}Show only first bug in thread (don't iterate over all W(X)s)         {self._show_only_first_bug_in_thread}")
+
+        # Races
+        if self._races:
+            lines.append('Races')
+            lines.append(f"{INDENT}Total races by trace events  {len(self._races.races):,}")
+            lines.append(f"{INDENT}Total races by instructions  {len(list(self._races.race_nodes_by_pc())):,}")
+            lines.append(f"{INDENT}Duration                     {self._time_first_stage + self._time_second_stage:.3f} sec")
+            lines.append(f"{INDENT}{INDENT}1st stage duration {self._time_first_stage:.3f} sec")
+            lines.append(f"{INDENT}{INDENT}2nd stage duration {self._time_second_stage:.3f} sec")
+
+        max_line_size = max(map(len, lines))
+        lines.insert(0, f'{" CPRD Stats ":#^{max_line_size}}')
+        lines.append(f'{"":#^{max_line_size}}')
+
+        return '\n'.join(lines)
+
     @property
     def hbg(self):
         return self._hbg
@@ -139,6 +181,9 @@ class PersistencyRaceDetector:
                     _vc.copy_from(vc)
 
                 case NodeType.EPOCH:
+                    if self._ignore_inter_thread_edges:
+                        continue
+
                     n: EpochNode
 
                     # Tell inter parents the current state
@@ -166,15 +211,17 @@ class PersistencyRaceDetector:
             loc = self._hbg.get_node_location(read_node)
 
             # If the read is persisted, not a bug
-            if pvc.is_event_persisted(*loc):
-                continue
+            if not self._ignore_read_node_persistency and not self._ignore_persisted_before_index:
+                if pvc.is_event_persisted(*loc):
+                    continue
 
             # Find bugs
             daisy_chains = self._hbg.daisy_chains
             assert daisy_chains, "Can't find bugs without daisy chains"
 
             for tid in self._hbg.tids:
-                last_persisted_epoch = pvc.get_persisted_epoch(tid)
+                last_persisted_epoch = pvc.get_persisted_epoch(tid) if not self._ignore_persisted_before_index else None
+
                 if last_persisted_epoch is not None:
                     last_persisted_node = self._hbg.get_node_by_location((tid, last_persisted_epoch))
                     chain = daisy_chains.get_chain_by_node(last_persisted_node)
@@ -191,20 +238,24 @@ class PersistencyRaceDetector:
                     write_node_loc = self._hbg.get_node_location(write_node)
 
                     # Is already persisted
-                    if pvc.is_event_persisted(*write_node_loc):
-                        continue
+                    if not self._ignore_persisted_before_index:
+                        if pvc.is_event_persisted(*write_node_loc):
+                            continue
 
                     # Is happens after the read
-                    if vc_per_read_node[read_node].is_happens_after(*write_node_loc):
-                        break
+                    if not self._ignore_happens_after_index:
+                        if vc_per_read_node[read_node].is_happens_after(*write_node_loc):
+                            break
 
                     # It is a bug! Report it!
                     race = PersistencyRace(read_node, write_node, dependent_node)
                     self._races.add_race(race)
                     yield race
 
+                    if self._show_only_first_bug_in_thread:
+                        break
 
-    def _do_persisted_before_vector_clocks_analysis(self, vc_per_read_node: Dict[ReadNode, ReversedVectorClock], show_first_bug_only=False):
+    def _do_persisted_before_vector_clocks_analysis(self, vc_per_read_node: Dict[ReadNode, ReversedVectorClock]):
         pvc_per_thread:          Dict[ThreadId, Dict[Cacheline, PersistencyVectorClock]]  = utils.DefaultDictByKey(lambda tid: defaultdict(lambda: PersistencyVectorClock(tid)))
         pvc_per_epoch_node:      Dict[EpochNode, Dict[Cacheline, PersistencyVectorClock]] = utils.DefaultDictByKey(lambda n: defaultdict(lambda: PersistencyVectorClock(n.tid)))
         dirty_cachelines:        Dict[ThreadId, Set[Cacheline]]                           = defaultdict(set)
@@ -230,12 +281,18 @@ class PersistencyRaceDetector:
                     dirty_cachelines[n.tid].add(n.get_cacheline_address())
 
                 case NodeType.FLUSH:
+                    if self._ignore_flush_nodes:
+                        continue
+
                     n: FlushNode
                     pvc: PersistencyVectorClock = pvc_per_thread[n.tid][n.get_cacheline_address()]
                     pvc.flush()
                     dirty_cachelines[n.tid].add(n.get_cacheline_address())
 
                 case NodeType.EPOCH:
+                    if self._ignore_inter_thread_edges:
+                        continue
+
                     n: EpochNode
 
                     if dirty_cachelines[n.tid]:
@@ -269,7 +326,7 @@ class PersistencyRaceDetector:
                         dirty_cachelines[n.tid].add(cacheline)
                     del pvc_per_epoch_node[n]
 
-    def run(self, show_first_bug_only=False):
+    def run(self, validate=False):
         self._races.clear()
 
         with utils.timeit() as t:
@@ -280,9 +337,10 @@ class PersistencyRaceDetector:
             races = list(self._do_persisted_before_vector_clocks_analysis(vc_per_read_node))
         self._time_second_stage = t.total
 
-        with utils.timeit('Bug detection O(N*V*T^2 + B) ~ O(N*(B+V))'):
-            return list(self._do_persisted_before_vector_clocks_analysis(vc_per_read_node, show_first_bug_only))
-        
+        if validate:
+            for race in races:
+                if not self.is_bug(race):
+                    raise Exception(f'Not a race!\n{race}')
 
         return races
 
