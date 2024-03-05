@@ -20,17 +20,19 @@ class PersistencyRace:
     read_node: ReadNode
     write_node: WriteNode
     dependent_node: WriteNode
+    validate: bool = True
 
     def __post_init__(self):
-        assert self.read_node.tid == self.dependent_node.tid
-        assert self.read_node.is_overlap(self.write_node)
-        assert not self.read_node.is_overlap(self.dependent_node)
-        assert not self.write_node.is_overlap(self.dependent_node)
+        if self.validate:
+            assert self.read_node.tid == self.dependent_node.tid
+            assert self.read_node.is_interval_overlap(self.write_node)
+            assert not self.read_node.is_interval_overlap(self.dependent_node)
+            assert not self.write_node.is_interval_overlap(self.dependent_node)
 
     @property
     def tid(self):
         return self.read_node.tid
-
+    
     def __str__(self) -> str:
         s = []
         s.append('PERSISTENCY RACE!')
@@ -64,7 +66,7 @@ class PersistencyRaces:
         self._races.clear()
         self._races_by_pc.clear()
 
-    def _get_race_nodes_by_pc(self) -> Generator[Tuple[int, ReadNode, WriteNode, Set[WriteNode]], None, None]:
+    def race_nodes_by_pc(self) -> Generator[Tuple[int, ReadNode, WriteNode, Set[WriteNode]], None, None]:
         for i, read_pc in enumerate(self._races_by_pc):
             read_node = dependent_node = None
             write_nodes = set()
@@ -81,7 +83,7 @@ class PersistencyRaces:
     def __str__(self) -> str:
         all_lines = []
 
-        for i, read_node, dependent_node, write_nodes in self._get_race_nodes_by_pc():
+        for i, read_node, dependent_node, write_nodes in self.race_nodes_by_pc():
             lines = [
                 f'Race {i+1:4}',
                 f'R(X): {read_node.info}',
