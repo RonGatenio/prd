@@ -1,6 +1,9 @@
 import os
+from typing import Set, Tuple
 from hbg import HBG, HBGBuilder
 from trace_event_info import TraceEventInfo
+import intervaltree
+from symbolizer.symbolizer import AddressInfo
 
 
 _any_int = lambda x: int(x, 0)
@@ -12,6 +15,8 @@ class TraceParser:
         self._hbg_builder = HBGBuilder()
         self._name = name
         self._pmem_range = None
+        self._ignore_ranges: Set[Tuple[int, int]] = set()
+        self._module_interval = intervaltree.IntervalTree()
     
     @property
     def name(self):
@@ -26,6 +31,17 @@ class TraceParser:
         name = os.path.splitext(os.path.basename(filename))[0]
         with open(filename, 'r') as f:
             return cls(f.readlines(), name)
+        
+    def address_to_info(self, address: int) -> AddressInfo:
+        module = self._module_interval.at(address)
+        if not module:
+            return
+        
+        assert len(module) == 1
+        
+        module_start, module_end, module = module.pop()
+            
+        return AddressInfo.from_address(module, module_start, address)
 
     def _parse_line(self, line, line_number=None, debug=False):
         dbg_print = print if debug else lambda x: None
@@ -59,6 +75,13 @@ class TraceParser:
             case 'PMEM':
                 start, size = tuple(map(_any_int, args))
                 self._pmem_range = (start, start+size)
+            case 'VOLATILE':
+                start, size = tuple(map(_any_int, args))
+                self._ignore_ranges.add((start, start+size))
+            case 'MODULE':
+                start, end = tuple(map(_any_int, args[:2]))
+                name = args[2]
+                self._module_interval.addi(start, end, name)
             case 'READ' | 'WRITE' | 'FLUSH':
                 pc, address, size = parts[2:5]
                 pc = _any_int(pc)
@@ -67,8 +90,20 @@ class TraceParser:
                 
                 info = parts[5:]
                 info = ':'.join(info) if info else ''
-                info = TraceEventInfo.from_str(info)
                 
+                if info.startswith('0x'):
+                    info = info.split('|')
+                    addr = _any_int(info[0])
+                    callstack = map(_any_int, (info[1].strip(',') if len(info) > 1 else '').split(','))
+                    
+                    info = self.address_to_info(addr)
+                    if info:
+                        info = TraceEventInfo(str(info), info.function, info.file, info.line, info.column, list(map(self.address_to_info, callstack)))
+                    else:
+                        info = TraceEventInfo()
+                else:
+                    info = TraceEventInfo.from_str(info)
+                    
                 self._hbg_builder.add_instruction_node(key, tid, pc, address, size, info, line_number)
             case _:
                 # Invalid key
