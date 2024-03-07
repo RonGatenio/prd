@@ -47,22 +47,27 @@ class TraceEventInfo:
         if not self.function:
             return self.info
         
-        return f'{self.function} {os.path.basename(self.file)}:{self.line}:{self.column} {self.symbol}'
+        return f'{self.function} {os.path.basename(self.file) if self.file else "python3 run.py /app/traces/fast-fair-pmdk-trace-btree_concurrent.trace"}:{self.line}:{self.column} {self.symbol}'
     
     def full_info(self,
                   callstack_limit:      int|None    = None,
                   callstack_line_limit: int|None    = None,
                   one_line_callstack:   bool|None   = False,
-                  callstack_top_func:   str|None    = None) -> str:
+                  callstack_top_func:   str|list|None    = None,
+                  indent=0) -> str:
         callstack_limit = callstack_limit if callstack_limit is not None else len(self.callstack)
+
+        if isinstance(callstack_top_func, str):
+            callstack_top_func = [callstack_top_func]
 
         if callstack_top_func:
             for i, l in reversed(list(enumerate(self.callstack))):
-                if callstack_top_func in l:
+                if any((f in l for f in callstack_top_func)):
                     callstack_limit = min(i+1, callstack_limit)
                     break
 
         def trunc(l):
+            l = ' '*indent + l
             if callstack_line_limit is None or len(l) <= callstack_line_limit:
                 return l
             return l[:callstack_line_limit] + '...'
