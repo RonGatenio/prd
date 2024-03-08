@@ -1,6 +1,6 @@
 from hbg_trace_parser import TraceParser
 from pdg import generate_mock_pdg_v2
-from prd_v2 import PersistencyRaceDetector
+from prd import PersistencyRaceDetector
 from utils import timeit
 import argparse
 

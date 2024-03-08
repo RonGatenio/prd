@@ -1,6 +1,6 @@
 import pytest
 from nodes import EpochNode, NodeType
-from prd_v2 import PersistencyRace, PersistencyRaceDetector
+from prd import PersistencyRace, PersistencyRaceDetector
 from pdg import PDG, PDGBuilder, generate_mock_pdg_v2
 from hbg import HBG, HBGBuilder
 from vector_clock import VectorClock

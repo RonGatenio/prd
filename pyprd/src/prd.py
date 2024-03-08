@@ -7,6 +7,10 @@ from vector_clock import PersistencyVectorClock, ReversedVectorClock
 from hbg import HBG
 from pdg import PDG
 import utils
+import logging
+
+
+logger = logging.getLogger(__name__)
 
 
 ###########################################################
