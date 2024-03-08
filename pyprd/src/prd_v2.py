@@ -1,7 +1,8 @@
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Dict, Generator, Set, Tuple
+from typing import Dict, Generator, List, Set, Tuple
 from nodes import AbstractNode, NodeType, ReadNode, WriteNode, FlushNode, EpochNode
+from trace_event_info import TraceEventInfo
 from vector_clock import PersistencyVectorClock, ReversedVectorClock
 from hbg import HBG
 from pdg import PDG
@@ -66,7 +67,7 @@ class PersistencyRaces:
         self._races.clear()
         self._races_by_pc.clear()
 
-    def race_nodes_by_pc(self) -> Generator[Tuple[int, ReadNode, WriteNode, Set[WriteNode]], None, None]:
+    def race_nodes_by_read_pc(self) -> Generator[Tuple[int, ReadNode, WriteNode, Set[WriteNode]], None, None]:
         for i, read_pc in enumerate(self._races_by_pc):
             read_node = dependent_node = None
             write_nodes = set()
@@ -80,22 +81,30 @@ class PersistencyRaces:
             if read_node:
                 yield i, read_node, dependent_node, write_nodes
 
-    def __str__(self) -> str:
+    def to_str(self, callstack_top: str | List[str] | None = None):
         all_lines = []
+        
+        def node_to_str(node: ReadNode | WriteNode, indent: int = 0) -> str:
+            if isinstance(node.info, TraceEventInfo):
+                return node.info.full_info(callstack_top_func=callstack_top, indent=indent)
+            return node.info
 
-        for i, read_node, dependent_node, write_nodes in self.race_nodes_by_pc():
+        for i, read_node, dependent_node, write_nodes in self.race_nodes_by_read_pc():
             lines = [
                 f'Race {i+1:4}',
-                f'R(X): {read_node.info}',
-                f'W(Y): {dependent_node.info}',
+                f'R(X): {node_to_str(read_node)}',
+                f'W(Y): {node_to_str(dependent_node)}',
             ]
             lines.extend([
-                f'    W(X): {write_node.info}' for write_node in write_nodes
+                f'    W(X): {node_to_str(write_node, indent=4)}' for write_node in write_nodes
             ])
 
             all_lines.append('\n'.join(lines))
 
         return f'\n{"":-^20}\n'.join(all_lines)
+
+    def __str__(self) -> str:
+        return self.to_str()
 
 
 class PersistencyRaceDetector:
@@ -137,9 +146,10 @@ class PersistencyRaceDetector:
         # Races
         if self._races:
             lines.append('Races')
-            lines.append(f"{INDENT}Total races by trace events  {len(self._races.races):,}")
-            lines.append(f"{INDENT}Total races by instructions  {len(list(self._races.race_nodes_by_pc())):,}")
-            lines.append(f"{INDENT}Duration                     {self._time_first_stage + self._time_second_stage:.3f} sec")
+            lines.append(f"{INDENT}Total races by trace events      {len(self._races.races):,}")
+            lines.append(f"{INDENT}Total races by instructions      {sum(map(len, self._races.races_by_pc.values())):,}")
+            lines.append(f"{INDENT}Total races by read instructions {len(list(self._races.race_nodes_by_read_pc())):,}")
+            lines.append(f"{INDENT}Duration                         {self._time_first_stage + self._time_second_stage:.3f} sec")
             lines.append(f"{INDENT}{INDENT}1st stage duration {self._time_first_stage:.3f} sec")
             lines.append(f"{INDENT}{INDENT}2nd stage duration {self._time_second_stage:.3f} sec")
 
