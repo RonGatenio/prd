@@ -439,28 +439,37 @@ class HBGBuilder:
     def add_happens_before_edge(self, src_tid, src_epoch, dst_tid, dst_epoch):
         self._edges.add((nodes.EpochNode(src_tid, src_epoch), nodes.EpochNode(dst_tid, dst_epoch)))
 
-    def _filter_volatile_nodes(self, pmem_range=None):
+    def _filter_volatile_nodes(self, pmem_range=None, ignore_ranges: Set[Tuple[int, int]]|None = None):
         import intervaltree
 
-        t = intervaltree.IntervalTree()
+        keep_tree = intervaltree.IntervalTree()
+        ignore_tree = intervaltree.IntervalTree()
 
         if pmem_range:
             self._log(f'Filtering with given PMEM range from 0x{pmem_range[0]:x} to 0x{pmem_range[1]:x} (size of 0x{pmem_range[1]-pmem_range[0]:x})')
-            t.addi(*pmem_range)
+            keep_tree.addi(*pmem_range)
         else:
             for n in self._nodes:
                 if n.itype == nodes.NodeType.FLUSH:
                     n: nodes.InstructionNode
-                    t.addi(*n.interval)
+                    keep_tree.addi(*n.interval)
 
-        t.merge_overlaps(strict=False)
+        keep_tree.merge_overlaps(strict=False)
+        
+        if ignore_ranges:
+            for begin, end in ignore_ranges:
+                ignore_tree.addi(begin, end)
 
         def should_keep(n: nodes.AbstractNode):
             if n.itype not in (nodes.NodeType.READ, nodes.NodeType.WRITE):
                 return True
 
             n: nodes.InstructionNode
-            if t.overlaps_range(*n.interval):
+            
+            if ignore_tree.envelop(*n.interval):
+                return False
+            
+            if keep_tree.overlaps_range(*n.interval):
                 return True
 
             return False
@@ -491,7 +500,7 @@ class HBGBuilder:
         assert src.tid != dst.tid, 'TIDs must be different'
         self._graph.add_edge(src, dst, type=EdgeType.INTER_THREAD)
 
-    def build(self, filter_volatile_nodes=True, pmem_range=None, make_daisy_chains=True) -> HBG:
+    def build(self, filter_volatile_nodes=True, pmem_range=None, make_daisy_chains=True, ignore_ranges=None) -> HBG:
         cacheline_size = None
 
         daisy_chains = None
@@ -499,7 +508,7 @@ class HBGBuilder:
             daisy_chains = DaisyChains()
         
         if filter_volatile_nodes:
-            self._filter_volatile_nodes(pmem_range)
+            self._filter_volatile_nodes(pmem_range, ignore_ranges)
 
         for n in self._nodes:
             self._add_node(n)

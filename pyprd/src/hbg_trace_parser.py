@@ -108,4 +108,4 @@ class TraceParser:
         self.parse(debug=debug, max_lines=max_lines)
 
         return self._hbg_builder.build(filter_volatile_nodes=filter_volatile_nodes,
-                                       pmem_range=self._pmem_range, make_daisy_chains=make_daisy_chains)
+                                       pmem_range=self._pmem_range, make_daisy_chains=make_daisy_chains, ignore_ranges=self._ignore_ranges)
