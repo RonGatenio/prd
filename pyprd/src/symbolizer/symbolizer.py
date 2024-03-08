@@ -11,6 +11,10 @@ LIB_DIR_PATH         = os.environ.get('LIB_DIR_PATH', './lib')
 LLVM_SYMBOLIZER_PATH = os.environ.get('LLVM_SYMBOLIZER_PATH', 'llvm-symbolizer')
 
 
+LLVM_SYMBOLIZER_TIMEOUT   = 1.5
+LLVM_SYMBOLIZER_MAX_TRIES = 4
+
+
 class Module:
     def __init__(self, path):
         self._path = path
@@ -91,8 +95,16 @@ class Symbolizer:
     def get_debug_info(self, address: int) -> Tuple[str, str, int, int] | None:
         start, end, module = self.get_module(address)
         
-        p = subprocess.Popen([LLVM_SYMBOLIZER_PATH], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        stdout, stderr = p.communicate(f'{module.path} {address - start}\n'.encode('utf-8'), 1)
+        tries = 0
+        while True:
+            try:
+                p = subprocess.Popen([LLVM_SYMBOLIZER_PATH], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                stdout, stderr = p.communicate(f'{module.path} {address - start}\n'.encode('utf-8'), LLVM_SYMBOLIZER_TIMEOUT)
+                break
+            except subprocess.TimeoutExpired:
+                tries += 1
+                if tries >= LLVM_SYMBOLIZER_MAX_TRIES:
+                    raise
         
         if stderr:
             return None # '??', '??', 0, 0
