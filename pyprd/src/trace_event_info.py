@@ -1,8 +1,8 @@
 from dataclasses import dataclass
-from typing import Collection, Tuple
+from typing import Collection, List, Tuple
 import os
 
-from symbolizer.symbolizer import Symbolizer, Symbol
+from symbolizer import Symbolizer, Symbol
 
 
 class TraceEventInfo:
@@ -26,11 +26,12 @@ class TraceEventInfo:
         return str(self._symbol)
     
     def full_info(self,
-                  callstack_limit:      int|None        = None,
-                  callstack_line_limit: int|None        = None,
-                  one_line_callstack:   bool|None       = False,
-                  callstack_top_func:   str|list|None   = None,
-                  indent=0) -> str:
+                  callstack_limit:      int | None              = None,
+                  callstack_line_limit: int | None              = None,
+                  one_line_callstack:   bool | None             = False,
+                  callstack_top_func:   str | List[str] | None  = None,
+                  indent:               int                     = 0
+                  ) -> str:
         callstack = tuple(map(str, self._callstack))
         
         callstack_limit = callstack_limit if callstack_limit is not None else len(callstack)

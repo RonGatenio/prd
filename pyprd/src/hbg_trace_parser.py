@@ -3,7 +3,7 @@ from typing import Set, Tuple
 from hbg import HBG, HBGBuilder
 from trace_event_info import TraceEventInfo
 import intervaltree
-from symbolizer.symbolizer import Symbolizer, Symbol
+from symbolizer import Symbolizer, Symbol
 
 
 _any_int = lambda x: int(x, 0)
