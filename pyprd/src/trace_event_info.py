@@ -1,80 +1,57 @@
 from dataclasses import dataclass
-from typing import List
+from typing import Collection, Tuple
 import os
 
+from symbolizer.symbolizer import Symbolizer, Symbol
 
-@dataclass(frozen=True)
+
 class TraceEventInfo:
-    info: str = ''
-    function: str = None
-    file: str = None
-    line: str = None
-    column: str = None
-    symbol: str = None
-    callstack: tuple[str] = tuple()
+    def __init__(self, symbol: Symbol, callstack: Collection[Symbol] = None):
+        self._symbol = symbol
+        self._callstack = callstack if callstack else tuple()
 
     @classmethod
-    def from_str(cls, s: str) -> 'TraceEventInfo':
-        if not s:
-            return cls()
-        
-        parts = s.split('|')
-        info = parts[0]
-        callstack = parts[1].split(';')[:-2] if len(parts) > 1 else tuple()
+    def from_addresses(cls, address: int, callstack: Collection[int], symbolizer: Symbolizer) -> 'TraceEventInfo':
+        return cls(Symbol(address, symbolizer), tuple(Symbol(x, symbolizer) for x in callstack))
 
-        function = file = line = column = symbol = None
-
-        if '@' in info:
-            function, flc, symbol = info.split('@')
-            file = flc
-            if ':' in flc:
-                file, line, column = flc.split(':')
-
-        def callstack_entry_parser(line):
-            if not line:
-                return ''
-            parts = line.split(' ')
-            flc = parts[-2].split(':')
-            if len(flc) == 3:
-                file, line, column = flc
-                parts[-2] = ':'.join((os.path.basename(file), line, column))
-            return ' '.join(parts)
-        callstack = tuple(map(callstack_entry_parser, callstack))
-
-        return cls(info, function, file, line, column, symbol, callstack)
+    @property
+    def symbol(self) -> Symbol:
+        return self._symbol
+    
+    @property
+    def callstack(self) -> Collection[Symbol]:
+        return self._callstack
     
     def __str__(self) -> str:
-        if not self.function:
-            return self.info
-        
-        return f'{self.function} {os.path.basename(self.file) if self.file else "python3 run.py /app/traces/fast-fair-pmdk-trace-btree_concurrent.trace"}:{self.line}:{self.column} {self.symbol}'
+        return str(self._symbol)
     
     def full_info(self,
-                  callstack_limit:      int|None    = None,
-                  callstack_line_limit: int|None    = None,
-                  one_line_callstack:   bool|None   = False,
-                  callstack_top_func:   str|list|None    = None,
+                  callstack_limit:      int|None        = None,
+                  callstack_line_limit: int|None        = None,
+                  one_line_callstack:   bool|None       = False,
+                  callstack_top_func:   str|list|None   = None,
                   indent=0) -> str:
-        callstack_limit = callstack_limit if callstack_limit is not None else len(self.callstack)
+        callstack = tuple(map(str, self._callstack))
+        
+        callstack_limit = callstack_limit if callstack_limit is not None else len(callstack)
 
         if isinstance(callstack_top_func, str):
             callstack_top_func = [callstack_top_func]
 
         if callstack_top_func:
-            for i, l in reversed(list(enumerate(self.callstack))):
+            for i, l in reversed(list(enumerate(callstack))):
                 if any((f in l for f in callstack_top_func)):
                     callstack_limit = min(i+1, callstack_limit)
                     break
 
         def trunc(l):
-            l = ' '*indent + l
             if callstack_line_limit is None or len(l) <= callstack_line_limit:
                 return l
             return l[:callstack_line_limit] + '...'
         
         delim = '\n' if not one_line_callstack else ';'
 
-        callstack = delim.join(map(trunc, self.callstack[:callstack_limit]))
+        callstack = delim.join((f'{" "*indent}#{i:2} {trunc(c)}' for i, c in enumerate(callstack[:callstack_limit])))
 
         if not callstack:
             return str(self)
