@@ -225,6 +225,15 @@ class HBG:
         # lines.append(f'{INDENT}2nd max  {total_nodes_per_var[-2]}')
         # lines.append(f'{INDENT}Min      {min(total_nodes_per_var)}')
 
+        # PC
+        lines.append('Instructions')
+        lines.append(f'{INDENT}Total instructions            {len(self._pc_info):,}')
+        lines.append(f'{INDENT}{INDENT}Total read instructions  {len({r.pc for r in self._nodes_by_type[nodes.NodeType.READ]}):,}')
+        lines.append(f'{INDENT}{INDENT}Total write instructions {len({r.pc for r in self._nodes_by_type[nodes.NodeType.WRITE]}):,}')
+        lines.append(f'{INDENT}{INDENT}Total flush instructions {len({r.pc for r in self._nodes_by_type[nodes.NodeType.FLUSH]}):,}')
+        lines.append(f'{INDENT}Trace events per instructions {self._graph.number_of_nodes()/len(self._pc_info):,.2f}')
+        self._pc_info
+
         # Cachelines
         lines.append(f'Number of Cachelines  {len(self._cachelines):,}')
         lines.append(f'Cacheline size        {self._cacheline_size}')
