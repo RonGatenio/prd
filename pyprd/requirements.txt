@@ -1,6 +1,8 @@
 intervaltree
-print-dict
+# print-dict
 networkx
-matplotlib
-# ncls            # https://github.com/biocore-ntnu/ncls cite:https://academic.oup.com/bioinformatics/article/36/3/918/5543103# numba
+# matplotlib
+# alive-progress
+# ncls            # https://github.com/biocore-ntnu/ncls cite:https://academic.oup.com/bioinformatics/article/36/3/918/5543103
+# numba
 lief
