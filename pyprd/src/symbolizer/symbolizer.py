@@ -1,110 +1,157 @@
 import os
-from typing import Tuple
+import shutil
 from dataclasses import dataclass
+from typing import Tuple
+import subprocess
+import intervaltree
 import lief
-import os
-
-from symbolizer.llvm_symbolizer import LLVMSymbolizer, get_symbol_information
 
 
-def _address_to_symbol(module: lief.Binary, image_base: int, address: int) -> Tuple[lief.Symbol, int]:
-    address = address - image_base + module.imagebase
+LIB_DIR_PATH         = os.environ.get('LIB_DIR_PATH', './lib')
+LLVM_SYMBOLIZER_PATH = os.environ.get('LLVM_SYMBOLIZER_PATH', 'llvm-symbolizer')
 
-    for symbol in module.symbols:
-        if symbol.value <= address < symbol.value + symbol.size:
-            return symbol, address - symbol.value
+
+class Module:
+    def __init__(self, path):
+        self._path = path
+        self._real_path = None
+        self._name = os.path.basename(path)
         
-    return '', address - module.imagebase
-
-
-def address_to_symbol(module_filepath: str, image_base: int, address: int) -> Tuple[str, int]:
-    default_symbol = (os.path.basename(module_filepath), address - image_base)
+        self._module: lief.Binary = None
     
-    if not os.path.isfile(module_filepath):
-        return default_symbol
+    @property
+    def name(self):
+        return self._name
     
-    module = lief.parse(module_filepath)
-    if not module:
-        return default_symbol
-    
-    address = address - image_base + module.imagebase
-
-    for symbol in module.symbols:
-        if symbol.value <= address < symbol.value + symbol.size:
-            return symbol.name, address - symbol.value
+    @property
+    def path(self) -> str | None:
+        if self._real_path:
+            return self._real_path
         
-    return default_symbol
-
-
-@dataclass(frozen=True)
-class AddressInfo:
-    address: int
-    module: str
-    module_offset: int
-    
-    function: str = None
-    function_offset: int = None
-    
-    file: str = None
-    line: str = None
-    column: str = None
-    
-    @classmethod
-    def from_address(cls, module_filepath: str, image_base: int, address: int, symbolizer: LLVMSymbolizer | None = None) -> 'AddressInfo':
-        module_offset = address - image_base
+        if os.path.isfile(self._path):
+            self._real_path = self._path
+            return self._real_path
         
-        symbol_name, symbol_offset = address_to_symbol(module_filepath, image_base, address)
-        # module = lief.parse(module_filepath) if os.path.isfile(module_filepath) else None
-        # symbol_name = symbol_offset = None
-        # if module:
-        #     symbol, symbol_offset = address_to_symbol(module, image_base, address)
-        #     symbol_name = symbol.name
+        _path = shutil.which(self._name, LIB_DIR_PATH)
+        if _path:
+            self._real_path = _path
+            return self._real_path
         
-        file = line = column = None
+        _path = shutil.which(self._name)
+        if _path:
+            self._real_path = _path
+            return self._real_path
         
-        # if not symbolizer:
-        #     symbolizer = LLVMSymbolizer()
-            
-        # with symbolizer:
-        #     symbols = symbolizer.get_symbol_information(module_filepath, module_offset)
-        #     # assert len(symbols) == 1
-        #     if len(symbols) == 1:
-        #         func, flc = symbols[0]
-        #         flc = flc.split(':')
-        #         file = flc[0]
-        #         if len(flc) == 3:
-        #             line, column = flc[1:3]
-        symbols = get_symbol_information(module_filepath, module_offset)
-        if symbols:
-            func, file, line, column = symbols
-            
-        return cls(address, module_filepath, module_offset, symbol_name, symbol_offset, file, line, column)
+        # raise FileNotFoundError(self._name)
+        return None
+    
+    @property
+    def module(self) -> lief.Binary | None:
+        if not self._module and self.path:
+            self._module = lief.parse(self.path)
+        return self._module
     
     def __str__(self) -> str:
-        modulename = os.path.basename(self.module)
+        return self._name
+
+
+class Symbolizer:
+    def __init__(self) -> None:
+        self._modules = intervaltree.IntervalTree()
+    
+    def add_module(self, path: str, imagebase: str, size: int):
+        self._modules.addi(imagebase, imagebase+size, Module(path))
+    
+    def get_module(self, address: int) -> Tuple[int, int, Module | None]:
+        modules = self._modules.at(address)
         
-        parts = [self.function]
+        if not modules:
+            return 0, 0, None
         
-        if self.file:
-            filename = os.path.basename(self.file)
-            line_col = f':{self.line}:{self.column}' if self.line is not None else ''
+        assert len(modules) == 1
+        
+        start, end, module = modules.pop()
+        return start, end, module
+    
+    def get_symbol(self, address: int) -> Tuple[str, int]:
+        start, end, module = self.get_module(address)
+        
+        if not module:
+            return '??', address
+        
+        module_offset = address - start
+        reloc_address = module_offset + module.module.imagebase
+        
+        for symbol in module.module.symbols:
+            if symbol.value <= reloc_address < symbol.value + symbol.size:
+                return symbol.name, reloc_address - symbol.value
+            
+        return module.name, module_offset
+    
+    def get_debug_info(self, address: int) -> Tuple[str, str, int, int] | None:
+        start, end, module = self.get_module(address)
+        
+        p = subprocess.Popen([LLVM_SYMBOLIZER_PATH], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        stdout, stderr = p.communicate(f'{module.path} {address - start}\n'.encode('utf-8'), 1)
+        
+        if stderr:
+            return None # '??', '??', 0, 0
+        
+        lines = stdout.decode('utf-8').split('\n')
+        file, line, column = lines[1].split(':')
+        return lines[0], file, int(line), int(column)
+
+
+class Symbol:
+    def __init__(self, address: int, symbolizer: Symbolizer) -> None:
+        self._address = address
+        self._symbolizer = symbolizer
+        
+        self._symbolized = False
+        
+        self._module: str = None
+        self._module_path: str = None
+        self._module_offset: int = None
+        
+        self._symbol: str = None
+        self._symbol_offset: int = None
+        
+        self._file: str = None
+        self._line: int = None
+        self._column: int = None
+    
+    def _symbolize(self):
+        if self._symbolized:
+            return
+        
+        start, end, module = self._symbolizer.get_module(self._address)
+        if module:
+            self._module = module.name
+            self._module_path = module.path
+            self._module_offset = self._address - start
+            
+        self._symbol, self._symbol_offset = self._symbolizer.get_symbol(self._address)
+        
+        dbg_info = self._symbolizer.get_debug_info(self._address)
+        if dbg_info:
+            self._symbol, self._file, self._line, self._column = dbg_info
+        
+        self._symbolized = True
+    
+    @property
+    def address(self) -> int:
+        return self._address
+    
+    def __str__(self) -> str:
+        self._symbolize()
+        
+        parts = [self._symbol]
+        
+        if self._file:
+            filename = os.path.basename(self._file)
+            line_col = f':{self._line}:{self._column}' if self._line is not None else ''
             parts.append(f'{filename}{line_col}')
             
-        parts.append(f'({modulename}+0x{self.module_offset:x})')
+        parts.append(f'({self._module}+0x{self._module_offset:x})')
         
         return ' '.join(parts)
-
-
-@dataclass(frozen=True)
-class Module:
-    path: str
-    imagebase: int
-    max_executable_address: int
-    
-
-
-class ModuleParser:
-    def __init__(self):
-        self._modules = []
-        
-    # def add_module()
