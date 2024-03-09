@@ -224,6 +224,35 @@ class HBG:
             lines.append(f'{INDENT}Sizes        {sorted(list(total_nodes_per_var_set), reverse=True)}')
         # lines.append(f'{INDENT}2nd max  {total_nodes_per_var[-2]}')
         # lines.append(f'{INDENT}Min      {min(total_nodes_per_var)}')
+            
+        # RW Candidates
+        _rw_candidates_by_var = {}
+        _rw_candidates_total = 0
+        _rw_candidates_pc_by_var = {}
+        _rw_candidates_pc_total = 0
+        for var, read_nodes in self._read_nodes_by_vars.items():
+            write_nodes = self._write_nodes_by_vars.get(var, [])
+            _candidates = len(read_nodes) * len(write_nodes)
+            _rw_candidates_by_var[var] = _candidates
+            _rw_candidates_total += _candidates
+            
+            _candidates_pc = len({r.pc for r in read_nodes}) * len({w.pc for w in write_nodes})
+            _rw_candidates_pc_by_var[var] = _candidates_pc
+            _rw_candidates_pc_total += _candidates_pc
+        
+        lines.append('R/W Candidates')
+        lines.append(f'R/W Candidates        {_rw_candidates_total:,}')
+        lines.append(f'R/W Candidates pc     {_rw_candidates_pc_total:,}')
+
+        _what = defaultdict(set)
+        for var, read_nodes in self._read_nodes_by_vars.items():
+            write_nodes = self._write_nodes_by_vars.get(var, [])
+            # _what.extend({r.pc:  for r in read_nodes})
+            for r in read_nodes:
+                _what[r.pc] |= ({w.pc for w in write_nodes})
+
+        _c = sum(map(len, _what.values()))
+        lines.append(f'R/W Candidates FIXED {_c}')
 
         # PC
         lines.append('Instructions')
