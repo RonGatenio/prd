@@ -1,29 +1,19 @@
-from dataclasses import dataclass
-from typing import Collection, List, Tuple
-import os
-
+from dataclasses import dataclass, field
+from typing import Sequence, List
 from symbolizer import Symbolizer, Symbol
 
 
+@dataclass(frozen=True)
 class TraceEventInfo:
-    def __init__(self, symbol: Symbol, callstack: Collection[Symbol] = None):
-        self._symbol = symbol
-        self._callstack = callstack if callstack else tuple()
+    symbol: Symbol
+    callstack: Sequence[Symbol] = field(default_factory=tuple)
 
     @classmethod
-    def from_addresses(cls, address: int, callstack: Collection[int], symbolizer: Symbolizer) -> 'TraceEventInfo':
+    def from_addresses(cls, address: int, callstack: Sequence[int], symbolizer: Symbolizer) -> 'TraceEventInfo':
         return cls(Symbol(address, symbolizer), tuple(Symbol(x, symbolizer) for x in callstack))
-
-    @property
-    def symbol(self) -> Symbol:
-        return self._symbol
-    
-    @property
-    def callstack(self) -> Collection[Symbol]:
-        return self._callstack
     
     def __str__(self) -> str:
-        return str(self._symbol)
+        return str(self.symbol)
     
     def full_info(self,
                   callstack_limit:      int | None              = None,
@@ -32,7 +22,7 @@ class TraceEventInfo:
                   callstack_top_func:   str | List[str] | None  = None,
                   indent:               int                     = 0
                   ) -> str:
-        callstack = tuple(map(str, self._callstack))
+        callstack = tuple(map(str, self.callstack))
         
         callstack_limit = callstack_limit if callstack_limit is not None else len(callstack)
 

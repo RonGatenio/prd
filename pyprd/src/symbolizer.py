@@ -114,11 +114,12 @@ class Symbolizer:
         return lines[0], file, int(line), int(column)
 
 
+@dataclass(unsafe_hash=True)
 class Symbol:
-    def __init__(self, address: int, symbolizer: Symbolizer) -> None:
-        self._address = address
-        self._symbolizer = symbolizer
-        
+    address: int
+    _symbolizer: Symbolizer = field(compare=False, repr=False)
+
+    def __post_init__(self):
         self._symbolized = False
         
         self._module: str = None
@@ -136,23 +137,19 @@ class Symbol:
         if self._symbolized:
             return
         
-        start, end, module = self._symbolizer.get_module(self._address)
+        start, end, module = self._symbolizer.get_module(self.address)
         if module:
             self._module = module.name
             self._module_path = module.path
-            self._module_offset = self._address - start
+            self._module_offset = self.address - start
             
-        self._symbol, self._symbol_offset = self._symbolizer.get_symbol(self._address)
+        self._symbol, self._symbol_offset = self._symbolizer.get_symbol(self.address)
         
-        dbg_info = self._symbolizer.get_debug_info(self._address)
+        dbg_info = self._symbolizer.get_debug_info(self.address)
         if dbg_info:
             self._symbol, self._file, self._line, self._column = dbg_info
         
         self._symbolized = True
-    
-    @property
-    def address(self) -> int:
-        return self._address
     
     def __str__(self) -> str:
         self._symbolize()

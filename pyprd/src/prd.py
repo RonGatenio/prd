@@ -38,6 +38,12 @@ class PersistencyRace:
     def tid(self):
         return self.read_node.tid
     
+    def is_inter(self):
+        return self.read_node.tid != self.write_node.tid
+    
+    def is_intra(self):
+        return not self.is_inter()
+    
     def __str__(self) -> str:
         s = []
         s.append('PERSISTENCY RACE!')
@@ -49,8 +55,11 @@ class PersistencyRace:
 
 class PersistencyRaces:
     def __init__(self):
-        self._races:       Set[PersistencyRace]                       = set()
-        self._races_by_pc: Dict[int, Dict[int, Set[PersistencyRace]]] = defaultdict(lambda: defaultdict(set))
+        self._races:                Set[PersistencyRace]                       = set()
+        self._races_by_pc:          Dict[int, Dict[int, Set[PersistencyRace]]] = defaultdict(lambda: defaultdict(set))
+        self._races_by_pc_tstate:   Dict[int, Dict[int, Set[str]]]             = defaultdict(lambda: defaultdict(set))
+        self._races_by_info:        Dict[int, Dict[int, Set[PersistencyRace]]] = defaultdict(lambda: defaultdict(set))
+        self._races_by_info_tstate: Dict[int, Dict[int, Set[str]]]             = defaultdict(lambda: defaultdict(set))
 
     @property
     def races(self):
@@ -61,22 +70,31 @@ class PersistencyRaces:
         return self._races_by_pc
 
     def add_race(self, race: PersistencyRace):
+        tstate = 'inter' if race.is_inter() else 'intra'
+        
         self._races.add(race)
 
         read_already_saved  = race.read_node.pc  in self._races_by_pc
         write_already_saved = race.write_node.pc in self._races_by_pc[race.read_node.pc]
         self._races_by_pc[race.read_node.pc][race.write_node.pc].add(race)
+        self._races_by_pc_tstate[race.read_node.pc][race.write_node.pc].add(tstate)
+        
+        read_already_saved  = race.read_node.info  in self._races_by_info
+        write_already_saved = race.write_node.info in self._races_by_info[race.read_node.info]
+        self._races_by_info[race.read_node.info][race.write_node.info].add(race)
+        self._races_by_info_tstate[race.read_node.info][race.write_node.info].add(tstate)
 
     def clear(self):
         self._races.clear()
         self._races_by_pc.clear()
-
-    def race_nodes_by_read_pc(self) -> Generator[Tuple[int, ReadNode, WriteNode, Set[WriteNode]], None, None]:
-        for i, read_pc in enumerate(self._races_by_pc):
+        
+    @staticmethod
+    def races_iterator(races: Dict[int, Dict[int, Set[PersistencyRace]]]) -> Generator[Tuple[int, ReadNode, WriteNode, Set[WriteNode]], None, None]:
+        for i, read_id in enumerate(races):
             read_node = dependent_node = None
             write_nodes = set()
-            for write_pc, races in self._races_by_pc[read_pc].items():
-                race: PersistencyRace = next(iter(races))
+            for write_id, _races in races[read_id].items():
+                race: PersistencyRace = next(iter(_races))
                 if not read_node:
                     read_node = race.read_node
                     dependent_node = race.dependent_node
@@ -85,7 +103,13 @@ class PersistencyRaces:
             if read_node:
                 yield i, read_node, dependent_node, write_nodes
 
-    def to_str(self, callstack_top: str | List[str] | None = None):
+    def race_nodes_by_read_pc(self) -> Generator[Tuple[int, ReadNode, WriteNode, Set[WriteNode]], None, None]:
+        return self.races_iterator(self._races_by_pc)
+
+    def race_nodes_by_read_info(self) -> Generator[Tuple[int, ReadNode, WriteNode, Set[WriteNode]], None, None]:
+        return self.races_iterator(self._races_by_info)
+    
+    def to_str(self, callstack_top: str | List[str] | None = None, group_by_info=True):
         all_lines = []
         
         def node_to_str(node: ReadNode | WriteNode, indent: int = 0) -> str:
@@ -93,15 +117,17 @@ class PersistencyRaces:
                 return node.info.full_info(callstack_top_func=callstack_top, indent=indent)
             return node.info
 
-        for i, read_node, dependent_node, write_nodes in self.race_nodes_by_read_pc():
+        races = self.race_nodes_by_read_info() if group_by_info else self.race_nodes_by_read_pc()
+        for i, read_node, dependent_node, write_nodes in races:
             lines = [
                 f'Race {i+1:4}',
                 f'R(X): {node_to_str(read_node)}',
                 f'W(Y): {node_to_str(dependent_node)}',
             ]
-            lines.extend([
-                f'    W(X): {node_to_str(write_node, indent=4)}' for write_node in write_nodes
-            ])
+            for write_node in write_nodes:
+                frequency = len(self._races_by_pc[read_node.pc][write_node.pc]) / len(self._races)
+                tstate = ",".join(self._races_by_pc_tstate[read_node.pc][write_node.pc])
+                lines.append(f'    W(X) {100*frequency:3.2f}% ({tstate}): {node_to_str(write_node, indent=4)}')
 
             all_lines.append('\n'.join(lines))
 
