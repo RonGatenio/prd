@@ -89,7 +89,8 @@ def main():
         "main::$_1::operator()(int, int) const test.cpp:",
     ]
     
-    print(prd.races.to_str(callstack_top=tops))
+    with timeit('print races'):
+        print(prd.races.to_str(callstack_top=tops))
 
 
 if __name__ == "__main__":
