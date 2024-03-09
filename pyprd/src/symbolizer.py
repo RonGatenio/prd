@@ -1,6 +1,7 @@
+import functools
 import os
 import shutil
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Tuple
 import subprocess
 import intervaltree
@@ -18,7 +19,6 @@ LLVM_SYMBOLIZER_MAX_TRIES = 4
 class Module:
     def __init__(self, path):
         self._path = path
-        self._real_path = None
         self._name = os.path.basename(path)
         
         self._module: lief.Binary = None
@@ -27,24 +27,19 @@ class Module:
     def name(self):
         return self._name
     
-    @property
+    @functools.cached_property
     def path(self) -> str | None:
-        if self._real_path:
-            return self._real_path
+        _path = os.path.abspath(self._path)
+        if os.path.isfile(_path):
+            return os.path.abspath(_path)
         
-        if os.path.isfile(self._path):
-            self._real_path = self._path
-            return self._real_path
-        
-        _path = shutil.which(self._name, LIB_DIR_PATH)
-        if _path:
-            self._real_path = _path
-            return self._real_path
+        _path = os.path.abspath(os.path.join(LIB_DIR_PATH, self._name))
+        if os.path.isfile(_path):
+            return _path
         
         _path = shutil.which(self._name)
         if _path:
-            self._real_path = _path
-            return self._real_path
+            return _path
         
         # raise FileNotFoundError(self._name)
         return None
@@ -80,7 +75,7 @@ class Symbolizer:
     def get_symbol(self, address: int) -> Tuple[str, int]:
         start, end, module = self.get_module(address)
         
-        if not module:
+        if not module or not module.module:
             return '??', address
         
         module_offset = address - start
@@ -94,6 +89,9 @@ class Symbolizer:
     
     def get_debug_info(self, address: int) -> Tuple[str, str, int, int] | None:
         start, end, module = self.get_module(address)
+        
+        if not module:
+            return None
         
         tries = 0
         while True:
