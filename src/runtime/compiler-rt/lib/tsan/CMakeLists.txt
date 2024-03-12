@@ -110,6 +110,12 @@ set(TSAN_HEADERS
   rtl/tsan_trace.h
   rtl/tsan_update_shadow_word_inl.h)
 
+set(CPRD_SOURCES
+  rtl/cprd/cprd_logger.cpp)
+
+set(CPRD_HEADERS
+  rtl/cprd/cprd_logger.h)
+
 set(TSAN_RUNTIME_LIBRARIES)
 add_compiler_rt_component(tsan)
 
@@ -133,8 +139,8 @@ if(APPLE)
     SHARED
     OS ${TSAN_SUPPORTED_OS}
     ARCHS ${TSAN_SUPPORTED_ARCH}
-    SOURCES ${TSAN_SOURCES} ${TSAN_CXX_SOURCES} ${TSAN_ASM_SOURCES}
-    ADDITIONAL_HEADERS ${TSAN_HEADERS}
+    SOURCES ${TSAN_SOURCES} ${TSAN_CXX_SOURCES} ${TSAN_ASM_SOURCES} ${CPRD_SOURCES}
+    ADDITIONAL_HEADERS ${TSAN_HEADERS} ${CPRD_HEADERS}
     OBJECT_LIBS RTInterception
                 RTSanitizerCommon
                 RTSanitizerCommonLibc
@@ -148,8 +154,8 @@ if(APPLE)
   add_compiler_rt_object_libraries(RTTsan_dynamic
     OS ${TSAN_SUPPORTED_OS}
     ARCHS ${TSAN_SUPPORTED_ARCH}
-    SOURCES ${TSAN_SOURCES} ${TSAN_CXX_SOURCES} ${TSAN_ASM_SOURCES}
-    ADDITIONAL_HEADERS ${TSAN_HEADERS}
+    SOURCES ${TSAN_SOURCES} ${TSAN_CXX_SOURCES} ${TSAN_ASM_SOURCES} ${CPRD_SOURCES}
+    ADDITIONAL_HEADERS ${TSAN_HEADERS} ${CPRD_HEADERS}
     CFLAGS ${TSAN_RTL_CFLAGS})
 
   # Build and check Go runtime.
@@ -205,14 +211,14 @@ else()
     add_compiler_rt_runtime(clang_rt.tsan
       STATIC
       ARCHS ${arch}
-      SOURCES ${TSAN_SOURCES} ${TSAN_ASM_SOURCES}
+      SOURCES ${TSAN_SOURCES} ${TSAN_ASM_SOURCES} ${CPRD_SOURCES}
               $<TARGET_OBJECTS:RTInterception.${arch}>
               $<TARGET_OBJECTS:RTSanitizerCommon.${arch}>
               $<TARGET_OBJECTS:RTSanitizerCommonLibc.${arch}>
               $<TARGET_OBJECTS:RTSanitizerCommonCoverage.${arch}>
               $<TARGET_OBJECTS:RTSanitizerCommonSymbolizer.${arch}>
               $<TARGET_OBJECTS:RTUbsan.${arch}>
-      ADDITIONAL_HEADERS ${TSAN_HEADERS}
+      ADDITIONAL_HEADERS ${TSAN_HEADERS} ${CPRD_HEADERS}
       CFLAGS ${TSAN_RTL_CFLAGS}
       PARENT_TARGET tsan)
     add_compiler_rt_runtime(clang_rt.tsan_cxx
@@ -220,7 +226,7 @@ else()
       ARCHS ${arch}
       SOURCES ${TSAN_CXX_SOURCES}
               $<TARGET_OBJECTS:RTUbsan_cxx.${arch}>
-      ADDITIONAL_HEADERS ${TSAN_HEADERS}
+      ADDITIONAL_HEADERS ${TSAN_HEADERS} ${CPRD_HEADERS}
       CFLAGS ${TSAN_RTL_CFLAGS}
       PARENT_TARGET tsan)
     list(APPEND TSAN_RUNTIME_LIBRARIES clang_rt.tsan-${arch}
