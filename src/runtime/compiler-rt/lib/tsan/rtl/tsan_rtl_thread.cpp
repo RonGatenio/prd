@@ -398,7 +398,7 @@ void MemoryAccessRange(ThreadState *thr, uptr pc, uptr addr,
     cur.SetWrite(is_write);
     cur.SetAddr0AndSizeLog(addr & (kShadowCell - 1), kAccessSizeLog);
     MemoryAccessImpl(thr, addr, kAccessSizeLog, is_write, false,
-        shadow_mem, cur);
+        shadow_mem, cur, pc);
   }
   if (unaligned)
     shadow_mem += kShadowCnt;
@@ -409,7 +409,7 @@ void MemoryAccessRange(ThreadState *thr, uptr pc, uptr addr,
     cur.SetWrite(is_write);
     cur.SetAddr0AndSizeLog(0, kAccessSizeLog);
     MemoryAccessImpl(thr, addr, kAccessSizeLog, is_write, false,
-        shadow_mem, cur);
+        shadow_mem, cur, pc);
     shadow_mem += kShadowCnt;
   }
   // Handle ending, if any.
@@ -419,7 +419,7 @@ void MemoryAccessRange(ThreadState *thr, uptr pc, uptr addr,
     cur.SetWrite(is_write);
     cur.SetAddr0AndSizeLog(addr & (kShadowCell - 1), kAccessSizeLog);
     MemoryAccessImpl(thr, addr, kAccessSizeLog, is_write, false,
-        shadow_mem, cur);
+        shadow_mem, cur, pc);
   }
 }
 

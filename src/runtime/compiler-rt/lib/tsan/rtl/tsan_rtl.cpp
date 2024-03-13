@@ -651,7 +651,7 @@ static inline bool HappensBefore(Shadow old, ThreadState *thr) {
 ALWAYS_INLINE
 void MemoryAccessImpl1(ThreadState *thr, uptr addr,
     int kAccessSizeLog, bool kAccessIsWrite, bool kIsAtomic,
-    u64 *shadow_mem, Shadow cur) {
+    u64 *shadow_mem, Shadow cur, uptr pc) {
   StatInc(thr, StatMop);
   StatInc(thr, kAccessIsWrite ? StatMopWrite : StatMopRead);
   StatInc(thr, (StatType)(StatMop1 + kAccessSizeLog));
@@ -998,14 +998,14 @@ void MemoryAccess(ThreadState *thr, uptr pc, uptr addr,
   }
 
   MemoryAccessImpl1(thr, addr, kAccessSizeLog, kAccessIsWrite, kIsAtomic,
-      shadow_mem, cur);
+      shadow_mem, cur, pc);
 }
 
 // Called by MemoryAccessRange in tsan_rtl_thread.cpp
 ALWAYS_INLINE USED
 void MemoryAccessImpl(ThreadState *thr, uptr addr,
     int kAccessSizeLog, bool kAccessIsWrite, bool kIsAtomic,
-    u64 *shadow_mem, Shadow cur) {
+    u64 *shadow_mem, Shadow cur, uptr pc) {
   if (LIKELY(ContainsSameAccess(shadow_mem, cur.raw(),
       thr->fast_synch_epoch, kAccessIsWrite))) {
     StatInc(thr, StatMop);
@@ -1016,7 +1016,7 @@ void MemoryAccessImpl(ThreadState *thr, uptr addr,
   }
 
   MemoryAccessImpl1(thr, addr, kAccessSizeLog, kAccessIsWrite, kIsAtomic,
-      shadow_mem, cur);
+      shadow_mem, cur, pc);
 }
 
 static void MemoryRangeSet(ThreadState *thr, uptr pc, uptr addr, uptr size,
