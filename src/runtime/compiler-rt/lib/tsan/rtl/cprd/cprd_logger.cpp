@@ -1,24 +1,12 @@
-// #include "sanitizer_common/sanitizer_atomic.h"
-// #include "sanitizer_common/sanitizer_common.h"
 // #include "sanitizer_common/sanitizer_file.h"
-// #include "sanitizer_common/sanitizer_libc.h"
-// #include "sanitizer_common/sanitizer_stackdepot.h"
-// #include "sanitizer_common/sanitizer_placement_new.h"
-// #include "sanitizer_common/sanitizer_symbolizer.h"
 #include "sanitizer_common/sanitizer_stacktrace_printer.h"
-// #include "sanitizer_common/sanitizer_atomic.h"
-// #include "tsan_defs.h"
-// #include "tsan_platform.h"
-// #include "tsan_rtl.h"
-// #include "tsan_mman.h"
-// #include "tsan_suppressions.h"
 #include "../tsan_symbolize.h"
-// #include "ubsan/ubsan_init.h"
 #include "cprd_logger.h"
 
 using namespace __tsan;
 
 namespace cprd {
+
 
 void log_loaded_modules() {
   static atomic_uint8_t printed_modules = {0};
@@ -80,6 +68,11 @@ void get_symbol_info(InternalScopedString& iss, ThreadState *thr, uptr pc, bool 
       log_callstack(iss, thr, pc);
     }
   }
+}
+
+Cprd& Cprd::get_instance() {
+  static Cprd cprd;
+  return cprd;
 }
 
 }

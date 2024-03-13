@@ -27,6 +27,7 @@
 #include "tsan_suppressions.h"
 #include "tsan_symbolize.h"
 #include "ubsan/ubsan_init.h"
+#include "cprd/cprd_logger.h"
 
 #ifdef __SSE3__
 // <emmintrin.h> transitively includes <stdlib.h>,
@@ -656,6 +657,22 @@ void MemoryAccessImpl1(ThreadState *thr, uptr addr,
   StatInc(thr, kAccessIsWrite ? StatMopWrite : StatMopRead);
   StatInc(thr, (StatType)(StatMop1 + kAccessSizeLog));
 
+  if (cprd::Cprd::get_instance().is_pm_address(addr)) {
+    InternalScopedString res(2 * GetPageSizeCached());
+
+    res.append("%d:%s:%p:%p:%d:", 
+              (int)thr->fast_state.tid(), 
+              kAccessIsWrite ? "WRITE" : "READ", 
+              (void*)pc, 
+              (void*)addr,
+              (int)(1 << kAccessSizeLog));
+    cprd::get_symbol_info(res, thr, pc);
+    res.append("# IsAtomic: %d", kIsAtomic);
+    res.append("\n");
+    Printf(res.data());
+  }
+
+
   // This potentially can live in an MMX/SSE scratch register.
   // The required intrinsics are:
   // __m128i _mm_move_epi64(__m128i*);
@@ -827,118 +844,9 @@ bool ContainsSameAccess(u64 *s, u64 a, u64 sync_epoch, bool is_write) {
 }
 
 ALWAYS_INLINE USED
-void get_symbol_info(InternalScopedString& iss, ThreadState *thr, uptr pc) {
-  SymbolizedStack *ent = SymbolizeCode(pc);
-
-  uptr pc1 = pc;
-  if ((pc & kExternalPCBit) == 0)
-    pc1 = StackTrace::GetPreviousInstructionPc(pc);
-  // SymbolizedStack *ent_prev_pc = SymbolizeCode(pc1);
-  iss.append("%p", pc1);
-
-  /*
-    %f - function name
-    %S - file/line/column
-    %M - prints module basename and offset, if it is known, or PC.
-  */
-  // RenderFrame(&iss, "%f@%S@", 0, ent_prev_pc->info, false);
-  // RenderFrame(&iss, "%M", 0, ent->info, false);
-}
-
-ALWAYS_INLINE USED
-void get_symbol_info2(InternalScopedString& iss, ThreadState *thr, uptr pc) {
-  SymbolizedStack *ent = SymbolizeCode(pc);
-
-  uptr pc1 = pc;
-  if ((pc & kExternalPCBit) == 0)
-    pc1 = StackTrace::GetPreviousInstructionPc(pc);
-  SymbolizedStack *ent_prev_pc = SymbolizeCode(pc1);
-  // iss.append("%p", pc1);
-
-  /*
-    %f - function name
-    %S - file/line/column
-    %M - prints module basename and offset, if it is known, or PC.
-  */
-  RenderFrame(&iss, "%f@%S@", 0, ent_prev_pc->info, false);
-  RenderFrame(&iss, "%M", 0, ent->info, false);
-}
-
-void CaptureCurrentStackNoSymbols(InternalScopedString* buffer, ThreadState *thr, uptr pc, const char delimiter) {
-  static atomic_uint8_t printed_modules = {0};
-
-  u8 cmp = 0;
-  if (atomic_compare_exchange_strong(&printed_modules, &cmp, 1, memory_order_seq_cst)) {
-    ListOfModules modules;
-    modules.init();
-    for (uptr i = 0; i < modules.size(); i++) {
-      Printf("0:MODULE:%p:%p:%s\n", modules[i].base_address(), modules[i].max_executable_address(), modules[i].full_name());
-    }
-  }
-  
-  VarSizeStackTrace trace;
-  ObtainCurrentStack(thr, pc, &trace);
-  for (uptr si = trace.size; si > 0; si--) {
-    const uptr pc = trace.trace[si - 1];
-    uptr pc1 = pc;
-    // We obtain the return address, but we're interested in the previous
-    // instruction.
-    if ((pc & kExternalPCBit) == 0)
-      pc1 = StackTrace::GetPreviousInstructionPc(pc);
-
-    buffer->append("%p%c", pc1, delimiter);
-  }
-    // buffer->append("\n");
-
-  // for (int i = 0; frame && frame->info.address; frame = frame->next, i++) {
-  // CaptureStack(buffer, SymbolizeStack(trace), delimiter);
-}
-
-ALWAYS_INLINE USED
 void MemoryAccess(ThreadState *thr, uptr pc, uptr addr,
     int kAccessSizeLog, bool kAccessIsWrite, bool kIsAtomic) {
   u64 *shadow_mem = (u64*)MemToShadow(addr);
-
-  InternalScopedString res(2 * GetPageSizeCached());
-
-  res.append("%d:%s:%p:%p:%d:", 
-            (int)thr->fast_state.tid(), 
-            kAccessIsWrite ? "WRITE" : "READ", 
-            (void*)pc, 
-            (void*)addr,
-            (int)(1 << kAccessSizeLog));
-  get_symbol_info(res, thr, pc);
-  res.append("|");
-  CaptureCurrentStackNoSymbols(&res, thr, pc, ',');
-  res.append("\n");
-  // Printf(res.data());
-
-  // res.clear();
-
-  // res.append("%d:%s:%p:%p:%d:", 
-  //           (int)thr->fast_state.tid(), 
-  //           kAccessIsWrite ? "WRITE" : "READ", 
-  //           (void*)pc, 
-  //           (void*)addr,
-  //           (int)(1 << kAccessSizeLog));
-  // get_symbol_info2(res, thr, pc);
-  // res.append("|");
-  // CaptureCurrentStack(&res, thr, pc, ';');
-  // res.append("\n");
-  Printf(res.data());
-
-  // auto fd = OpenFile("tempfilename.txt", WrOnly);
-
-  // if (fd != kInvalidFd) {
-  //   uptr bytes_written = 0;
-  //   bool success = WriteToFile(fd, res.data(), res.length(), &bytes_written);
-  //   if (!success || bytes_written != res.length()) {
-  //     Report("WARNING: Can't write to symbolizer at fd %d\n", fd);
-  //   }
-
-  //   CloseFile(fd);
-  // }
-
 
   DPrintf2("#%d: MemoryAccess: @%p %p size=%d"
       " is_write=%d shadow_mem=%p {%zx, %zx, %zx, %zx}\n",
@@ -1137,7 +1045,7 @@ void MemoryFenceAccess(ThreadState *thr, uptr pc) {
   for (uptr i = 0; i < thr->flushes_cache.Size(); i++)
   {
     InternalScopedString res(2 * GetPageSizeCached());
-    get_symbol_info(res, thr, pc);
+    cprd::get_symbol_info(res, thr, pc, false);
 
     Printf("%d:FLUSH:%p:%p:%d:%s\n", thr->tid, (void*)pc, (void*)thr->flushes_cache[i], kCacheLineSize, res.data());
   }

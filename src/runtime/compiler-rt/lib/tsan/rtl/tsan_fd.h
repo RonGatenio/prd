@@ -42,7 +42,7 @@ void FdAcquire(ThreadState *thr, uptr pc, int fd);
 void FdRelease(ThreadState *thr, uptr pc, int fd);
 void FdAccess(ThreadState *thr, uptr pc, int fd);
 void FdClose(ThreadState *thr, uptr pc, int fd, bool write = true);
-void FdFileCreate(ThreadState *thr, uptr pc, int fd);
+void FdFileCreate(ThreadState *thr, uptr pc, int fd, const char* name = nullptr);
 void FdDup(ThreadState *thr, uptr pc, int oldfd, int newfd, bool write);
 void FdPipeCreate(ThreadState *thr, uptr pc, int rfd, int wfd);
 void FdEventCreate(ThreadState *thr, uptr pc, int fd);

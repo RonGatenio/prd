@@ -13,6 +13,7 @@
 #include "tsan_fd.h"
 #include "tsan_rtl.h"
 #include <sanitizer_common/sanitizer_atomic.h>
+#include "cprd/cprd_logger.h"
 
 namespace __tsan {
 
@@ -215,11 +216,12 @@ void FdClose(ThreadState *thr, uptr pc, int fd, bool write) {
   d->creation_stack = 0;
 }
 
-void FdFileCreate(ThreadState *thr, uptr pc, int fd) {
+void FdFileCreate(ThreadState *thr, uptr pc, int fd, const char* name) {
   DPrintf("#%d: FdFileCreate(%d)\n", thr->tid, fd);
   if (bogusfd(fd))
     return;
   init(thr, pc, fd, &fdctx.filesync);
+  cprd::Cprd::get_instance().handle_open_file(name, fd);
 }
 
 void FdDup(ThreadState *thr, uptr pc, int oldfd, int newfd, bool write) {

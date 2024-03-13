@@ -30,6 +30,7 @@
 #include "tsan_rtl.h"
 #include "tsan_mman.h"
 #include "tsan_fd.h"
+#include "cprd/cprd_logger.h"
 
 using namespace __tsan;
 
@@ -770,7 +771,10 @@ static void *mmap_interceptor(ThreadState *thr, uptr pc, Mmap real_mmap,
   if (!fix_mmap_addr(&addr, sz, flags)) return MAP_FAILED;
   void *res = real_mmap(addr, sz, prot, flags, fd, off);
   if (res != MAP_FAILED) {
-    if (fd > 0) FdAccess(thr, pc, fd);
+    if (fd > 0) {
+      FdAccess(thr, pc, fd);
+      cprd::Cprd::get_instance().handle_mmap((uptr)addr, sz, fd);
+    }
     MemoryRangeImitateWriteOrResetRange(thr, pc, (uptr)res, sz);
   }
   return res;
@@ -1221,7 +1225,6 @@ INTERCEPTOR(int, pthread_cond_destroy, void *c) {
 }
 
 TSAN_INTERCEPTOR(int, pthread_mutex_init, void *m, void *a) {
-  Printf("Hello from pthread_mutex_init interceptor\n");
   SCOPED_TSAN_INTERCEPTOR(pthread_mutex_init, m, a);
   int res = REAL(pthread_mutex_init)(m, a);
   if (res == 0) {
@@ -1514,7 +1517,7 @@ TSAN_INTERCEPTOR(int, open, const char *name, int flags, int mode) {
   READ_STRING(thr, pc, name, 0);
   int fd = REAL(open)(name, flags, mode);
   if (fd >= 0)
-    FdFileCreate(thr, pc, fd);
+    FdFileCreate(thr, pc, fd, name);
   return fd;
 }
 
@@ -1524,7 +1527,7 @@ TSAN_INTERCEPTOR(int, open64, const char *name, int flags, int mode) {
   READ_STRING(thr, pc, name, 0);
   int fd = REAL(open64)(name, flags, mode);
   if (fd >= 0)
-    FdFileCreate(thr, pc, fd);
+    FdFileCreate(thr, pc, fd, name);
   return fd;
 }
 #define TSAN_MAYBE_INTERCEPT_OPEN64 TSAN_INTERCEPT(open64)
@@ -1537,7 +1540,7 @@ TSAN_INTERCEPTOR(int, creat, const char *name, int mode) {
   READ_STRING(thr, pc, name, 0);
   int fd = REAL(creat)(name, mode);
   if (fd >= 0)
-    FdFileCreate(thr, pc, fd);
+    FdFileCreate(thr, pc, fd, name);
   return fd;
 }
 
@@ -1547,7 +1550,7 @@ TSAN_INTERCEPTOR(int, creat64, const char *name, int mode) {
   READ_STRING(thr, pc, name, 0);
   int fd = REAL(creat64)(name, mode);
   if (fd >= 0)
-    FdFileCreate(thr, pc, fd);
+    FdFileCreate(thr, pc, fd, name);
   return fd;
 }
 #define TSAN_MAYBE_INTERCEPT_CREAT64 TSAN_INTERCEPT(creat64)
@@ -2245,7 +2248,7 @@ static void HandleRecvmsg(ThreadState *thr, uptr pc,
     Acquire(thr, pc, File2addr(path));                \
   if (file) {                                         \
     int fd = fileno_unlocked(file);                   \
-    if (fd >= 0) FdFileCreate(thr, pc, fd);           \
+    if (fd >= 0) FdFileCreate(thr, pc, fd, path);     \
   }
 
 #define COMMON_INTERCEPTOR_FILE_CLOSE(ctx, file) \
