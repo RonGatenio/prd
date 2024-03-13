@@ -32,9 +32,8 @@ class TraceParser:
         with open(filename, 'r') as f:
             return cls(f.readlines(), name)
 
-    def _parse_line(self, line, line_number=None, debug=False):
+    def _parse_line(self, line, line_number, debug=False):
         dbg_print = print if debug else lambda x: None
-        # line = line.split('#')[0].strip()
         
         parts = line.split(':')
         
@@ -81,6 +80,7 @@ class TraceParser:
                 info = ':'.join(info) if info else ''
                 
                 if info.startswith('0x'):
+                    info = info.split('#')[0].strip()
                     info = info.split('|')
                     addr = _any_int(info[0])
                     callstack = tuple(map(_any_int, (info[1].strip(',').split(',') if len(info) > 1 else [])))
@@ -100,7 +100,7 @@ class TraceParser:
             if max_lines and i > max_lines:
                 break
 
-            self._parse_line(line, i, debug=debug)
+            self._parse_line(line, i+1, debug=debug)
 
         return self
 

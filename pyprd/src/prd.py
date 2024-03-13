@@ -68,6 +68,10 @@ class PersistencyRaces:
     @property
     def races_by_pc(self):
         return self._races_by_pc
+    
+    @property
+    def races_by_info(self):
+        return self._races_by_info
 
     def add_race(self, race: PersistencyRace):
         tstate = 'inter' if race.is_inter() else 'intra'
@@ -118,6 +122,9 @@ class PersistencyRaces:
             return node.info
 
         races = self.race_nodes_by_read_info() if group_by_info else self.race_nodes_by_read_pc()
+        races_by_group = self._races_by_info if group_by_info else self._races_by_pc
+        races_by_group_tsate = self._races_by_info_tstate if group_by_info else self._races_by_pc_tstate
+
         for i, read_node, dependent_node, write_nodes in races:
             lines = [
                 f'Race {i+1:4}',
@@ -125,9 +132,17 @@ class PersistencyRaces:
                 f'W(Y): {node_to_str(dependent_node)}',
             ]
             for write_node in write_nodes:
-                frequency = len(self._races_by_pc[read_node.pc][write_node.pc]) / len(self._races)
-                tstate = ",".join(self._races_by_pc_tstate[read_node.pc][write_node.pc])
-                lines.append(f'    W(X) {100*frequency:3.2f}% ({tstate}): {node_to_str(write_node, indent=4)}')
+                read_id = read_node.info if group_by_info else read_node.pc
+                write_id = write_node.info if group_by_info else write_node.pc
+
+                _all_races = races_by_group[read_id][write_id]
+
+                frequency = len(_all_races) / len(self._races)
+                tstate = ",".join(races_by_group_tsate[read_id][write_id])
+                
+                trace_lines = ', '.join(sorted({f'(W {r.write_node.trace_line_number}, R {r.read_node.trace_line_number})' for r in _all_races}))
+                
+                lines.append(f'    W(X) {100*frequency:3.2f}% {len(_all_races):3}/{len(self._races)} ({tstate}): {node_to_str(write_node, indent=4)}\n    {trace_lines}\n')
 
             all_lines.append('\n'.join(lines))
 
@@ -178,6 +193,7 @@ class PersistencyRaceDetector:
             lines.append('Races')
             lines.append(f"{INDENT}Total races by trace events      {len(self._races.races):,}")
             lines.append(f"{INDENT}Total races by instructions      {sum(map(len, self._races.races_by_pc.values())):,}")
+            lines.append(f"{INDENT}Total races by callstack (info)  {sum(map(len, self._races.races_by_info.values())):,}")
             lines.append(f"{INDENT}Total races by read instructions {len(list(self._races.race_nodes_by_read_pc())):,}")
             lines.append(f"{INDENT}Duration                         {self._time_first_stage + self._time_second_stage:.3f} sec")
             lines.append(f"{INDENT}{INDENT}1st stage duration {self._time_first_stage:.3f} sec")
