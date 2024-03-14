@@ -4,6 +4,8 @@
 #include "../tsan_defs.h"
 #include "../tsan_rtl.h"
 #include "sanitizer_common/sanitizer_file.h"
+#include "cprd_common.h"
+#include "cprd_array.h"
 
 using namespace __tsan;
 
@@ -81,58 +83,7 @@ char _info_delimiter = '|';
 void get_symbol_info(InternalScopedString& iss, ThreadState* thr, uptr pc,
                      bool callstack = true, bool symbolize = false);
 
-template <typename T, u32 MaxSize>
-class Array {
- private:
-  T m_data[MaxSize];
-  u32 m_count;
 
-  typedef bool (*predicate_function_t)(const T& arg);
-
- public:
-  explicit Array() {}
-
-  u32 Size() const { return m_count; }
-
-  T& operator[](u32 i) {
-    DCHECK_LT(i, m_count);
-    return m_data[i];
-  }
-
-  const T& operator[](u32 i) const {
-    DCHECK_LT(i, m_count);
-    return m_data[i];
-  }
-
-  T* PushBack() {
-    DCHECK_LT(m_count, MaxSize);
-    T* p = &m_data[m_count++];
-    internal_memset(p, 0, sizeof(*p));
-    return p;
-  }
-
-  T* PushBack(const T& v) {
-    DCHECK_LT(m_count, MaxSize);
-    T* p = &m_data[m_count++];
-    internal_memcpy(p, &v, sizeof(*p));
-    return p;
-  }
-
-  void PopBack() {
-    if (m_count > 0) {
-      m_count--;
-    }
-  }
-
-  bool IsInArray(const T& v) {
-    for (u32 i = 0; i < m_count; i++) {
-      if (m_data[i] == v) {
-        return true;
-      }
-    }
-    return false;
-  }
-};
 
 /* PM regions */
 #define PM_POOL_CAND_MAX 128
@@ -141,7 +92,11 @@ struct pm_region {
   uptr begin;
   uptr end;
 
-  bool is_in_region(uptr addr) { return begin <= addr && addr < end; }
+  bool operator==(const pm_region& other) const {
+    return begin == other.begin && end == other.end;
+  }
+
+  bool contains(uptr addr) { return begin <= addr && addr < end; }
 };
 
 class Cprd {
@@ -157,19 +112,24 @@ class Cprd {
   Cprd& operator=(const Cprd&)= delete;
 
  public:
-  static Cprd& get_instance();
+  static Cprd& getInstance();
 
   void handle_open_file(const char* path, fd_t fd) {
     if (internal_strstr(path, _s_pm_pool_path_pattern) == nullptr) {
       return;
     }
 
-    m_pm_pool_candidates.PushBack(fd);
-    Printf("[*] In handle_open_file %s\n", path);
+    m_pm_pool_candidates.push_back(fd);
+    Printf("[*] In handle_open_file %s with fd %d\n", path, fd);
+  }
+
+  void handle_close_file(fd_t fd) {
+    if (m_pm_pool_candidates.remove(fd))
+    Printf("[*] In handle_close_file fd %d\n", fd);
   }
 
   void handle_mmap(uptr addr, u32 size, fd_t fd) {
-    if (!m_pm_pool_candidates.IsInArray(fd)) {
+    if (!m_pm_pool_candidates.contains(fd)) {
       return;
     }
 
@@ -177,13 +137,22 @@ class Cprd {
     region.begin = addr;
     region.end = addr + size;
 
-    m_pm_regions.PushBack(region);
-    Printf("[*] In handle_mmap %p\n", addr);
+    m_pm_regions.push_back(region);
+    Printf("[*] In handle_mmap; added PM region %p, size %p, fd %d\n", addr, size, fd);
+  }
+
+  void handle_munmap(uptr addr, u32 size) {
+    pm_region region;
+    region.begin = addr;
+    region.end = addr + size;
+
+    if (m_pm_regions.remove(region))
+    Printf("[*] In handle_munmap; removed PM region %p, size %p\n", addr, size);
   }
 
   bool is_pm_address(uptr addr) {
-    for (u32 i = 0; i < m_pm_regions.Size(); i++) {
-      if (m_pm_regions[i].is_in_region(addr)) {
+    for (auto& region : m_pm_regions) {
+      if (region.contains(addr)) {
         return true;
       }
     }

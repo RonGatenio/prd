@@ -70,7 +70,7 @@ void get_symbol_info(InternalScopedString& iss, ThreadState *thr, uptr pc, bool 
   }
 }
 
-Cprd& Cprd::get_instance() {
+Cprd& Cprd::getInstance() {
   static Cprd cprd;
   return cprd;
 }

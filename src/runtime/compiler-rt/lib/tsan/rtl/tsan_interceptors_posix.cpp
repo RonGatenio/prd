@@ -773,7 +773,7 @@ static void *mmap_interceptor(ThreadState *thr, uptr pc, Mmap real_mmap,
   if (res != MAP_FAILED) {
     if (fd > 0) {
       FdAccess(thr, pc, fd);
-      cprd::Cprd::get_instance().handle_mmap((uptr)addr, sz, fd);
+      cprd::Cprd::getInstance().handle_mmap((uptr)res, sz, fd);
     }
     MemoryRangeImitateWriteOrResetRange(thr, pc, (uptr)res, sz);
   }
@@ -784,6 +784,9 @@ TSAN_INTERCEPTOR(int, munmap, void *addr, long_t sz) {
   SCOPED_TSAN_INTERCEPTOR(munmap, addr, sz);
   UnmapShadow(thr, (uptr)addr, sz);
   int res = REAL(munmap)(addr, sz);
+  if (0 == res) {
+    cprd::Cprd::getInstance().handle_munmap((uptr)addr, sz);
+  }
   return res;
 }
 
