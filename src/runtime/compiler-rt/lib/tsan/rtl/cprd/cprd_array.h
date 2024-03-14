@@ -66,18 +66,10 @@ private:
 public:
   explicit Array() {}
 
-  T* push_back() {
-    DCHECK_LT(m_count, MaxSize);
-    _Item& p = m_data[m_count++];
-    internal_memcpy(&p.data, 0, sizeof(p.data));
-    p.valid = true;
-    return &p.data;
-  }
-
   T* push_back(const T& v) {
     DCHECK_LT(m_count, MaxSize);
     _Item& p = m_data[m_count++];
-    internal_memcpy(&p.data, &v, sizeof(p.data));
+    p.data = v;
     p.valid = true;
     return &p.data;
   }

@@ -193,7 +193,7 @@ void FdClose(ThreadState *thr, uptr pc, int fd, bool write) {
   if (bogusfd(fd))
     return;
   FdDesc *d = fddesc(thr, pc, fd);
-  cprd::Cprd::getInstance().handle_close_file(fd);
+  cprd::Cprd::s_get_instance().handle_close_file(fd);
   if (write) {
     // To catch races between fd usage and close.
     MemoryWrite(thr, pc, (uptr)d, kSizeLog8);
@@ -222,7 +222,7 @@ void FdFileCreate(ThreadState *thr, uptr pc, int fd, const char* name) {
   if (bogusfd(fd))
     return;
   init(thr, pc, fd, &fdctx.filesync);
-  cprd::Cprd::getInstance().handle_open_file(name, fd);
+  cprd::Cprd::s_get_instance().handle_open_file(name, fd);
 }
 
 void FdDup(ThreadState *thr, uptr pc, int oldfd, int newfd, bool write) {

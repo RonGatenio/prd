@@ -657,7 +657,7 @@ void MemoryAccessImpl1(ThreadState *thr, uptr addr,
   StatInc(thr, kAccessIsWrite ? StatMopWrite : StatMopRead);
   StatInc(thr, (StatType)(StatMop1 + kAccessSizeLog));
 
-  if (cprd::Cprd::get_instance().is_pm_address(addr)) {
+  if (cprd::Cprd::s_get_instance().is_pm_address(addr)) {
     InternalScopedString res(2 * GetPageSizeCached());
 
     res.append("%d:%s:%p:%p:%d:", 

@@ -112,7 +112,7 @@ class Cprd {
   Cprd& operator=(const Cprd&)= delete;
 
  public:
-  static Cprd& getInstance();
+  static Cprd& s_get_instance();
 
   void handle_open_file(const char* path, fd_t fd) {
     if (internal_strstr(path, _s_pm_pool_path_pattern) == nullptr) {
@@ -120,12 +120,12 @@ class Cprd {
     }
 
     m_pm_pool_candidates.push_back(fd);
-    Printf("[*] In handle_open_file %s with fd %d\n", path, fd);
+    DEBUG_LOG("In handle_open_file %s with fd %d", path, fd);
   }
 
   void handle_close_file(fd_t fd) {
     if (m_pm_pool_candidates.remove(fd))
-    Printf("[*] In handle_close_file fd %d\n", fd);
+    DEBUG_LOG("In handle_close_file fd %d", fd);
   }
 
   void handle_mmap(uptr addr, u32 size, fd_t fd) {
@@ -138,7 +138,7 @@ class Cprd {
     region.end = addr + size;
 
     m_pm_regions.push_back(region);
-    Printf("[*] In handle_mmap; added PM region %p, size %p, fd %d\n", addr, size, fd);
+    DEBUG_LOG("In handle_mmap; added PM region %p, size %p, fd %d", addr, size, fd);
   }
 
   void handle_munmap(uptr addr, u32 size) {
@@ -147,7 +147,7 @@ class Cprd {
     region.end = addr + size;
 
     if (m_pm_regions.remove(region))
-    Printf("[*] In handle_munmap; removed PM region %p, size %p\n", addr, size);
+    DEBUG_LOG("In handle_munmap; removed PM region %p, size %p", addr, size);
   }
 
   bool is_pm_address(uptr addr) {
