@@ -62,19 +62,38 @@ COPY --from=build /app /app
 # Copy benchmarks folder
 COPY benchmarks /app/benchmarks
 
-
+# Make traces folder
+RUN mkdir -p /app/traces
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # RECIPE (Converting Concurrent DRAM Indexes to Persistent-Memory Indexes)
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 WORKDIR /app/benchmarks/RECIPE
 
+RUN dos2unix *.sh
+RUN ./compile.sh
+RUN ./run.sh
+RUN cp *.trace /app/traces
+
+WORKDIR /app/pyprd/src
+
+RUN python3 run.py /app/traces/pclht.trace          > out.pclht.races
+RUN python3 run.py /app/traces/pclht-recovery.trace > out.pclht-recovery.races
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # CCEH (Cacheline-Concious Extendible Hashing)
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 WORKDIR /app/benchmarks/CCEH
 
+RUN dos2unix *.sh
+RUN ./compile.sh
+RUN ./run_pmdk.sh
+RUN cp *.trace /app/traces
+
+WORKDIR /app/pyprd/src
+
+RUN python3 run.py /app/traces/multi_threaded_cceh.trace          > out.cceh.races
+RUN python3 run.py /app/traces/multi_threaded_cceh-recovery.trace > out.cceh-recovery.races
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # FAST-FAIR (Failure-Atomic ShifT(FAST) and Failure-Atomic In-place Rebalancing(FAIR))
@@ -83,12 +102,16 @@ WORKDIR /app/benchmarks/FAST_FAIR
 
 RUN dos2unix *.sh
 RUN ./compile_pmdk.sh
-RUN ./run_pmdk.sh
-RUN mkdir -p /app/traces && cp *.trace /app/traces
+RUN ./run_pmdk.sh ; exit 0
+RUN cp *.trace /app/traces
 
 WORKDIR /app/pyprd/src
 
-RUN python3 run.py /app/traces/fast-fair-pmdk-trace-btree_concurrent.trace > out.races
+RUN python3 run.py /app/traces/fast-fair-pmdk.trace                > out.fastfair.races
+RUN python3 run.py /app/traces/fast-fair-pmdk-recovery.trace       > out.fastfair-recovery.races
+RUN python3 run.py /app/traces/fast-fair-pmdk-mixed.trace          > out.fastfair.races
+RUN python3 run.py /app/traces/fast-fair-pmdk-mixed-recovery.trace > out.fastfair-recovery.races
+
 
 #####################################################################
 # Example stage
