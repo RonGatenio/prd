@@ -1,11 +1,11 @@
 import argparse
 from datetime import datetime
 import os
-import sys
 import io
 import tarfile
 import docker
 from docker.models.containers import Container
+from docker.errors import NotFound
 
 
 OUT_FOLDER = os.path.join(os.path.dirname(__file__), 'docker-out')
@@ -61,7 +61,14 @@ def copy_from(container: Container, src: str|list[str], dst=None):
         src = [src]
     
     for s in src:
-        bits, stat = container.get_archive(s)
+        try:
+            bits, stat = container.get_archive(s)
+            size = stat.get("size")
+            size = f'{size / 0x400:,.2f} KB' if size else ''
+            print(f'[^] Found file {s}\t{size}')
+        except NotFound as e:
+            print(f'[!] Could not find file {s}')
+            continue
 
         tar_buf = io.BytesIO()
         for chunk in bits:
@@ -72,7 +79,7 @@ def copy_from(container: Container, src: str|list[str], dst=None):
         with tarfile.open(fileobj=tar_buf, mode='r') as tar:
             tar.extractall(dirpath)
 
-    print(f'Files located at {os.path.abspath(dirpath)}')
+    print(f'[*] Files located at {os.path.abspath(dirpath)}')
 
 
 def parse_args():
