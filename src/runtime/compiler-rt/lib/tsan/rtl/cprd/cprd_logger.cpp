@@ -3,7 +3,6 @@
 #include "../tsan_symbolize.h"
 #include "cprd_logger.h"
 
-using namespace __tsan;
 
 namespace cprd {
 
