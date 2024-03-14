@@ -7,7 +7,6 @@
 #include "cprd_common.h"
 #include "cprd_array.h"
 
-using namespace __tsan;
 
 namespace cprd {
 

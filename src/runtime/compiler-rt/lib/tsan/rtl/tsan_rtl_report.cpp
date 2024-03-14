@@ -24,6 +24,7 @@
 #include "tsan_mman.h"
 #include "tsan_flags.h"
 #include "tsan_fd.h"
+#include "cprd/cprd_common.h"
 
 namespace __tsan {
 
@@ -497,6 +498,9 @@ static bool HandleRacyAddress(ThreadState *thr, uptr addr_min, uptr addr_max) {
 }
 
 bool OutputReport(ThreadState *thr, const ScopedReport &srep) {
+  if (!CPRD_REPORT_TSAN_RACE)
+    return false;
+
   if (!flags()->report_bugs || thr->suppress_reports)
     return false;
   atomic_store_relaxed(&ctx->last_symbolize_time_ns, NanoTime());

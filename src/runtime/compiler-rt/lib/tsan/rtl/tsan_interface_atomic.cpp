@@ -24,6 +24,7 @@
 #include "tsan_flags.h"
 #include "tsan_interface.h"
 #include "tsan_rtl.h"
+#include "cprd/cprd_common.h"
 
 using namespace __tsan;
 
@@ -493,7 +494,7 @@ class ScopedAtomic {
                morder mo, const char *func)
       : thr_(thr) {
     FuncEntry(thr_, pc);
-    DPrintf("#%d: %s(%p, %d)\n", thr_->tid, func, a, mo);
+    TRACE_LOG("#%d: %s(%p, %d) ATOMIC\n", thr_->tid, func, a, mo);
   }
   ~ScopedAtomic() {
     ProcessPendingSignals(thr_);

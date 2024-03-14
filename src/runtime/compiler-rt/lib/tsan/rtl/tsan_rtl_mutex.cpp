@@ -19,6 +19,7 @@
 #include "tsan_report.h"
 #include "tsan_symbolize.h"
 #include "tsan_platform.h"
+#include "cprd/cprd_common.h"
 
 namespace __tsan {
 
@@ -62,7 +63,7 @@ static void ReportMutexMisuse(ThreadState *thr, uptr pc, ReportType typ,
 }
 
 void MutexCreate(ThreadState *thr, uptr pc, uptr addr, u32 flagz) {
-  DPrintf("#%d: MutexCreate %zx flagz=0x%x\n", thr->tid, addr, flagz);
+  TRACE_LOG("#%d: MutexCreate %zx flagz=0x%x\n", thr->tid, addr, flagz);
   StatInc(thr, StatMutexCreate);
   if (!(flagz & MutexFlagLinkerInit) && IsAppMem(addr)) {
     CHECK(!thr->is_freeing);
@@ -78,7 +79,7 @@ void MutexCreate(ThreadState *thr, uptr pc, uptr addr, u32 flagz) {
 }
 
 void MutexDestroy(ThreadState *thr, uptr pc, uptr addr, u32 flagz) {
-  DPrintf("#%d: MutexDestroy %zx\n", thr->tid, addr);
+  TRACE_LOG("#%d: MutexDestroy %zx\n", thr->tid, addr);
   StatInc(thr, StatMutexDestroy);
   SyncVar *s = ctx->metamap.GetIfExistsAndLock(addr, true);
   if (s == 0)
@@ -140,7 +141,7 @@ void MutexDestroy(ThreadState *thr, uptr pc, uptr addr, u32 flagz) {
 }
 
 void MutexPreLock(ThreadState *thr, uptr pc, uptr addr, u32 flagz) {
-  DPrintf("#%d: MutexPreLock %zx flagz=0x%x\n", thr->tid, addr, flagz);
+  TRACE_LOG("#%d: MutexPreLock %zx flagz=0x%x\n", thr->tid, addr, flagz);
   if (!(flagz & MutexFlagTryLock) && common_flags()->detect_deadlocks) {
     SyncVar *s = ctx->metamap.GetOrCreateAndLock(thr, pc, addr, false);
     s->UpdateFlags(flagz);
@@ -156,7 +157,7 @@ void MutexPreLock(ThreadState *thr, uptr pc, uptr addr, u32 flagz) {
 }
 
 void MutexPostLock(ThreadState *thr, uptr pc, uptr addr, u32 flagz, int rec) {
-  DPrintf("#%d: MutexPostLock %zx flag=0x%x rec=%d\n",
+  TRACE_LOG("#%d: MutexPostLock %zx flag=0x%x rec=%d\n",
       thr->tid, addr, flagz, rec);
   if (flagz & MutexFlagRecursiveLock)
     CHECK_GT(rec, 0);
@@ -211,7 +212,7 @@ void MutexPostLock(ThreadState *thr, uptr pc, uptr addr, u32 flagz, int rec) {
 }
 
 int MutexUnlock(ThreadState *thr, uptr pc, uptr addr, u32 flagz) {
-  DPrintf("#%d: MutexUnlock %zx flagz=0x%x\n", thr->tid, addr, flagz);
+  TRACE_LOG("#%d: MutexUnlock %zx flagz=0x%x\n", thr->tid, addr, flagz);
   if (IsAppMem(addr))
     MemoryReadAtomic(thr, pc, addr, kSizeLog1);
   SyncVar *s = ctx->metamap.GetOrCreateAndLock(thr, pc, addr, true);
@@ -254,7 +255,7 @@ int MutexUnlock(ThreadState *thr, uptr pc, uptr addr, u32 flagz) {
 }
 
 void MutexPreReadLock(ThreadState *thr, uptr pc, uptr addr, u32 flagz) {
-  DPrintf("#%d: MutexPreReadLock %zx flagz=0x%x\n", thr->tid, addr, flagz);
+  TRACE_LOG("#%d: MutexPreReadLock %zx flagz=0x%x\n", thr->tid, addr, flagz);
   if (!(flagz & MutexFlagTryLock) && common_flags()->detect_deadlocks) {
     SyncVar *s = ctx->metamap.GetOrCreateAndLock(thr, pc, addr, false);
     s->UpdateFlags(flagz);
@@ -266,7 +267,7 @@ void MutexPreReadLock(ThreadState *thr, uptr pc, uptr addr, u32 flagz) {
 }
 
 void MutexPostReadLock(ThreadState *thr, uptr pc, uptr addr, u32 flagz) {
-  DPrintf("#%d: MutexPostReadLock %zx flagz=0x%x\n", thr->tid, addr, flagz);
+  TRACE_LOG("#%d: MutexPostReadLock %zx flagz=0x%x\n", thr->tid, addr, flagz);
   StatInc(thr, StatMutexReadLock);
   if (IsAppMem(addr))
     MemoryReadAtomic(thr, pc, addr, kSizeLog1);
@@ -306,7 +307,7 @@ void MutexPostReadLock(ThreadState *thr, uptr pc, uptr addr, u32 flagz) {
 }
 
 void MutexReadUnlock(ThreadState *thr, uptr pc, uptr addr) {
-  DPrintf("#%d: MutexReadUnlock %zx\n", thr->tid, addr);
+  TRACE_LOG("#%d: MutexReadUnlock %zx\n", thr->tid, addr);
   StatInc(thr, StatMutexReadUnlock);
   if (IsAppMem(addr))
     MemoryReadAtomic(thr, pc, addr, kSizeLog1);
@@ -338,7 +339,7 @@ void MutexReadUnlock(ThreadState *thr, uptr pc, uptr addr) {
 }
 
 void MutexReadOrWriteUnlock(ThreadState *thr, uptr pc, uptr addr) {
-  DPrintf("#%d: MutexReadOrWriteUnlock %zx\n", thr->tid, addr);
+  TRACE_LOG("#%d: MutexReadOrWriteUnlock %zx\n", thr->tid, addr);
   if (IsAppMem(addr))
     MemoryReadAtomic(thr, pc, addr, kSizeLog1);
   SyncVar *s = ctx->metamap.GetOrCreateAndLock(thr, pc, addr, true);
@@ -385,7 +386,7 @@ void MutexReadOrWriteUnlock(ThreadState *thr, uptr pc, uptr addr) {
 }
 
 void MutexRepair(ThreadState *thr, uptr pc, uptr addr) {
-  DPrintf("#%d: MutexRepair %zx\n", thr->tid, addr);
+  TRACE_LOG("#%d: MutexRepair %zx\n", thr->tid, addr);
   SyncVar *s = ctx->metamap.GetOrCreateAndLock(thr, pc, addr, true);
   s->owner_tid = SyncVar::kInvalidTid;
   s->recursion = 0;
@@ -393,7 +394,7 @@ void MutexRepair(ThreadState *thr, uptr pc, uptr addr) {
 }
 
 void MutexInvalidAccess(ThreadState *thr, uptr pc, uptr addr) {
-  DPrintf("#%d: MutexInvalidAccess %zx\n", thr->tid, addr);
+  TRACE_LOG("#%d: MutexInvalidAccess %zx\n", thr->tid, addr);
   SyncVar *s = ctx->metamap.GetOrCreateAndLock(thr, pc, addr, true);
   u64 mid = s->GetId();
   s->mtx.Unlock();
@@ -401,7 +402,7 @@ void MutexInvalidAccess(ThreadState *thr, uptr pc, uptr addr) {
 }
 
 void Acquire(ThreadState *thr, uptr pc, uptr addr) {
-  DPrintf("#%d: Acquire %zx\n", thr->tid, addr);
+  TRACE_LOG("#%d: Acquire %zx\n", thr->tid, addr);
   if (thr->ignore_sync)
     return;
   SyncVar *s = ctx->metamap.GetIfExistsAndLock(addr, false);
@@ -423,7 +424,7 @@ static void UpdateClockCallback(ThreadContextBase *tctx_base, void *arg) {
 }
 
 void AcquireGlobal(ThreadState *thr, uptr pc) {
-  DPrintf("#%d: AcquireGlobal\n", thr->tid);
+  TRACE_LOG("#%d: AcquireGlobal\n", thr->tid);
   if (thr->ignore_sync)
     return;
   ThreadRegistryLock l(ctx->thread_registry);
@@ -432,7 +433,7 @@ void AcquireGlobal(ThreadState *thr, uptr pc) {
 }
 
 void ReleaseStoreAcquire(ThreadState *thr, uptr pc, uptr addr) {
-  DPrintf("#%d: ReleaseStoreAcquire %zx\n", thr->tid, addr);
+  TRACE_LOG("#%d: ReleaseStoreAcquire %zx\n", thr->tid, addr);
   if (thr->ignore_sync)
     return;
   SyncVar *s = ctx->metamap.GetOrCreateAndLock(thr, pc, addr, true);
@@ -444,7 +445,7 @@ void ReleaseStoreAcquire(ThreadState *thr, uptr pc, uptr addr) {
 }
 
 void Release(ThreadState *thr, uptr pc, uptr addr) {
-  DPrintf("#%d: Release %zx\n", thr->tid, addr);
+  TRACE_LOG("#%d: Release %zx\n", thr->tid, addr);
   if (thr->ignore_sync)
     return;
   SyncVar *s = ctx->metamap.GetOrCreateAndLock(thr, pc, addr, true);
@@ -456,7 +457,7 @@ void Release(ThreadState *thr, uptr pc, uptr addr) {
 }
 
 void ReleaseStore(ThreadState *thr, uptr pc, uptr addr) {
-  DPrintf("#%d: ReleaseStore %zx\n", thr->tid, addr);
+  TRACE_LOG("#%d: ReleaseStore %zx\n", thr->tid, addr);
   if (thr->ignore_sync)
     return;
   SyncVar *s = ctx->metamap.GetOrCreateAndLock(thr, pc, addr, true);
@@ -478,7 +479,7 @@ static void UpdateSleepClockCallback(ThreadContextBase *tctx_base, void *arg) {
 }
 
 void AfterSleep(ThreadState *thr, uptr pc) {
-  DPrintf("#%d: AfterSleep %zx\n", thr->tid);
+  TRACE_LOG("#%d: AfterSleep %zx\n", thr->tid);
   if (thr->ignore_sync)
     return;
   thr->last_sleep_stack_id = CurrentStackId(thr, pc);

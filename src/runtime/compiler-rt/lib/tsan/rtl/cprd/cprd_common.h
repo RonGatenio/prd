@@ -5,7 +5,8 @@
 #include "cprd_config.h"
 #include "cprd_debug_logger.h"
 
+namespace cprd {
 using namespace __tsan;
-
+}
 
 #endif  // CPRD_COMMON_H
