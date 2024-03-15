@@ -924,7 +924,7 @@ llvmGetPassPluginInfo() {
         .PluginName = "PrdPass",
         .PluginVersion = LLVM_VERSION_STRING,
         .RegisterPassBuilderCallbacks = [](PassBuilder &PB) {
-          PB.registerPipelineEarlySimplificationEPCallback(
+          PB.registerOptimizerLastEPCallback(
             [](ModulePassManager &MPM, auto) {
               MPM.addPass(PrdModulePass());
               MPM.addPass(createModuleToFunctionPassAdaptor(PrdFunctionPass()));
