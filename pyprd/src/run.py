@@ -34,7 +34,7 @@ def main():
         trace = TraceParser.from_file(args.trace)
 
     with timeit('hbg build'):
-        hbg = trace.to_hbg(filter_volatile_nodes=True)
+        hbg = trace.to_hbg(filter_volatile_nodes=False)
 
     with timeit('hbg stats'):
         print(hbg.stats(True))
@@ -85,8 +85,11 @@ def main():
     print('')
     
     tops = [
-        "main test.cpp",
-        "main::$_1::operator()(int, int) const test.cpp:",
+        "main ",
+        "main::$_0::operator()(int, int) const",
+        "main::$_1::operator()(int, int) const",
+        'main::$_0::operator()(int, int, int) const'
+        'main::$_1::operator()(int, int, int) const'
     ]
     
     with timeit('print races'):
