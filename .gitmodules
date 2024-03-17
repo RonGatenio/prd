@@ -8,5 +8,5 @@
 	path = benchmarks/RECIPE
 	url = https://github.com/RonGatenio/RECIPE.git
 [submodule "src/deps/dg"]
-	path = src/deps/dg
+	path = instrumentation/deps/dg
 	url = https://github.com/RonGatenio/dg.git
