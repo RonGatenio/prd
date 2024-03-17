@@ -224,12 +224,16 @@ ALWAYS_INLINE u64 ThreadClock::get(unsigned tid) const {
 
 ALWAYS_INLINE void ThreadClock::set(u64 v) {
   DCHECK_GE(v, clk_[tid_]);
-  Printf("%d:EPOC_INC:%d:%d\n", tid_, clk_[tid_], v);
+
+  if (clk_[tid_] != v) {
+    Printf("%d:EPOC_INC:%d:%d  # ThreadClock::set(u64)\n", tid_, clk_[tid_], v);
+  }
+
   clk_[tid_] = v;
 }
 
 ALWAYS_INLINE void ThreadClock::tick() {
-  Printf("%d:EPOC_INC:%d:%d\n", tid_, clk_[tid_], clk_[tid_]+1);
+  Printf("%d:EPOC_INC:%d:%d  # ThreadClock::tick()\n", tid_, clk_[tid_], clk_[tid_]+1);
   clk_[tid_]++;
 }
 

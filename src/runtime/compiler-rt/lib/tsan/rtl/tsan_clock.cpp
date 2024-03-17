@@ -153,14 +153,11 @@ void ThreadClock::acquire(ClockCache *c, SyncClock *src) {
     unsigned tid = dirty.tid;
     if (tid != kInvalidTid) {
       if (clk_[tid] < dirty.epoch) {
-        if (clk_[tid] != dirty.epoch && tid_ != tid)
-        {
+
+        if (tid_ != tid) {
           Printf("%d:HB_EDGE:%d:%d:%d:%d  # ThreadClock::acquire 1\n", tid_, tid, dirty.epoch, tid_, clk_[tid_]);
         }
-        else
-        {
-          Printf("# %d:HB_EDGE:%d:%d:%d:%d  # ThreadClock::acquire 1\n", tid_, tid, dirty.epoch, tid_, clk_[tid_]);
-        }
+
         clk_[tid] = dirty.epoch;
         acquired = true;
       }
@@ -173,22 +170,21 @@ void ThreadClock::acquire(ClockCache *c, SyncClock *src) {
     CPP_STAT_INC(StatClockAcquireFull);
     nclk_ = max(nclk_, nclk);
     u64 *dst_pos = &clk_[0];
-    unsigned int i = 0;
+    
+    unsigned tid = 0;
+    
     for (ClockElem &src_elem : *src) {
       u64 epoch = src_elem.epoch;
       if (*dst_pos < epoch) {
-        if (clk_[i] != epoch && tid_ != i)
-        {
-          Printf("%d:HB_EDGE:%d:%d:%d:%d  # ThreadClock::acquire 2\n", tid_, i, epoch, tid_, clk_[tid_]);
+
+        if (tid_ != tid) {
+          Printf("%d:HB_EDGE:%d:%d:%d:%d  # ThreadClock::acquire 2 (full)\n", tid_, tid, epoch, tid_, clk_[tid_]);
         }
-        else
-        {
-          Printf("# %d:HB_EDGE:%d:%d:%d:%d  # ThreadClock::acquire 2\n", tid_, i, epoch, tid_, clk_[tid_]);
-        }
+
         *dst_pos = epoch;
         acquired = true;
       }
-      i++;
+      tid++;
       dst_pos++;
     }
 
@@ -241,6 +237,7 @@ void ThreadClock::releaseStoreAcquire(ClockCache *c, SyncClock *sc) {
       clk_[i] = ce.epoch;
       acquired = true;
     }
+
     ce.epoch = tmp;
     ce.reused = 0;
     i++;
@@ -440,14 +437,13 @@ bool ThreadClock::HasAcquiredAfterRelease(const SyncClock *dst) const {
 void ThreadClock::set(ClockCache *c, unsigned tid, u64 v) {
   DCHECK_LT(tid, kMaxTid);
   DCHECK_GE(v, clk_[tid]);
-  if (clk_[tid] != v && tid_ != tid)
-  {
-    Printf("%d:HB_EDGE:%d:%d:%d:%d  # ThreadClock::set\n", tid_, tid, v, tid_, clk_[tid_]);
+
+  if (tid_ == tid) {
+    Printf("%d:EPOC_INC:%d:%d  # ThreadClock::set(ClockCache*, unsigned, u64)\n", tid_, clk_[tid_], v);
+  } else if (clk_[tid] != v) {
+    Printf("%d:HB_EDGE:%d:%d:%d:%d  # ThreadClock::set(ClockCache*, unsigned, u64)\n", tid_, tid, v, tid_, clk_[tid_]);
   }
-  else
-  {
-    Printf("# %d:HB_EDGE:%d:%d:%d:%d  # ThreadClock::set\n", tid_, tid, v, tid_, clk_[tid_]);
-  }
+
   clk_[tid] = v;
   if (nclk_ <= tid)
     nclk_ = tid + 1;
