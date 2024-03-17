@@ -1,5 +1,5 @@
 import pytest
-from epoch import Epoch
+from pyprd.epoch import Epoch
 
 
 def test_compare():

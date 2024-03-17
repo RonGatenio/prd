@@ -1,13 +1,13 @@
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Dict, Generator, List, Set, Tuple
-from nodes import AbstractNode, NodeType, ReadNode, WriteNode, FlushNode, EpochNode
-from trace_event_info import TraceEventInfo
-from vector_clock import PersistencyVectorClock, ReversedVectorClock
-from hbg import HBG
-from pdg import PDG
-import utils
 import logging
+from .nodes import AbstractNode, NodeType, ReadNode, WriteNode, FlushNode, EpochNode
+from .trace_event_info import TraceEventInfo
+from .vector_clock import PersistencyVectorClock, ReversedVectorClock
+from .hbg import HBG
+from .pdg import PDG
+from . import utils
 
 
 logger = logging.getLogger(__name__)
@@ -25,7 +25,9 @@ class PersistencyRace:
     read_node: ReadNode
     write_node: WriteNode
     dependent_node: WriteNode
-    validate: bool = True
+    is_write_hb_read: bool|None = field(default=None, compare=False, repr=False)
+    is_write_hb_dependent: bool|None = field(default=None, compare=False, repr=False)
+    validate: bool = field(default=True, compare=False, repr=False)
 
     def __post_init__(self):
         if self.validate:
@@ -58,8 +60,18 @@ class PersistencyRaces:
         self._races:                Set[PersistencyRace]                       = set()
         self._races_by_pc:          Dict[int, Dict[int, Set[PersistencyRace]]] = defaultdict(lambda: defaultdict(set))
         self._races_by_pc_tstate:   Dict[int, Dict[int, Set[str]]]             = defaultdict(lambda: defaultdict(set))
+        self._races_by_pc_wx_hb_wy: Dict[int, Dict[int, Set[str]]]             = defaultdict(lambda: defaultdict(set))
         self._races_by_info:        Dict[int, Dict[int, Set[PersistencyRace]]] = defaultdict(lambda: defaultdict(set))
         self._races_by_info_tstate: Dict[int, Dict[int, Set[str]]]             = defaultdict(lambda: defaultdict(set))
+        self._races_by_info_wx_hb_wy: Dict[int, Dict[int, Set[str]]]             = defaultdict(lambda: defaultdict(set))
+    
+    @staticmethod
+    def _get_race_id_by_pc(race: PersistencyRace):
+        return race.read_node.pc, race.write_node.pc
+    
+    @staticmethod
+    def _get_race_id_by_info(race: PersistencyRace):
+        return race.read_node.info, race.write_node.info
 
     @property
     def races(self):
@@ -75,6 +87,7 @@ class PersistencyRaces:
 
     def add_race(self, race: PersistencyRace):
         tstate = 'inter' if race.is_inter() else 'intra'
+        wx_hb_wy = 'W(X)->W(Y)' if race.is_write_hb_dependent else 'W(X)|W(Y)'
         
         self._races.add(race)
 
@@ -82,11 +95,13 @@ class PersistencyRaces:
         write_already_saved = race.write_node.pc in self._races_by_pc[race.read_node.pc]
         self._races_by_pc[race.read_node.pc][race.write_node.pc].add(race)
         self._races_by_pc_tstate[race.read_node.pc][race.write_node.pc].add(tstate)
+        self._races_by_pc_wx_hb_wy[race.read_node.info][race.write_node.info].add(wx_hb_wy)
         
         read_already_saved  = race.read_node.info  in self._races_by_info
         write_already_saved = race.write_node.info in self._races_by_info[race.read_node.info]
         self._races_by_info[race.read_node.info][race.write_node.info].add(race)
         self._races_by_info_tstate[race.read_node.info][race.write_node.info].add(tstate)
+        self._races_by_info_wx_hb_wy[race.read_node.info][race.write_node.info].add(wx_hb_wy)
 
     def clear(self):
         self._races.clear()
@@ -113,7 +128,7 @@ class PersistencyRaces:
     def race_nodes_by_read_info(self) -> Generator[Tuple[int, ReadNode, WriteNode, Set[WriteNode]], None, None]:
         return self.races_iterator(self._races_by_info)
     
-    def to_str(self, callstack_top: str | List[str] | None = None, group_by_info=True):
+    def to_str(self, callstack_top: str | List[str] | None = None, group_by_info=True, trace_lines=False):
         all_lines = []
         
         def node_to_str(node: ReadNode | WriteNode, indent: int = 0) -> str:
@@ -124,6 +139,7 @@ class PersistencyRaces:
         races = self.race_nodes_by_read_info() if group_by_info else self.race_nodes_by_read_pc()
         races_by_group = self._races_by_info if group_by_info else self._races_by_pc
         races_by_group_tsate = self._races_by_info_tstate if group_by_info else self._races_by_pc_tstate
+        races_by_group_wx_hb_wy = self._races_by_info_wx_hb_wy if group_by_info else self._races_by_pc_wx_hb_wy
 
         for i, read_node, dependent_node, write_nodes in races:
             lines = [
@@ -139,10 +155,14 @@ class PersistencyRaces:
 
                 frequency = len(_all_races) / len(self._races)
                 tstate = ",".join(races_by_group_tsate[read_id][write_id])
+                wx_hb_wy = ",".join(races_by_group_wx_hb_wy[read_id][write_id])
                 
-                trace_lines = ', '.join(sorted({f'(W {r.write_node.trace_line_number}, R {r.read_node.trace_line_number})' for r in _all_races}))
+                _trace_lines = ''
+                if trace_lines:
+                    _trace_lines = ', '.join(sorted({f'(W {r.write_node.trace_line_number}, R {r.read_node.trace_line_number})' for r in _all_races}))
+                    _trace_lines = f'\n    {_trace_lines}\n'
                 
-                lines.append(f'    W(X) {100*frequency:3.2f}% {len(_all_races):3}/{len(self._races)} ({tstate}): {node_to_str(write_node, indent=4)}\n    {trace_lines}\n')
+                lines.append(f'    W(X) {100*frequency:3.2f}% {len(_all_races):3}/{len(self._races)} ({tstate}) ({wx_hb_wy}): {node_to_str(write_node, indent=4)}{_trace_lines}')
 
             all_lines.append('\n'.join(lines))
 
@@ -173,6 +193,8 @@ class PersistencyRaceDetector:
 
         self._time_first_stage  = None
         self._time_second_stage = None
+        
+        self._race_counter_dropped_by_read_persistency = 0
 
     def stats(self) -> str:
         lines = []
@@ -269,6 +291,7 @@ class PersistencyRaceDetector:
             # If the read is persisted, not a bug
             if not self._ignore_read_node_persistency and not self._ignore_persisted_before_index:
                 if pvc.is_event_persisted(*loc):
+                    self._race_counter_dropped_by_read_persistency += 1
                     continue
 
             # Find bugs
@@ -304,8 +327,15 @@ class PersistencyRaceDetector:
                             break
 
                     # It is a bug! Report it!
-                    race = PersistencyRace(read_node, write_node, dependent_node)
+                    race = PersistencyRace(read_node, write_node, dependent_node,
+                                           is_write_hb_dependent=pvc.is_event_happened_before(*write_node_loc))
                     self._races.add_race(race)
+                    
+                    # if (240227, 245017) == (race.write_node.trace_line_number, race.read_node.trace_line_number):
+                    #     print(f'Found my race. is race: {self.is_bug(race)}')
+                    #     import ipdb; ipdb.set_trace()
+                    #     pass
+                    
                     yield race
 
                     if self._show_only_first_bug_in_thread:

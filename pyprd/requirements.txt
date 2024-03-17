@@ -2,7 +2,8 @@ intervaltree
 # print-dict
 networkx
 # matplotlib
-# alive-progress
 # ncls            # https://github.com/biocore-ntnu/ncls cite:https://academic.oup.com/bioinformatics/article/36/3/918/5543103
 # numba
 lief
+alive-progress
+about-time

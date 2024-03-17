@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
+import re
 from typing import Sequence, List
-from symbolizer import Symbolizer, Symbol
+from .symbolizer import Symbolizer, Symbol
 
 
 @dataclass(frozen=True)
@@ -31,7 +32,7 @@ class TraceEventInfo:
 
         if callstack_top_func:
             for i, l in reversed(list(enumerate(callstack))):
-                if any((f in l for f in callstack_top_func)):
+                if any((re.search(pattern, l) for pattern in callstack_top_func)):
                     callstack_limit = min(i+1, callstack_limit)
                     break
 

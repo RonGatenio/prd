@@ -1,9 +1,9 @@
 import pytest
-from nodes import EpochNode, NodeType
-from prd import PersistencyRace, PersistencyRaceDetector
-from pdg import PDG, PDGBuilder, generate_mock_pdg_v2
-from hbg import HBG, HBGBuilder
-from vector_clock import VectorClock
+from pyprd.nodes import EpochNode, NodeType
+from pyprd.prd import PersistencyRace, PersistencyRaceDetector
+from pyprd.pdg import PDG, PDGBuilder, generate_mock_pdg_v2
+from pyprd.hbg import HBG, HBGBuilder
+from pyprd.vector_clock import VectorClock
 
 
 def add_edge(b: HBGBuilder, e1: EpochNode, e2: EpochNode):

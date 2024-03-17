@@ -1,8 +1,8 @@
-from hbg_trace_parser import TraceParser
-from pdg import generate_mock_pdg_v2
-from prd import PersistencyRaceDetector
-from utils import timeit
 import argparse
+from .hbg_trace_parser import TraceParser
+from .pdg import generate_mock_pdg_v2
+from .prd import PersistencyRaceDetector
+from .utils import timeit
 
 
 def run(hbg, pdg,
@@ -74,26 +74,23 @@ def main():
     #     ignore_read_node_persistency=True,
     #     show_only_first_bug_in_thread=False)
     
-    # run(hbg, pdg,
-    #     ignore_inter_thread_edges=True,
-    #     ignore_flush_nodes=True,
-    #     ignore_persisted_before_index=True,
-    #     ignore_happens_after_index=True,
-    #     ignore_read_node_persistency=True,
-    #     show_only_first_bug_in_thread=False)
+    run(hbg, pdg,
+        ignore_inter_thread_edges=True,
+        ignore_flush_nodes=True,
+        ignore_persisted_before_index=True,
+        ignore_happens_after_index=True,
+        ignore_read_node_persistency=True,
+        show_only_first_bug_in_thread=False)
 
     print('')
     
     tops = [
-        "main ",
-        "main::$_0::operator()(int, int) const",
-        "main::$_1::operator()(int, int) const",
-        'main::$_0::operator()(int, int, int) const'
-        'main::$_1::operator()(int, int, int) const'
+        r"main::\$_\d+::operator\(\)\(int, int(, int)?\) const",
+        # r'std::function<std::unique_ptr<std::__future_base::_Result_base, std::__future_base::_Result_base::_Deleter>',
     ]
     
     with timeit('print races'):
-        print(prd.races.to_str(callstack_top=tops))
+        print(prd.races.to_str(callstack_top=tops, trace_lines=True))
 
 
 if __name__ == "__main__":

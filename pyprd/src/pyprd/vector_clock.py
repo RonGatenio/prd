@@ -1,6 +1,6 @@
 from collections import defaultdict
 from typing import Dict
-from epoch import Epoch, ReversedEpoch
+from .epoch import Epoch, ReversedEpoch
 
 
 ThreadId = int
@@ -86,6 +86,9 @@ class PersistencyVectorClock:
         self._last_seen.merge(other._last_seen)
         self._last_persisted.merge(other._last_persisted)
 
+    def is_event_happened_before(self, tid: ThreadId, epoch: Epoch) -> bool:
+        return self._last_seen.is_happens_before(tid, epoch)
+    
     def get_persisted_epoch(self, tid: ThreadId) -> int | None:
         return self._last_persisted.get_epoch(tid)
     

@@ -1,5 +1,5 @@
 import pytest
-from vector_clock import VectorClock, PersistencyVectorClock
+from pyprd.vector_clock import VectorClock, PersistencyVectorClock
 
 
 def test_sanity():

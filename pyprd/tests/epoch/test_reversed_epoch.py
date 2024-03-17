@@ -1,4 +1,4 @@
-from epoch import ReversedEpoch
+from pyprd.epoch import ReversedEpoch
 
 
 def test_compare():
