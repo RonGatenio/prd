@@ -86,10 +86,8 @@ RUN ./compile.sh
 RUN ./run.sh ; exit 0
 RUN cp *.trace /app/traces
 
-WORKDIR /app/pyprd/src
-
-RUN python3 run.py /app/traces/pclht.trace          > /app/races/pclht.races
-RUN python3 run.py /app/traces/pclht-recovery.trace > /app/races/pclht-recovery.races
+RUN pycprd /app/traces/pclht.trace          > /app/races/pclht.races
+RUN pycprd /app/traces/pclht-recovery.trace > /app/races/pclht-recovery.races
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # CCEH (Cacheline-Concious Extendible Hashing)
@@ -101,10 +99,8 @@ RUN ./compile.sh
 RUN ./run_pmdk.sh ; exit 0
 RUN cp *.trace /app/traces
 
-WORKDIR /app/pyprd/src
-
-RUN python3 run.py /app/traces/multi_threaded_cceh.trace          > /app/races/cceh.races
-RUN python3 run.py /app/traces/multi_threaded_cceh-recovery.trace > /app/races/cceh-recovery.races
+RUN pycprd /app/traces/multi_threaded_cceh.trace          > /app/races/cceh.races
+RUN pycprd /app/traces/multi_threaded_cceh-recovery.trace > /app/races/cceh-recovery.races
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # FAST-FAIR (Failure-Atomic ShifT(FAST) and Failure-Atomic In-place Rebalancing(FAIR))
@@ -116,12 +112,10 @@ RUN ./compile_pmdk.sh
 RUN ./run_pmdk.sh ; exit 0
 RUN cp *.trace /app/traces
 
-WORKDIR /app/pyprd/src
-
-RUN python3 run.py /app/traces/fast-fair-pmdk.trace                > /app/races/fastfair.races
-# RUN python3 run.py /app/traces/fast-fair-pmdk-recovery.trace       > /app/races/fastfair-recovery.races
-RUN python3 run.py /app/traces/fast-fair-pmdk-mixed.trace          > /app/races/fastfair-mixed.races
-# RUN python3 run.py /app/traces/fast-fair-pmdk-mixed-recovery.trace > /app/races/fastfair-mixed-recovery.races
+RUN pycprd /app/traces/fast-fair-pmdk.trace                > /app/races/fastfair.races
+# RUN pycprd /app/traces/fast-fair-pmdk-recovery.trace       > /app/races/fastfair-recovery.races
+RUN pycprd /app/traces/fast-fair-pmdk-mixed.trace          > /app/races/fastfair-mixed.races
+# RUN pycprd /app/traces/fast-fair-pmdk-mixed-recovery.trace > /app/races/fastfair-mixed-recovery.races
 
 
 #####################################################################
