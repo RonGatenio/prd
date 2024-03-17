@@ -21,7 +21,7 @@ setup(
     install_requires=requirements,
     entry_points={
         "console_scripts": [
-            "pycprd = pyprd.run:main",
+            f"{NAME} = pycprd.run:main",
         ],
     },
 )

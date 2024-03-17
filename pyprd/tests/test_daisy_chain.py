@@ -1,6 +1,6 @@
 import pytest
-from pyprd.hbg import DaisyChain, DaisyChains
-from pyprd.nodes import WriteNode, ReadNode
+from pycprd.hbg import DaisyChain, DaisyChains
+from pycprd.nodes import WriteNode, ReadNode
 
 
 def test_daisy_chain():

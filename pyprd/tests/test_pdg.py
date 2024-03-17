@@ -1,5 +1,5 @@
-from pyprd.pdg import generate_mock_pdg_v2
-from pyprd.hbg import HBGBuilder
+from pycprd.pdg import generate_mock_pdg_v2
+from pycprd.hbg import HBGBuilder
 
 
 def test_mock_builder():

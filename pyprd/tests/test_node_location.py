@@ -1,5 +1,5 @@
 import pytest
-from pyprd.hbg import NodeLocation
+from pycprd.hbg import NodeLocation
 
 
 def test_compare_none():
