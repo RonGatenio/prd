@@ -18,6 +18,7 @@ setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     packages=find_packages(where="src"),
+    package_dir={"": "src"},
     install_requires=requirements,
     entry_points={
         "console_scripts": [
