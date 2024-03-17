@@ -155,6 +155,7 @@ private:
   static const size_t kNumberOfAccessSizes = 5;
   FunctionCallee TsanRead[kNumberOfAccessSizes];
   FunctionCallee TsanWrite[kNumberOfAccessSizes];
+  FunctionCallee TsanNonTemporalWrite[kNumberOfAccessSizes];
   FunctionCallee TsanUnalignedRead[kNumberOfAccessSizes];
   FunctionCallee TsanUnalignedWrite[kNumberOfAccessSizes];
   FunctionCallee TsanVolatileRead[kNumberOfAccessSizes];
@@ -274,6 +275,10 @@ void ThreadSanitizer::initialize(Module &M) {
     SmallString<32> WriteName("__tsan_write" + ByteSizeStr);
     TsanWrite[i] = M.getOrInsertFunction(WriteName, Attr, IRB.getVoidTy(),
                                          IRB.getInt8PtrTy());
+
+    SmallString<32> NonTemporalWriteName("__tsan_nontemporal_write" + ByteSizeStr);
+    TsanNonTemporalWrite[i] = M.getOrInsertFunction(NonTemporalWriteName, Attr, IRB.getVoidTy(),
+                                                    IRB.getInt8PtrTy());
 
     SmallString<64> UnalignedReadName("__tsan_unaligned_read" + ByteSizeStr);
     TsanUnalignedRead[i] = M.getOrInsertFunction(
@@ -683,6 +688,7 @@ bool ThreadSanitizer::instrumentLoadOrStore(const InstructionInfo &II,
   Value *Addr = IsWrite ? cast<StoreInst>(II.Inst)->getPointerOperand()
                         : cast<LoadInst>(II.Inst)->getPointerOperand();
   Type *OrigTy = getLoadStoreType(II.Inst);
+  const bool IsNonTemporal = IsWrite ? cast<StoreInst>(II.Inst)->getMetadata(LLVMContext::MD_nontemporal) != nullptr : false;
 
   // swifterror memory addresses are mem2reg promoted by instruction selection.
   // As such they cannot have regular uses like an instrumentation function and
@@ -734,6 +740,8 @@ bool ThreadSanitizer::instrumentLoadOrStore(const InstructionInfo &II,
       OnAccessFunc = TsanCompoundRW[Idx];
     else if (IsVolatile)
       OnAccessFunc = IsWrite ? TsanVolatileWrite[Idx] : TsanVolatileRead[Idx];
+    else if (IsNonTemporal && IsWrite)
+      OnAccessFunc = TsanNonTemporalWrite[Idx];
     else
       OnAccessFunc = IsWrite ? TsanWrite[Idx] : TsanRead[Idx];
   } else {
@@ -742,6 +750,8 @@ bool ThreadSanitizer::instrumentLoadOrStore(const InstructionInfo &II,
     else if (IsVolatile)
       OnAccessFunc = IsWrite ? TsanUnalignedVolatileWrite[Idx]
                              : TsanUnalignedVolatileRead[Idx];
+    else if (IsNonTemporal && IsWrite)
+      OnAccessFunc = TsanNonTemporalWrite[Idx];
     else
       OnAccessFunc = IsWrite ? TsanUnalignedWrite[Idx] : TsanUnalignedRead[Idx];
   }

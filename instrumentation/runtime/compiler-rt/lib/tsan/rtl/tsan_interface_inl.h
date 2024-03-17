@@ -49,6 +49,22 @@ void __tsan_write8(void *addr) {
   MemoryWrite(cur_thread(), CALLERPC, (uptr)addr, kSizeLog8);
 }
 
+void __tsan_nontemporal_write1(void *addr) {
+  MemoryNonTemporalWrite(cur_thread(), CALLERPC, (uptr)addr, kSizeLog1);
+}
+
+void __tsan_nontemporal_write2(void *addr) {
+  MemoryNonTemporalWrite(cur_thread(), CALLERPC, (uptr)addr, kSizeLog2);
+}
+
+void __tsan_nontemporal_write4(void *addr) {
+  MemoryNonTemporalWrite(cur_thread(), CALLERPC, (uptr)addr, kSizeLog4);
+}
+
+void __tsan_nontemporal_write8(void *addr) {
+  MemoryNonTemporalWrite(cur_thread(), CALLERPC, (uptr)addr, kSizeLog8);
+}
+
 void __tsan_read1_pc(void *addr, void *pc) {
   MemoryRead(cur_thread(), (uptr)pc, (uptr)addr, kSizeLog1);
 }

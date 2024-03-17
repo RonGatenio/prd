@@ -652,12 +652,12 @@ static inline bool HappensBefore(Shadow old, ThreadState *thr) {
 ALWAYS_INLINE
 void MemoryAccessImpl1(ThreadState *thr, uptr addr,
     int kAccessSizeLog, bool kAccessIsWrite, bool kIsAtomic,
-    u64 *shadow_mem, Shadow cur, uptr pc) {
+    u64 *shadow_mem, Shadow cur, uptr pc, bool kIsNonTemporal = false) {
   StatInc(thr, StatMop);
   StatInc(thr, kAccessIsWrite ? StatMopWrite : StatMopRead);
   StatInc(thr, (StatType)(StatMop1 + kAccessSizeLog));
 
-  if (cprd::Cprd::s_get_instance().is_pm_address(addr)) {
+  if (cprd::Cprd::s_get_instance().is_pm_address(addr) && !kIsNonTemporal) {
     InternalScopedString res(2 * GetPageSizeCached());
 
     res.append("%d:%s:%p:%p:%d:", 
@@ -845,7 +845,7 @@ bool ContainsSameAccess(u64 *s, u64 a, u64 sync_epoch, bool is_write) {
 
 ALWAYS_INLINE USED
 void MemoryAccess(ThreadState *thr, uptr pc, uptr addr,
-    int kAccessSizeLog, bool kAccessIsWrite, bool kIsAtomic) {
+    int kAccessSizeLog, bool kAccessIsWrite, bool kIsAtomic, bool kIsNonTemporal) {
   u64 *shadow_mem = (u64*)MemToShadow(addr);
 
   DPrintf2("#%d: MemoryAccess: @%p %p size=%d"
@@ -906,14 +906,14 @@ void MemoryAccess(ThreadState *thr, uptr pc, uptr addr,
   }
 
   MemoryAccessImpl1(thr, addr, kAccessSizeLog, kAccessIsWrite, kIsAtomic,
-      shadow_mem, cur, pc);
+      shadow_mem, cur, pc, kIsNonTemporal);
 }
 
 // Called by MemoryAccessRange in tsan_rtl_thread.cpp
 ALWAYS_INLINE USED
 void MemoryAccessImpl(ThreadState *thr, uptr addr,
     int kAccessSizeLog, bool kAccessIsWrite, bool kIsAtomic,
-    u64 *shadow_mem, Shadow cur, uptr pc) {
+    u64 *shadow_mem, Shadow cur, uptr pc, bool kIsNonTemporal) {
   if (LIKELY(ContainsSameAccess(shadow_mem, cur.raw(),
       thr->fast_synch_epoch, kAccessIsWrite))) {
     StatInc(thr, StatMop);
@@ -924,7 +924,7 @@ void MemoryAccessImpl(ThreadState *thr, uptr addr,
   }
 
   MemoryAccessImpl1(thr, addr, kAccessSizeLog, kAccessIsWrite, kIsAtomic,
-      shadow_mem, cur, pc);
+      shadow_mem, cur, pc, kIsNonTemporal);
 }
 
 static void MemoryRangeSet(ThreadState *thr, uptr pc, uptr addr, uptr size,

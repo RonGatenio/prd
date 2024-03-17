@@ -724,10 +724,10 @@ void OnUserAlloc(ThreadState *thr, uptr pc, uptr p, uptr sz, bool write);
 void OnUserFree(ThreadState *thr, uptr pc, uptr p, bool write);
 
 void MemoryAccess(ThreadState *thr, uptr pc, uptr addr,
-    int kAccessSizeLog, bool kAccessIsWrite, bool kIsAtomic);
+    int kAccessSizeLog, bool kAccessIsWrite, bool kIsAtomic, bool kIsNonTemporal = false);
 void MemoryAccessImpl(ThreadState *thr, uptr addr,
     int kAccessSizeLog, bool kAccessIsWrite, bool kIsAtomic,
-    u64 *shadow_mem, Shadow cur, uptr pc);
+    u64 *shadow_mem, Shadow cur, uptr pc, bool kIsNonTemporal = false);
 void MemoryAccessRange(ThreadState *thr, uptr pc, uptr addr,
     uptr size, bool is_write);
 void MemoryAccessRangeStep(ThreadState *thr, uptr pc, uptr addr,
@@ -751,6 +751,11 @@ void ALWAYS_INLINE MemoryRead(ThreadState *thr, uptr pc,
 void ALWAYS_INLINE MemoryWrite(ThreadState *thr, uptr pc,
                                       uptr addr, int kAccessSizeLog) {
   MemoryAccess(thr, pc, addr, kAccessSizeLog, true, false);
+}
+
+void ALWAYS_INLINE MemoryNonTemporalWrite(ThreadState *thr, uptr pc,
+                                      uptr addr, int kAccessSizeLog) {
+  MemoryAccess(thr, pc, addr, kAccessSizeLog, true, false, true);
 }
 
 void ALWAYS_INLINE MemoryReadAtomic(ThreadState *thr, uptr pc,

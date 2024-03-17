@@ -46,6 +46,12 @@ SANITIZER_INTERFACE_ATTRIBUTE void __tsan_write4(void *addr);
 SANITIZER_INTERFACE_ATTRIBUTE void __tsan_write8(void *addr);
 SANITIZER_INTERFACE_ATTRIBUTE void __tsan_write16(void *addr);
 
+SANITIZER_INTERFACE_ATTRIBUTE void __tsan_nontemporal_write1(void *addr);
+SANITIZER_INTERFACE_ATTRIBUTE void __tsan_nontemporal_write2(void *addr);
+SANITIZER_INTERFACE_ATTRIBUTE void __tsan_nontemporal_write4(void *addr);
+SANITIZER_INTERFACE_ATTRIBUTE void __tsan_nontemporal_write8(void *addr);
+SANITIZER_INTERFACE_ATTRIBUTE void __tsan_nontemporal_write16(void *addr);
+
 SANITIZER_INTERFACE_ATTRIBUTE void __tsan_unaligned_read2(const void *addr);
 SANITIZER_INTERFACE_ATTRIBUTE void __tsan_unaligned_read4(const void *addr);
 SANITIZER_INTERFACE_ATTRIBUTE void __tsan_unaligned_read8(const void *addr);
