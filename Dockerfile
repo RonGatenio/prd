@@ -29,7 +29,7 @@ ENV PATH /usr/lib/llvm-${LLVM_VERSION}/bin:$PATH
 RUN ln -s /usr/include/llvm-${LLVM_VERSION} /usr/include/llvm
 RUN ln -s /usr/include/llvm-c-${LLVM_VERSION} /usr/include/llvm-c
 
-RUN echo . /app/src/scripts/setup-env.sh >> ~/.bashrc
+RUN echo . /app/instrumentation/scripts/setup-env.sh >> ~/.bashrc
 
 
 #####################################################################
@@ -41,7 +41,7 @@ FROM setup AS build
 # Create a working directory
 WORKDIR /app
 
-# Copy src folder to container
+# Copy instrumentation folder to container
 COPY instrumentation /app/instrumentation
 
 # Build pass and runtime lib
@@ -70,11 +70,17 @@ COPY --from=build /app /app
 # Copy benchmarks folder
 COPY benchmarks /app/benchmarks
 
-# Make traces folder
-RUN mkdir -p /app/traces
+# Make results compilations folder
+ENV CPRD_RESULTS_BIN /app/results/bin
+RUN mkdir -p ${CPRD_RESULTS_BIN}
 
-# Make races folder
-RUN mkdir -p /app/races
+# Make results traces folder
+ENV CPRD_RESULTS_TRACES /app/results/traces
+RUN mkdir -p ${CPRD_RESULTS_TRACES}
+
+# Make results races folder
+ENV CPRD_RESULTS_RACES /app/results/races
+RUN mkdir -p ${CPRD_RESULTS_RACES}
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # RECIPE (Converting Concurrent DRAM Indexes to Persistent-Memory Indexes)
@@ -84,10 +90,10 @@ WORKDIR /app/benchmarks/RECIPE
 RUN dos2unix *.sh
 RUN ./compile.sh
 RUN ./run.sh ; exit 0
-RUN cp *.trace /app/traces
+RUN cp *.trace ${CPRD_RESULTS_TRACES}
 
-RUN pycprd /app/traces/pclht.trace          > /app/races/pclht.races
-RUN pycprd /app/traces/pclht-recovery.trace > /app/races/pclht-recovery.races
+RUN pycprd ${CPRD_RESULTS_TRACES}/pclht.trace          > ${CPRD_RESULTS_RACES}/pclht.races
+# RUN pycprd ${CPRD_RESULTS_TRACES}/pclht-recovery.trace > ${CPRD_RESULTS_RACES}/pclht-recovery.races
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # CCEH (Cacheline-Concious Extendible Hashing)
@@ -97,10 +103,10 @@ WORKDIR /app/benchmarks/CCEH
 RUN dos2unix *.sh
 RUN ./compile.sh
 RUN ./run_pmdk.sh ; exit 0
-RUN cp *.trace /app/traces
+RUN cp *.trace ${CPRD_RESULTS_TRACES}
 
-RUN pycprd /app/traces/multi_threaded_cceh.trace          > /app/races/cceh.races
-RUN pycprd /app/traces/multi_threaded_cceh-recovery.trace > /app/races/cceh-recovery.races
+RUN pycprd ${CPRD_RESULTS_TRACES}/multi_threaded_cceh.trace          > ${CPRD_RESULTS_RACES}/cceh.races
+# RUN pycprd ${CPRD_RESULTS_TRACES}/multi_threaded_cceh-recovery.trace > ${CPRD_RESULTS_RACES}/cceh-recovery.races
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # FAST-FAIR (Failure-Atomic ShifT(FAST) and Failure-Atomic In-place Rebalancing(FAIR))
@@ -110,12 +116,12 @@ WORKDIR /app/benchmarks/FAST_FAIR
 RUN dos2unix *.sh
 RUN ./compile_pmdk.sh
 RUN ./run_pmdk.sh ; exit 0
-RUN cp *.trace /app/traces
+RUN cp *.trace ${CPRD_RESULTS_TRACES}
 
-RUN pycprd /app/traces/fast-fair-pmdk.trace                > /app/races/fastfair.races
-# RUN pycprd /app/traces/fast-fair-pmdk-recovery.trace       > /app/races/fastfair-recovery.races
-RUN pycprd /app/traces/fast-fair-pmdk-mixed.trace          > /app/races/fastfair-mixed.races
-# RUN pycprd /app/traces/fast-fair-pmdk-mixed-recovery.trace > /app/races/fastfair-mixed-recovery.races
+RUN pycprd ${CPRD_RESULTS_TRACES}/fast-fair-pmdk.trace                > ${CPRD_RESULTS_RACES}/fastfair.races
+# RUN pycprd ${CPRD_RESULTS_TRACES}/fast-fair-pmdk-recovery.trace       > ${CPRD_RESULTS_RACES}/fastfair-recovery.races
+RUN pycprd ${CPRD_RESULTS_TRACES}/fast-fair-pmdk-mixed.trace          > ${CPRD_RESULTS_RACES}/fastfair-mixed.races
+# RUN pycprd ${CPRD_RESULTS_TRACES}/fast-fair-pmdk-mixed-recovery.trace > ${CPRD_RESULTS_RACES}/fastfair-mixed-recovery.races
 
 
 #####################################################################
@@ -126,7 +132,7 @@ RUN pycprd /app/traces/fast-fair-pmdk-mixed.trace          > /app/races/fastfair
 
 # COPY --from=build /app /app
 
-# RUN clang -O0 -g -fpass-plugin=/app/build/bin/PrdPass.so -I/app/src/example/ /app/src/example/test.c /app/src/example/sec.c -L/app/build/bin -l:tsan-x86_64.a -o test.exe \
+# RUN clang -O0 -g -fpass-plugin=/app/build/bin/PrdPass.so -I/app/instrumentation/example/ /app/instrumentation/example/test.c /app/instrumentation/example/sec.c -L/app/build/bin -l:tsan-x86_64.a -o test.exe \
 #     -fuse-ld=gold \
 #     -lm -ldl -lpthread \
 #     -z muldefs \
@@ -135,7 +141,7 @@ RUN pycprd /app/traces/fast-fair-pmdk-mixed.trace          > /app/races/fastfair
 
 
 # Compile example
-# RUN clang -g -O0 -c -emit-llvm -fPIC -fPIE -I/app/src/example/ /app/src/example/test.c /app/src/example/sec.c
+# RUN clang -g -O0 -c -emit-llvm -fPIC -fPIE -I/app/instrumentation/example/ /app/instrumentation/example/test.c /app/instrumentation/example/sec.c
 
 # Disasm the bytecode
 # RUN llvm-dis test.bc
@@ -178,7 +184,7 @@ RUN pycprd /app/traces/fast-fair-pmdk-mixed.trace          > /app/races/fastfair
 
 
 # # # Compile pass
-# # RUN clang -g3 -shared -o /app/libtsantestpass.so /app/src/prd/tsanpass.cpp -v -I/usr/include/llvm/ -I/usr/include/llvm-c/ -fPIC
+# # RUN clang -g3 -shared -o /app/libtsantestpass.so /app/instrumentation/prd/tsanpass.cpp -v -I/usr/include/llvm/ -I/usr/include/llvm-c/ -fPIC
 
 
 # # # Compile runtime lib
@@ -208,7 +214,7 @@ RUN pycprd /app/traces/fast-fair-pmdk-mixed.trace          > /app/races/fastfair
 # # # ENTRYPOINT ["cat", "x.txt", "&&", "/bin/bash"]
 # # # ENTRYPOINT ["echo", "x.txt", "&&", "/bin/bash"]
 # # # ENTRYPOINT ["/bin/bash"]
-# # WORKDIR /app/src/runtime/compiler-rt
+# # WORKDIR /app/instrumentation/runtime/compiler-rt
 # # RUN cmake .
 # # RUN make -j 2
 
@@ -227,8 +233,8 @@ RUN pycprd /app/traces/fast-fair-pmdk-mixed.trace          > /app/races/fastfair
 
 # # RUN clang test_instrumented.o \
 # #     -o test_instrumented.exe \
-# #     /app/src/runtime/compiler-rt/lib/linux/libclang_rt.tsan-x86_64.a \
-# #     /app/src/runtime/compiler-rt/lib/linux/libclang_rt.tsan_cxx-x86_64.a \
+# #     /app/instrumentation/runtime/compiler-rt/lib/linux/libclang_rt.tsan-x86_64.a \
+# #     /app/instrumentation/runtime/compiler-rt/lib/linux/libclang_rt.tsan_cxx-x86_64.a \
 # #     -fuse-ld=gold \
 # #     -lm -ldl -lpthread \
 # #     -z muldefs \
