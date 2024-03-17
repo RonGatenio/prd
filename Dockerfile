@@ -11,9 +11,17 @@ ENV LLVM_VERSION 14
 RUN apt-get update && apt-get install -y llvm-${LLVM_VERSION} llvm-${LLVM_VERSION}-dev clang-${LLVM_VERSION}
 RUN apt install -y cmake
 RUN apt install -y python3-pip
+RUN apt install -y build-essential libboost-all-dev libpapi-dev
+
+# Install PMDK
+RUN apt install -y libpmem-dev
+RUN apt install -y libpmemobj-cpp-dev
 
 # Install tools packages
 RUN apt install -y dos2unix mlocate less
+
+# Install jemalloc and tbb
+RUN apt install -y libtbb-dev libjemalloc-dev
 
 # Set env
 ENV PATH /usr/lib/llvm-${LLVM_VERSION}/bin:$PATH
@@ -33,17 +41,21 @@ FROM setup AS build
 # Create a working directory
 WORKDIR /app
 
-# Copy pyprd folder to docker
-COPY pyprd /app/pyprd
-
-WORKDIR /app/pyprd
-RUN python3 -m pip install -r requirements.txt
-
-# Copy src folder to docker
-COPY src /app/src
+# Copy src folder to container
+COPY instrumentation /app/instrumentation
 
 # Build pass and runtime lib
-RUN /app/src/scripts/build.sh
+RUN /app/instrumentation/scripts/build.sh
+
+# Add bin path to PATH
+ENV PATH /app/build/bin:$PATH
+
+# Copy pyprd folder to container
+COPY pyprd /app/pyprd
+
+# Install pyprd
+WORKDIR /app/pyprd
+RUN python3 setup.py install
 
 
 #####################################################################
@@ -51,10 +63,6 @@ RUN /app/src/scripts/build.sh
 #####################################################################
 
 FROM build AS benchmarks
-
-# Install PMDK
-RUN apt install -y libpmem-dev
-RUN apt install -y libpmemobj-cpp-dev
 
 # Copy from build stage
 COPY --from=build /app /app
@@ -65,6 +73,9 @@ COPY benchmarks /app/benchmarks
 # Make traces folder
 RUN mkdir -p /app/traces
 
+# Make races folder
+RUN mkdir -p /app/races
+
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # RECIPE (Converting Concurrent DRAM Indexes to Persistent-Memory Indexes)
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -72,13 +83,13 @@ WORKDIR /app/benchmarks/RECIPE
 
 RUN dos2unix *.sh
 RUN ./compile.sh
-RUN ./run.sh
+RUN ./run.sh ; exit 0
 RUN cp *.trace /app/traces
 
 WORKDIR /app/pyprd/src
 
-RUN python3 run.py /app/traces/pclht.trace          > out.pclht.races
-RUN python3 run.py /app/traces/pclht-recovery.trace > out.pclht-recovery.races
+RUN python3 run.py /app/traces/pclht.trace          > /app/races/pclht.races
+RUN python3 run.py /app/traces/pclht-recovery.trace > /app/races/pclht-recovery.races
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # CCEH (Cacheline-Concious Extendible Hashing)
@@ -87,13 +98,13 @@ WORKDIR /app/benchmarks/CCEH
 
 RUN dos2unix *.sh
 RUN ./compile.sh
-RUN ./run_pmdk.sh
+RUN ./run_pmdk.sh ; exit 0
 RUN cp *.trace /app/traces
 
 WORKDIR /app/pyprd/src
 
-RUN python3 run.py /app/traces/multi_threaded_cceh.trace          > out.cceh.races
-RUN python3 run.py /app/traces/multi_threaded_cceh-recovery.trace > out.cceh-recovery.races
+RUN python3 run.py /app/traces/multi_threaded_cceh.trace          > /app/races/cceh.races
+RUN python3 run.py /app/traces/multi_threaded_cceh-recovery.trace > /app/races/cceh-recovery.races
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # FAST-FAIR (Failure-Atomic ShifT(FAST) and Failure-Atomic In-place Rebalancing(FAIR))
@@ -107,10 +118,10 @@ RUN cp *.trace /app/traces
 
 WORKDIR /app/pyprd/src
 
-RUN python3 run.py /app/traces/fast-fair-pmdk.trace                > out.fastfair.races
-RUN python3 run.py /app/traces/fast-fair-pmdk-recovery.trace       > out.fastfair-recovery.races
-RUN python3 run.py /app/traces/fast-fair-pmdk-mixed.trace          > out.fastfair.races
-RUN python3 run.py /app/traces/fast-fair-pmdk-mixed-recovery.trace > out.fastfair-recovery.races
+RUN python3 run.py /app/traces/fast-fair-pmdk.trace                > /app/races/fastfair.races
+# RUN python3 run.py /app/traces/fast-fair-pmdk-recovery.trace       > /app/races/fastfair-recovery.races
+RUN python3 run.py /app/traces/fast-fair-pmdk-mixed.trace          > /app/races/fastfair-mixed.races
+# RUN python3 run.py /app/traces/fast-fair-pmdk-mixed-recovery.trace > /app/races/fastfair-mixed-recovery.races
 
 
 #####################################################################
