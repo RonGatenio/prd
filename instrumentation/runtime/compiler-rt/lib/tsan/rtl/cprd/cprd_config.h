@@ -7,5 +7,8 @@
 
 #define CPRD_REPORT_TSAN_RACE true
 
+#define CPRD_SYMBOLIZE_PC true
+#define CPRD_SYMBOLIZE_CALLSTACK false
+
 
 #endif  // CPRD_CONFIG_H

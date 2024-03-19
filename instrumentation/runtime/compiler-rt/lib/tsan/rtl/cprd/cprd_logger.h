@@ -80,7 +80,8 @@ char _callstack_delimiter = ',';
 char _info_delimiter = '|';
 
 void get_symbol_info(InternalScopedString& iss, ThreadState* thr, uptr pc,
-                     bool callstack = true, bool symbolize = false);
+                     bool callstack = true,
+                     bool symbolize_pc = false, bool symbolize_callstack = false);
 
 
 
@@ -149,6 +150,7 @@ class Cprd {
     DEBUG_LOG("In handle_munmap; removed PM region %p, size %p", addr, size);
   }
 
+  ALWAYS_INLINE USED
   bool is_pm_address(uptr addr) {
     for (auto& region : m_pm_regions) {
       if (region.contains(addr)) {

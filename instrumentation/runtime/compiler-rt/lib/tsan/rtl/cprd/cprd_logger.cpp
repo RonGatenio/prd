@@ -36,14 +36,14 @@ void log_callstack(InternalScopedString& iss, ThreadState *thr, uptr pc) {
 }
 
 ALWAYS_INLINE USED
-void get_symbol_info(InternalScopedString& iss, ThreadState *thr, uptr pc, bool callstack, bool symbolize) {
+void get_symbol_info(InternalScopedString& iss, ThreadState *thr, uptr pc, bool callstack, bool symbolize_pc, bool symbolize_callstack) {
   SymbolizedStack *ent = SymbolizeCode(pc);
 
   uptr pc1 = pc;
   if ((pc & kExternalPCBit) == 0)
     pc1 = StackTrace::GetPreviousInstructionPc(pc);
 
-  if (symbolize) {
+  if (symbolize_pc) {
     SymbolizedStack *ent_prev_pc = SymbolizeCode(pc1);
 
     /*
@@ -60,7 +60,7 @@ void get_symbol_info(InternalScopedString& iss, ThreadState *thr, uptr pc, bool 
   if (callstack) {
     iss.append("%c", _info_delimiter);
 
-    if (symbolize) {
+    if (symbolize_callstack) {
       CaptureCurrentStack(&iss, thr, pc, _callstack_delimiter);
     } else {
       log_loaded_modules();
