@@ -168,6 +168,10 @@ class Cprd {
       return;
     }
 
+    /* TODO: miss handling movnt... 
+    movnt is still a W(Y) but not a W(X). add a special mark to it and recognize it in pyprd
+    */
+
     InternalScopedString res(2 * GetPageSizeCached());
 
     res.append("%d:%s:%p:%p:%d:", 
