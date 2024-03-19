@@ -30,7 +30,7 @@ class AbstractNode(ABC):
         # self._tindex = int(tindex)
 
     @property
-    def itype(self):
+    def itype(self) -> NodeType:
         """Return the instruction type"""
         return self._itype
 
@@ -138,8 +138,19 @@ class InstructionNode(AbstractNode):
         info = self.info
         return f'{self.__class__.__name__}({tid=}, {instruction=}, {pc=:#x}, {address=:#x}, {size=}, {info=})'
     
-    def str_info(self) -> str:
+    @property
+    def str_itype(self) -> str:
         return f'{self.itype.to_letter()}'
+    
+    @property
+    def str_info(self) -> str:
+        from .trace_event_info import TraceEventInfo
+
+        if not isinstance(self.info, TraceEventInfo):
+            raise Exception('invalid node info')
+        
+        info: TraceEventInfo = self.info
+        return f'T{self.tid} {self.str_itype}({self.address:#x}, {self.size}) {info.symbol} (trace line {self.trace_line_number}) (cachline {self.get_cacheline_address():#x})'
 
 
 class WriteNode(InstructionNode):
