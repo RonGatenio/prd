@@ -2,7 +2,7 @@ import functools
 import os
 import shutil
 from dataclasses import dataclass, field
-from typing import Tuple
+from typing import Tuple, Dict
 import subprocess
 import intervaltree
 import lief
@@ -72,6 +72,7 @@ class Symbolizer:
         start, end, module = modules.pop()
         return start, end, module
     
+    @functools.cache
     def get_symbol(self, address: int) -> Tuple[str, int]:
         start, end, module = self.get_module(address)
         
@@ -87,6 +88,7 @@ class Symbolizer:
             
         return module.name, module_offset
     
+    @functools.cache
     def get_debug_info(self, address: int) -> Tuple[str, str, int, int] | None:
         start, end, module = self.get_module(address)
         
@@ -115,50 +117,68 @@ class Symbolizer:
 @dataclass(unsafe_hash=True)
 class Symbol:
     address: int
-    _symbolizer: Symbolizer = field(compare=False, repr=False)
 
+    _symbolizer: Symbolizer = field(compare=False, repr=False, hash=False)
+    
+    module: str             = field(default=None, init=False, compare=False, repr=False, hash=False)
+    module_path: str        = field(default=None, init=False, compare=False, repr=False, hash=False)
+    module_offset: int      = field(default=None, init=False, compare=False, repr=False, hash=False)
+    
+    symbol: str             = field(default=None, init=False, compare=False, repr=False, hash=False)
+    symbol_offset: int      = field(default=None, init=False, compare=False, repr=False, hash=False)
+    
+    file: str               = field(default=None, init=False, compare=False, repr=False, hash=False)
+    filename: str           = field(default=None, init=False, compare=False, repr=False, hash=False)
+    line: int               = field(default=None, init=False, compare=False, repr=False, hash=False)
+    column: int             = field(default=None, init=False, compare=False, repr=False, hash=False)
+    
     def __post_init__(self):
         self._symbolized = False
-        
-        self._module: str = None
-        self._module_path: str = None
-        self._module_offset: int = None
-        
-        self._symbol: str = None
-        self._symbol_offset: int = None
-        
-        self._file: str = None
-        self._line: int = None
-        self._column: int = None
     
     def _symbolize(self):
         if self._symbolized:
             return
-        
+
         start, end, module = self._symbolizer.get_module(self.address)
         if module:
-            self._module = module.name
-            self._module_path = module.path
-            self._module_offset = self.address - start
+            self.module = module.name
+            self.module_path = module.path
+            self.module_offset = self.address - start
             
-        self._symbol, self._symbol_offset = self._symbolizer.get_symbol(self.address)
+        self.symbol, self.symbol_offset = self._symbolizer.get_symbol(self.address)
         
         dbg_info = self._symbolizer.get_debug_info(self.address)
         if dbg_info:
-            self._symbol, self._file, self._line, self._column = dbg_info
+            self.symbol, self.file, self.line, self.column = dbg_info
+            self.filename = os.path.basename(self.file)
         
         self._symbolized = True
     
+    @property
+    def file_location_str(self) -> str:
+        self._symbolize()
+        
+        if not self.file:
+            return ''
+        
+        line_col = f':{self.line}:{self.column}' if self.line is not None else ''
+        return f'{self.filename}{line_col}'
+    
+    @property
+    def module_offset_str(self) -> str:
+        self._symbolize()
+        if not self.module:
+            return ''
+        return f'({self.module}+0x{self.module_offset:x})'
+
     def __str__(self) -> str:
         self._symbolize()
         
-        parts = [self._symbol]
+        parts = [self.symbol]
         
-        if self._file:
-            filename = os.path.basename(self._file)
-            line_col = f':{self._line}:{self._column}' if self._line is not None else ''
-            parts.append(f'{filename}{line_col}')
+        if self.file_location_str:
+            parts.append(self.file_location_str)
             
-        parts.append(f'({self._module}+0x{self._module_offset:x})')
+        parts.append(self.module_offset_str)
         
         return ' '.join(parts)
