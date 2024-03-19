@@ -159,6 +159,52 @@ class Cprd {
     }
     return false;
   }
+
+  ALWAYS_INLINE USED
+  void instrument_memory_access(ThreadState *thr, uptr addr, uptr pc, 
+    int kAccessSizeLog, bool kAccessIsWrite, bool kIsAtomic, bool kIsNonTemporal) {
+
+    if (kIsNonTemporal || !is_pm_address(addr)) {
+      return;
+    }
+
+    InternalScopedString res(2 * GetPageSizeCached());
+
+    res.append("%d:%s:%p:%p:%d:", 
+              (int)thr->fast_state.tid(), 
+              kAccessIsWrite ? "WRITE" : "READ", 
+              (void*)pc, 
+              (void*)addr,
+              (int)(1 << kAccessSizeLog));
+    get_symbol_info(res, thr, pc);
+    res.append("# IsAtomic: %d", kIsAtomic);
+
+#if CPRD_SYMBOLIZE_PC
+    res.append("# ");
+    get_symbol_info(res, thr, pc, false, true, false);
+#endif
+
+    res.append("\n");
+    Printf(res.data());
+
+  }
+
+  void instrument_flush(ThreadState *thr, uptr pc, uptr addr) {
+    addr = RoundDown(addr, kCacheLineSize);
+    thr->flushes_cache.PushBack(addr);
+  }
+
+  void instrument_fence(ThreadState *thr, uptr pc) {
+    InternalScopedString res(2 * GetPageSizeCached());
+    get_symbol_info(res, thr, pc, false);
+
+    for (uptr i = 0; i < thr->flushes_cache.Size(); i++)
+    {
+      Printf("%d:FLUSH:%p:%p:%d:%s\n", thr->tid, (void*)pc, (void*)thr->flushes_cache[i], kCacheLineSize, res.data());
+    }
+    
+    thr->flushes_cache.Reset();
+  }
 };
 
 }  // namespace cprd

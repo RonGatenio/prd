@@ -657,21 +657,7 @@ void MemoryAccessImpl1(ThreadState *thr, uptr addr,
   StatInc(thr, kAccessIsWrite ? StatMopWrite : StatMopRead);
   StatInc(thr, (StatType)(StatMop1 + kAccessSizeLog));
 
-  if (cprd::Cprd::s_get_instance().is_pm_address(addr) && !kIsNonTemporal) {
-    InternalScopedString res(2 * GetPageSizeCached());
-
-    res.append("%d:%s:%p:%p:%d:", 
-              (int)thr->fast_state.tid(), 
-              kAccessIsWrite ? "WRITE" : "READ", 
-              (void*)pc, 
-              (void*)addr,
-              (int)(1 << kAccessSizeLog));
-    cprd::get_symbol_info(res, thr, pc);
-    res.append("# IsAtomic: %d", kIsAtomic);
-    res.append("\n");
-    Printf(res.data());
-  }
-
+  cprd::Cprd::s_get_instance().instrument_memory_access(thr, addr, pc, kAccessSizeLog, kAccessIsWrite, kIsAtomic, kIsNonTemporal);
 
   // This potentially can live in an MMX/SSE scratch register.
   // The required intrinsics are:
@@ -1036,20 +1022,12 @@ void MemoryRangeImitateWriteOrResetRange(ThreadState *thr, uptr pc, uptr addr,
 
 ALWAYS_INLINE USED
 void MemoryFlushAccess(ThreadState *thr, uptr pc, uptr addr) {
-  addr = RoundDown(addr, kCacheLineSize);
-  thr->flushes_cache.PushBack(addr);
+  cprd::Cprd::s_get_instance().instrument_flush(thr, pc, addr);
 }
 
 ALWAYS_INLINE USED
 void MemoryFenceAccess(ThreadState *thr, uptr pc) {
-  for (uptr i = 0; i < thr->flushes_cache.Size(); i++)
-  {
-    InternalScopedString res(2 * GetPageSizeCached());
-    cprd::get_symbol_info(res, thr, pc, false);
-
-    Printf("%d:FLUSH:%p:%p:%d:%s\n", thr->tid, (void*)pc, (void*)thr->flushes_cache[i], kCacheLineSize, res.data());
-  }
-  thr->flushes_cache.Reset();
+  cprd::Cprd::s_get_instance().instrument_fence(thr, pc);
 }
 
 ALWAYS_INLINE USED
