@@ -1,3 +1,4 @@
+import functools
 from typing import Any, Dict, Generator, Iterable, List, Set, Tuple
 from collections import namedtuple, defaultdict
 from enum import Enum
@@ -382,29 +383,33 @@ class HBG:
         parent, = parents
         return parent
 
-    @property
+    @functools.cached_property
     def all_nodes(self) -> Set[nodes.AbstractNode]:
         return self._graph.nodes()
 
-    @property
+    @functools.cached_property
     def write_nodes(self) -> Set[nodes.InstructionNode]:
         return self.get_nodes_by_type(nodes.NodeType.WRITE)
 
-    @property
+    @functools.cached_property
     def read_nodes(self) -> Set[nodes.InstructionNode]:
         return self.get_nodes_by_type(nodes.NodeType.READ)
 
-    @property
+    @functools.cached_property
     def flush_nodes(self) -> Set[nodes.InstructionNode]:
         return self.get_nodes_by_type(nodes.NodeType.FLUSH)
 
-    @property
+    @functools.cached_property
     def epoch_nodes(self) -> Set[nodes.EpochNode]:
         return self.get_nodes_by_type(nodes.NodeType.EPOCH)
 
-    @property
+    @functools.cached_property
     def read_write_nodes(self) -> Set[nodes.InstructionNode]:
         return self.read_nodes | self.write_nodes
+    
+    @functools.cached_property
+    def instruction_nodes(self) -> Set[nodes.InstructionNode]:
+        return self.read_write_nodes | self.flush_nodes
 
     @property
     def instruction_nodes(self) -> Set[nodes.InstructionNode]:
