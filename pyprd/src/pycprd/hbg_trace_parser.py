@@ -75,20 +75,29 @@ class TraceParser:
                 address = _any_int(address)
                 size = _any_int(size)
                 
+                is_atomic = is_non_temporal = False
+                
                 info = parts[5:]
                 info = ':'.join(info) if info else ''
                 
                 if info.startswith('0x'):
                     info = info.split('#')[0].strip()
                     info = info.split('|')
-                    addr = _any_int(info[0])
+                    
+                    if ':' in info[0]:
+                        addr, is_atomic, is_non_temporal = map(_any_int, info[0].split(':'))
+                    else:
+                        addr = _any_int(info[0])
                     callstack = tuple(map(_any_int, (info[1].strip(',').split(',') if len(info) > 1 else [])))
 
                     info = TraceEventInfo.from_addresses(addr, callstack, self._symbolizer)
+                    
+                    is_atomic = bool(is_atomic)
+                    is_non_temporal = bool(is_non_temporal)
                 else:
                     info = info.split('|')[0]
                     
-                self._hbg_builder.add_instruction_node(key, tid, pc, address, size, info, line_number)
+                self._hbg_builder.add_instruction_node(key, tid, pc, address, size, info, line_number, is_atomic=is_atomic, is_non_temporal=is_non_temporal)
             case _:
                 # Invalid key
                 dbg_print(f'Invalid key {key} in line {line_number}')

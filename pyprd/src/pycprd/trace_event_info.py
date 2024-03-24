@@ -17,10 +17,10 @@ class TraceEventInfo:
         return str(self.symbol)
     
     def full_info(self,
-                  callstack_limit:      int | None              = None,
-                  callstack_line_limit: int | None              = None,
+                  callstack_limit:      int  | None             = None,
+                  callstack_line_limit: int  | None             = None,
                   one_line_callstack:   bool | None             = False,
-                  callstack_top_func:   str | List[str] | None  = None,
+                  callstack_top_func:   str  | List[str] | None = None,
                   indent:               int                     = 0
                   ) -> str:
         callstack = tuple(map(str, self.callstack))

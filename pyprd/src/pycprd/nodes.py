@@ -69,11 +69,15 @@ class EpochNode(AbstractNode):
 
 
 class InstructionNode(AbstractNode):
-    def __init__(self, itype: NodeType, tid: int, pc: int, address: int, size: int, info: Any = None, trace_line_number: int = None):
+    def __init__(self, itype: NodeType, tid: int, pc: int, address: int, size: int,
+                 is_atomic = False, is_non_temporal = False,
+                 info: Any = None, trace_line_number: int = None):
         super().__init__(itype, tid)
         self._pc = pc
         self._address = address
         self._size = size
+        self._is_atomic = is_atomic
+        self._is_non_temporal = is_non_temporal
         self._info = info
         self._trace_line_number = trace_line_number
 
@@ -98,6 +102,14 @@ class InstructionNode(AbstractNode):
     @property
     def interval(self):
         return (self.address, self.address + self.size)
+    
+    @property
+    def is_atomic(self):
+        return self._is_atomic
+    
+    @property
+    def is_non_temporal(self):
+        return self._is_non_temporal
 
     @property
     def info(self):
@@ -135,8 +147,11 @@ class InstructionNode(AbstractNode):
         pc = self.pc
         address = self.address
         size = self.size
+        atomic = self._is_atomic
+        nontemporal = self._is_non_temporal
         info = self.info
-        return f'{self.__class__.__name__}({tid=}, {instruction=}, {pc=:#x}, {address=:#x}, {size=}, {info=})'
+        traceline = self._trace_line_number
+        return f'{self.__class__.__name__}({tid=}, {instruction=}, {pc=:#x}, {address=:#x}, {size=}, {atomic=}, {nontemporal=}, {info=}, {traceline=})'
     
     @property
     def str_itype(self) -> str:
@@ -154,18 +169,18 @@ class InstructionNode(AbstractNode):
 
 
 class WriteNode(InstructionNode):
-    def __init__(self, tid: int, pc: int, address: int, size: int, info: Any = None, trace_line_number: int = None):
-        super().__init__(NodeType.WRITE, tid, pc, address, size, info, trace_line_number)
+    def __init__(self, tid: int, pc: int, address: int, size: int, is_atomic = False, is_non_temporal = False, info: Any = None, trace_line_number: int = None):
+        super().__init__(NodeType.WRITE, tid, pc, address, size, is_atomic, is_non_temporal, info, trace_line_number)
 
 
 class ReadNode(InstructionNode):
-    def __init__(self, tid: int, pc: int, address: int, size: int, info: Any = None, trace_line_number: int = None):
-        super().__init__(NodeType.READ, tid, pc, address, size, info, trace_line_number)
+    def __init__(self, tid: int, pc: int, address: int, size: int, is_atomic = False, is_non_temporal = False, info: Any = None, trace_line_number: int = None):
+        super().__init__(NodeType.READ, tid, pc, address, size, is_atomic, is_non_temporal, info, trace_line_number)
 
 
 class FlushNode(InstructionNode):
-    def __init__(self, tid: int, pc: int, address: int, size: int, info: Any = None, trace_line_number: int = None):
-        super().__init__(NodeType.FLUSH, tid, pc, address, size, info, trace_line_number)
+    def __init__(self, tid: int, pc: int, address: int, size: int, is_atomic = False, is_non_temporal = False, info: Any = None, trace_line_number: int = None):
+        super().__init__(NodeType.FLUSH, tid, pc, address, size, is_atomic, is_non_temporal, info, trace_line_number)
 
 
 def create_instruction_node(itype: NodeType,
@@ -173,6 +188,8 @@ def create_instruction_node(itype: NodeType,
                             pc: int,
                             address: int,
                             size: int,
+                            is_atomic: bool = False,
+                            is_non_temporal: bool = False,
                             info: Any = None,
                             trace_line_number: int = None) -> InstructionNode:
     cls = {
@@ -181,4 +198,4 @@ def create_instruction_node(itype: NodeType,
         NodeType.FLUSH: FlushNode,
     }[itype]
 
-    return cls(tid, pc, address, size, info, trace_line_number)
+    return cls(tid, pc, address, size, is_atomic, is_non_temporal, info, trace_line_number)
