@@ -79,9 +79,9 @@ namespace cprd {
 char _callstack_delimiter = ',';
 char _info_delimiter = '|';
 
-void get_symbol_info(InternalScopedString& iss, ThreadState* thr, uptr pc,
-                     bool callstack = true,
-                     bool symbolize_pc = false, bool symbolize_callstack = false);
+void get_callstack_info(InternalScopedString& iss, ThreadState *thr, uptr pc, bool symbolize = false);
+
+void get_symbol_info(InternalScopedString& iss, ThreadState *thr, uptr pc, bool symbolize = false);
 
 
 
@@ -181,11 +181,15 @@ class Cprd {
               (void*)addr,
               (int)(1 << kAccessSizeLog));
     get_symbol_info(res, thr, pc);
-    res.append("# IsAtomic: %d", kIsAtomic);
+
+    res.append(":%d:%d", kIsAtomic, kIsNonTemporal);
+
+    res.append("%c", _info_delimiter);
+    get_callstack_info(res, thr, pc);
 
 #if CPRD_SYMBOLIZE_PC
     res.append("# ");
-    get_symbol_info(res, thr, pc, false, true, false);
+    get_symbol_info(res, thr, pc, true);
 #endif
 
     res.append("\n");
@@ -200,7 +204,7 @@ class Cprd {
 
   void instrument_fence(ThreadState *thr, uptr pc) {
     InternalScopedString res(2 * GetPageSizeCached());
-    get_symbol_info(res, thr, pc, false);
+    get_symbol_info(res, thr, pc);
 
     for (uptr i = 0; i < thr->flushes_cache.Size(); i++)
     {

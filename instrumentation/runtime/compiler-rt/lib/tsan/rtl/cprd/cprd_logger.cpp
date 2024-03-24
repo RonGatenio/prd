@@ -36,14 +36,24 @@ void log_callstack(InternalScopedString& iss, ThreadState *thr, uptr pc) {
 }
 
 ALWAYS_INLINE USED
-void get_symbol_info(InternalScopedString& iss, ThreadState *thr, uptr pc, bool callstack, bool symbolize_pc, bool symbolize_callstack) {
+void get_callstack_info(InternalScopedString& iss, ThreadState *thr, uptr pc, bool symbolize) {
+  if (symbolize) {
+    CaptureCurrentStack(&iss, thr, pc, _callstack_delimiter);
+  } else {
+    log_loaded_modules();
+    log_callstack(iss, thr, pc);
+  }
+}
+
+ALWAYS_INLINE USED
+void get_symbol_info(InternalScopedString& iss, ThreadState *thr, uptr pc, bool symbolize) {
   SymbolizedStack *ent = SymbolizeCode(pc);
 
   uptr pc1 = pc;
   if ((pc & kExternalPCBit) == 0)
     pc1 = StackTrace::GetPreviousInstructionPc(pc);
 
-  if (symbolize_pc) {
+  if (symbolize) {
     SymbolizedStack *ent_prev_pc = SymbolizeCode(pc1);
 
     /*
@@ -55,17 +65,6 @@ void get_symbol_info(InternalScopedString& iss, ThreadState *thr, uptr pc, bool 
     RenderFrame(&iss, "%M", 0, ent->info, false);
   } else {
     iss.append("%p", pc1);
-  }
-
-  if (callstack) {
-    iss.append("%c", _info_delimiter);
-
-    if (symbolize_callstack) {
-      CaptureCurrentStack(&iss, thr, pc, _callstack_delimiter);
-    } else {
-      log_loaded_modules();
-      log_callstack(iss, thr, pc);
-    }
   }
 }
 
