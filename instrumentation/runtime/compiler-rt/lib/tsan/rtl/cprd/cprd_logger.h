@@ -164,13 +164,9 @@ class Cprd {
   void instrument_memory_access(ThreadState *thr, uptr addr, uptr pc, 
     int kAccessSizeLog, bool kAccessIsWrite, bool kIsAtomic, bool kIsNonTemporal) {
 
-    if (kIsNonTemporal || !is_pm_address(addr)) {
+    if (!is_pm_address(addr)) {
       return;
     }
-
-    /* TODO: miss handling movnt... 
-    movnt is still a W(Y) but not a W(X). add a special mark to it and recognize it in pyprd
-    */
 
     InternalScopedString res(2 * GetPageSizeCached());
 

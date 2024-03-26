@@ -309,7 +309,11 @@ class PersistencyRaceDetector:
 
                 for write_node in chain:
                     write_node: WriteNode
-
+                    
+                    # If we read after a non-temporal write, than the write must have been persisted
+                    if write_node.is_non_temporal:
+                        continue
+                    
                     # Is a different var
                     if not write_node.is_interval_overlap(read_node):
                         continue
@@ -330,11 +334,6 @@ class PersistencyRaceDetector:
                     race = PersistencyRace(read_node, write_node, dependent_node,
                                            is_write_hb_dependent=pvc.is_event_happened_before(*write_node_loc))
                     self._races.add_race(race)
-                    
-                    # if (240227, 245017) == (race.write_node.trace_line_number, race.read_node.trace_line_number):
-                    #     print(f'Found my race. is race: {self.is_bug(race)}')
-                    #     import ipdb; ipdb.set_trace()
-                    #     pass
                     
                     yield race
 
