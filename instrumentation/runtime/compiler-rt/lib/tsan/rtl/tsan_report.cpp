@@ -127,7 +127,7 @@ void PrintStack(const ReportStack *ent, const char delimiter) {
   }
   SymbolizedStack *frame = ent->frames;
   for (int i = 0; frame && frame->info.address; frame = frame->next, i++) {
-    InternalScopedString res(2 * GetPageSizeCached());
+    InternalScopedString res;
     RenderFrame(&res, common_flags()->stack_trace_format, i, frame->info,
                 common_flags()->symbolize_vs_style,
                 common_flags()->strip_path_prefix, kInterposedFunctionPrefix);
@@ -143,7 +143,7 @@ void CaptureStack(InternalScopedString *buffer, const ReportStack *ent, const ch
   }
   SymbolizedStack *frame = ent->frames;
   for (int i = 0; frame && frame->info.address; frame = frame->next, i++) {
-    InternalScopedString res(2 * GetPageSizeCached());
+    InternalScopedString res;
     RenderFrame(&res, common_flags()->stack_trace_format, i, frame->info,
                 common_flags()->symbolize_vs_style,
                 common_flags()->strip_path_prefix, kInterposedFunctionPrefix);

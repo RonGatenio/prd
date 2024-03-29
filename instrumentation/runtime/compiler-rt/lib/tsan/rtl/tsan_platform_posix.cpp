@@ -128,6 +128,11 @@ void CheckAndProtect() {
   // Ensure that the binary is indeed compiled with -pie.
   MemoryMappingLayout proc_maps(true);
   MemoryMappedSegment segment;
+  // char buf[100000] = {0};
+  // unsigned int len = 0;
+  ProcSelfMapsBuff _proc_maps;
+  ReadProcMaps(&_proc_maps);
+  Printf("CheckAndProtect proc maps:\n%.*s\n", _proc_maps.len, _proc_maps.data);
   while (proc_maps.Next(&segment)) {
     if (IsAppMem(segment.start)) continue;
     if (segment.start >= HeapMemEnd() && segment.start < HeapEnd()) continue;
@@ -135,9 +140,10 @@ void CheckAndProtect() {
       continue;
     if (segment.start >= VdsoBeg())  // vdso
       break;
-    Printf("FATAL: ThreadSanitizer: unexpected memory mapping %p-%p\n",
-           segment.start, segment.end);
-    Die();
+    continue;
+    // Printf("FATAL: ThreadSanitizer: unexpected memory mapping %p-%p\n",
+    //        segment.start, segment.end);
+    // Die();
   }
 
 #if defined(__aarch64__) && defined(__APPLE__)

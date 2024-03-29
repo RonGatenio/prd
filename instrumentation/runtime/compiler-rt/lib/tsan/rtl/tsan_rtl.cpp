@@ -368,7 +368,9 @@ void Initialize(ThreadState *thr) {
   const char *options = GetEnv(env_name);
   CacheBinaryName();
   CheckASLR();
-  InitializeFlags(&ctx->flags, options, env_name);
+  Printf("HERE\n");
+  //InitializeFlags(&ctx->flags, options, env_name);
+  Printf("After\n");
   AvoidCVE_2016_2143();
   __sanitizer::InitializePlatformEarly();
   __tsan::InitializePlatformEarly();
@@ -395,10 +397,10 @@ void Initialize(ThreadState *thr) {
   // InstallDeadlySignalHandlers(TsanOnDeadlySignal);
 #endif
   // Setup correct file descriptor for error reports.
-  __sanitizer_set_report_path(common_flags()->log_path);
-  InitializeSuppressions();
+  // __sanitizer_set_report_path(common_flags()->log_path);
+  // InitializeSuppressions();
 #if !SANITIZER_GO
-  InitializeLibIgnore();
+  // InitializeLibIgnore();
   Symbolizer::GetOrInit()->AddHooks(EnterSymbolizer, ExitSymbolizer);
 #endif
 
@@ -649,7 +651,7 @@ static inline bool HappensBefore(Shadow old, ThreadState *thr) {
   return thr->clock.get(old.TidWithIgnore()) >= old.epoch();
 }
 
-ALWAYS_INLINE
+// ALWAYS_INLINE
 void MemoryAccessImpl1(ThreadState *thr, uptr addr,
     int kAccessSizeLog, bool kAccessIsWrite, bool kIsAtomic,
     u64 *shadow_mem, Shadow cur, uptr pc, bool kIsNonTemporal = false) {
@@ -681,44 +683,44 @@ void MemoryAccessImpl1(ThreadState *thr, uptr addr,
   // However, we can't afford unrolling in debug mode, because the function
   // consumes almost 4K of stack. Gtest gives only 4K of stack to death test
   // threads, which is not enough for the unrolled loop.
-#if SANITIZER_DEBUG
-  for (int idx = 0; idx < 4; idx++) {
-#include "tsan_update_shadow_word_inl.h"
-  }
-#else
-  int idx = 0;
-#include "tsan_update_shadow_word_inl.h"
-  idx = 1;
-  if (stored) {
-#include "tsan_update_shadow_word_inl.h"
-  } else {
-#include "tsan_update_shadow_word_inl.h"
-  }
-  idx = 2;
-  if (stored) {
-#include "tsan_update_shadow_word_inl.h"
-  } else {
-#include "tsan_update_shadow_word_inl.h"
-  }
-  idx = 3;
-  if (stored) {
-#include "tsan_update_shadow_word_inl.h"
-  } else {
-#include "tsan_update_shadow_word_inl.h"
-  }
-#endif
+// #if SANITIZER_DEBUG
+//   for (int idx = 0; idx < 4; idx++) {
+// #include "tsan_update_shadow_word_inl.h"
+//   }
+// #else
+//   int idx = 0;
+// #include "tsan_update_shadow_word_inl.h"
+//   idx = 1;
+//   if (stored) {
+// #include "tsan_update_shadow_word_inl.h"
+//   } else {
+// #include "tsan_update_shadow_word_inl.h"
+//   }
+//   idx = 2;
+//   if (stored) {
+// #include "tsan_update_shadow_word_inl.h"
+//   } else {
+// #include "tsan_update_shadow_word_inl.h"
+//   }
+//   idx = 3;
+//   if (stored) {
+// #include "tsan_update_shadow_word_inl.h"
+//   } else {
+// #include "tsan_update_shadow_word_inl.h"
+//   }
+// #endif
 
   // we did not find any races and had already stored
   // the current access info, so we are done
   if (LIKELY(stored))
     return;
   // choose a random candidate slot and replace it
-  StoreShadow(shadow_mem + (cur.epoch() % kShadowCnt), store_word);
+  // StoreShadow(shadow_mem + (cur.epoch() % kShadowCnt), store_word);
   StatInc(thr, StatShadowReplace);
   return;
- RACE:
-  HandleRace(thr, shadow_mem, cur, old);
-  return;
+//  RACE:
+//   HandleRace(thr, shadow_mem, cur, old);
+//   return;
 }
 
 void UnalignedMemoryAccess(ThreadState *thr, uptr pc, uptr addr,
@@ -829,17 +831,17 @@ bool ContainsSameAccess(u64 *s, u64 a, u64 sync_epoch, bool is_write) {
 #endif
 }
 
-ALWAYS_INLINE USED
+// ALWAYS_INLINE USED
 void MemoryAccess(ThreadState *thr, uptr pc, uptr addr,
     int kAccessSizeLog, bool kAccessIsWrite, bool kIsAtomic, bool kIsNonTemporal) {
   u64 *shadow_mem = (u64*)MemToShadow(addr);
 
-  DPrintf2("#%d: MemoryAccess: @%p %p size=%d"
-      " is_write=%d shadow_mem=%p {%zx, %zx, %zx, %zx}\n",
-      (int)thr->fast_state.tid(), (void*)pc, (void*)addr,
-      (int)(1 << kAccessSizeLog), kAccessIsWrite, shadow_mem,
-      (uptr)shadow_mem[0], (uptr)shadow_mem[1],
-      (uptr)shadow_mem[2], (uptr)shadow_mem[3]);
+  // DPrintf2("#%d: MemoryAccess: @%p %p size=%d"
+  //     " is_write=%d shadow_mem=%p {%zx, %zx, %zx, %zx}\n",
+  //     (int)thr->fast_state.tid(), (void*)pc, (void*)addr,
+  //     (int)(1 << kAccessSizeLog), kAccessIsWrite, shadow_mem,
+  //     (uptr)shadow_mem[0], (uptr)shadow_mem[1],
+  //     (uptr)shadow_mem[2], (uptr)shadow_mem[3]);
 #if SANITIZER_DEBUG
   if (!IsAppMem(addr)) {
     Printf("Access to non app mem %zx\n", addr);
@@ -851,15 +853,15 @@ void MemoryAccess(ThreadState *thr, uptr pc, uptr addr,
   }
 #endif
 
-  if (!SANITIZER_GO && !kAccessIsWrite && *shadow_mem == kShadowRodata) {
-    // Access to .rodata section, no races here.
-    // Measurements show that it can be 10-20% of all memory accesses.
-    StatInc(thr, StatMop);
-    StatInc(thr, kAccessIsWrite ? StatMopWrite : StatMopRead);
-    StatInc(thr, (StatType)(StatMop1 + kAccessSizeLog));
-    StatInc(thr, StatMopRodata);
-    return;
-  }
+  // if (!SANITIZER_GO && !kAccessIsWrite && *shadow_mem == kShadowRodata) {
+  //   // Access to .rodata section, no races here.
+  //   // Measurements show that it can be 10-20% of all memory accesses.
+  //   StatInc(thr, StatMop);
+  //   StatInc(thr, kAccessIsWrite ? StatMopWrite : StatMopRead);
+  //   StatInc(thr, (StatType)(StatMop1 + kAccessSizeLog));
+  //   StatInc(thr, StatMopRodata);
+  //   return;
+  // }
 
   FastState fast_state = thr->fast_state;
   if (UNLIKELY(fast_state.GetIgnoreBit())) {
@@ -875,14 +877,14 @@ void MemoryAccess(ThreadState *thr, uptr pc, uptr addr,
   cur.SetWrite(kAccessIsWrite);
   cur.SetAtomic(kIsAtomic);
 
-  if (LIKELY(ContainsSameAccess(shadow_mem, cur.raw(),
-      thr->fast_synch_epoch, kAccessIsWrite))) {
-    StatInc(thr, StatMop);
-    StatInc(thr, kAccessIsWrite ? StatMopWrite : StatMopRead);
-    StatInc(thr, (StatType)(StatMop1 + kAccessSizeLog));
-    StatInc(thr, StatMopSame);
-    return;
-  }
+  // if (LIKELY(ContainsSameAccess(shadow_mem, cur.raw(),
+  //     thr->fast_synch_epoch, kAccessIsWrite))) {
+  //   StatInc(thr, StatMop);
+  //   StatInc(thr, kAccessIsWrite ? StatMopWrite : StatMopRead);
+  //   StatInc(thr, (StatType)(StatMop1 + kAccessSizeLog));
+  //   StatInc(thr, StatMopSame);
+  //   return;
+  // }
 
   if (kCollectHistory) {
     fast_state.IncrementEpoch();
@@ -900,14 +902,14 @@ ALWAYS_INLINE USED
 void MemoryAccessImpl(ThreadState *thr, uptr addr,
     int kAccessSizeLog, bool kAccessIsWrite, bool kIsAtomic,
     u64 *shadow_mem, Shadow cur, uptr pc, bool kIsNonTemporal) {
-  if (LIKELY(ContainsSameAccess(shadow_mem, cur.raw(),
-      thr->fast_synch_epoch, kAccessIsWrite))) {
-    StatInc(thr, StatMop);
-    StatInc(thr, kAccessIsWrite ? StatMopWrite : StatMopRead);
-    StatInc(thr, (StatType)(StatMop1 + kAccessSizeLog));
-    StatInc(thr, StatMopSame);
-    return;
-  }
+  // if (LIKELY(ContainsSameAccess(shadow_mem, cur.raw(),
+  //     thr->fast_synch_epoch, kAccessIsWrite))) {
+  //   StatInc(thr, StatMop);
+  //   StatInc(thr, kAccessIsWrite ? StatMopWrite : StatMopRead);
+  //   StatInc(thr, (StatType)(StatMop1 + kAccessSizeLog));
+  //   StatInc(thr, StatMopSame);
+  //   return;
+  // }
 
   MemoryAccessImpl1(thr, addr, kAccessSizeLog, kAccessIsWrite, kIsAtomic,
       shadow_mem, cur, pc, kIsNonTemporal);

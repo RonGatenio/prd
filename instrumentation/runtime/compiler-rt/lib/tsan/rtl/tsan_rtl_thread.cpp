@@ -373,13 +373,13 @@ void MemoryAccessRange(ThreadState *thr, uptr pc, uptr addr,
 
   StatInc(thr, StatMopRange);
 
-  if (*shadow_mem == kShadowRodata) {
-    DCHECK(!is_write);
-    // Access to .rodata section, no races here.
-    // Measurements show that it can be 10-20% of all memory accesses.
-    StatInc(thr, StatMopRangeRodata);
-    return;
-  }
+  // if (*shadow_mem == kShadowRodata) {
+  //   DCHECK(!is_write);
+  //   // Access to .rodata section, no races here.
+  //   // Measurements show that it can be 10-20% of all memory accesses.
+  //   StatInc(thr, StatMopRangeRodata);
+  //   return;
+  // }
 
   FastState fast_state = thr->fast_state;
   if (fast_state.GetIgnoreBit())
