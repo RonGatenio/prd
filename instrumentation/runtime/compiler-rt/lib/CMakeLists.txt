@@ -41,6 +41,7 @@ if(COMPILER_RT_BUILD_SANITIZERS)
     # add_subdirectory(stats)
     # add_subdirectory(lsan)
     add_subdirectory(ubsan)
+    add_subdirectory(dfsan)
   endif()
 
   foreach(sanitizer ${COMPILER_RT_SANITIZERS_TO_BUILD})
