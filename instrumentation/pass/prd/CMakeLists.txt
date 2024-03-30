@@ -1,7 +1,8 @@
 add_llvm_pass_plugin(PrdPass
     # List your source files here.
-    # Prd.cpp
+    Prd.cpp
     tsanpass.cpp
+    DataFlowSanitizer.cpp
 )
 
 # install(TARGETS ${name} RUNTIME DESTINATION examples)
