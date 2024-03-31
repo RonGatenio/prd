@@ -110,7 +110,7 @@ void InitializeShadowMemory() {
   DPrintf("meta shadow: %zx-%zx (%zuGB)\n",
       meta, meta + meta_size, meta_size >> 30);
 
-  InitializeShadowMemoryPlatform();
+  // InitializeShadowMemoryPlatform();
 }
 
 static void ProtectRange(uptr beg, uptr end) {
@@ -146,7 +146,7 @@ void CheckAndProtect() {
   ProtectRange(MetaShadowEnd(), TraceMemBeg());
 #else
   ProtectRange(LoAppMemEnd(), ShadowBeg());
-  ProtectRange(ShadowEnd(), MetaShadowBeg());
+  // ProtectRange(ShadowEnd(), MetaShadowBeg());
 #ifdef TSAN_MID_APP_RANGE
   ProtectRange(MetaShadowEnd(), MidAppMemBeg());
   ProtectRange(MidAppMemEnd(), TraceMemBeg());
