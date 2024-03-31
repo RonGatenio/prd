@@ -95,6 +95,7 @@ void get_symbol_info(InternalScopedString& iss, ThreadState *thr, uptr pc, bool 
 
 /* PM regions */
 #define PM_POOL_CAND_MAX 128
+#define PENDING_READS_MAX 10000
 
 struct pm_region {
   uptr begin;
@@ -113,6 +114,7 @@ struct DependencyState {
   uptr addr;
   uptr size;
   uptr pc;
+  u32 life;
 };
 
 typedef AddrHashMap<DependencyState, 31051> LabelsHashMap;
@@ -120,10 +122,7 @@ typedef AddrHashMap<DependencyState, 31051> LabelsHashMap;
 // This struct is stored in TLS.
 class CprdThreadState {
  private:
-  UnorderedArray<DependencyState, 100> df_pending_reads;
-  // u8 df_used_labels;
-  // LabelsHashMap df_pending_reads;
-
+  UnorderedArray<DependencyState, PENDING_READS_MAX> df_pending_reads;
   Vector<uptr> flushes_cache;
 
   CprdThreadState() = default;
@@ -135,23 +134,35 @@ class CprdThreadState {
   static CprdThreadState& s_get_instance();
 
   void df_mark_read(uptr pc, uptr addr, u32 size) {
-    InternalScopedString label_name(2 * GetPageSizeCached());
-    label_name.append("pd-%p-%p", addr, pc);
+    dfsan_label label = dfsan_read_label((void*)addr, size);
     
-    dfsan_label label = dfsan_create_label(label_name.data(), nullptr);
-    
-    TRACE_LOG("Adding label %x - %s", label, label_name.data());
-    
-    dfsan_add_label(label, (void*)addr, size); // not dfsan_set_label!
+    if (0 == label) {
+      InternalScopedString label_name(2 * GetPageSizeCached());
+      label_name.append("pd-%p-%p", addr, pc);
+      
+      TRACE_LOG("Creating label %x - %s", label, label_name.data());
+
+      label = dfsan_create_label(label_name.data(), nullptr);     
+      
+      dfsan_add_label(label, (void*)addr, size); // not dfsan_set_label!
+      // dfsan_set_label(label, (void*)addr, size); // not dfsan_set_label!
+    }
+
+    for (auto& df_pending_read : df_pending_reads) {
+      if (0 == --df_pending_read.data.life) {
+        df_pending_reads.remove_item(df_pending_read);
+      }
+    }
 
     auto *dependency_state = df_pending_reads.add();
     if (nullptr == dependency_state) {
-      WARN_LOG("No more available pending states", 1);
+      WARN_LOG("No more available pending states (max is %d)", PENDING_READS_MAX);
     } else {
       dependency_state->label = label;
       dependency_state->addr = addr;
       dependency_state->size = size;
       dependency_state->pc = pc;
+      dependency_state->life = 100;
     }
   }
 
@@ -164,11 +175,15 @@ class CprdThreadState {
 
     TRACE_LOG("Write has label %x", label);
 
+    TRACE_LOG("Found %d pending reads", df_pending_reads.count());
+
     for (auto& df_pending_read : df_pending_reads) {
-      if (dfsan_has_label(label, df_pending_read.label)) {
-        Printf("PD:%p:%p\n", df_pending_read.pc, pc);
+      if (dfsan_has_label(label, df_pending_read.data.label)) {
+        Printf("PD:%p:%p\n", df_pending_read.data.pc, pc);
+        df_pending_reads.remove_item(df_pending_read);
       }
     }
+    TRACE_LOG("Left %d pending reads", df_pending_reads.count());
   }
 
 };
@@ -271,7 +286,6 @@ class Cprd {
 
 
     if (!kAccessIsWrite) {
-      // dfsan_set_label(1 << 0, (void*)addr, (int)(1 << kAccessSizeLog));
       CprdThreadState::s_get_instance().df_mark_read(pc, addr, 1 << kAccessSizeLog);
     } else {
       CprdThreadState::s_get_instance().df_process_write(pc, addr, 1 << kAccessSizeLog);
