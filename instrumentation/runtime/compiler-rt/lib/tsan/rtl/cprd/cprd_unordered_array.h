@@ -35,8 +35,8 @@ private:
       return *this;
     }
 
-    T& operator*() {
-      return m_arr.m_data[m_i].data;
+    _Item& operator*() {
+      return m_arr.m_data[m_i];
     }
 
     bool operator==(const Iterator& other) const {
@@ -50,6 +50,7 @@ private:
 
 private:
   _Item m_data[MaxSize];
+  u32 m_count;
 
 private:
   _Item* _find(const T& v) {
@@ -73,11 +74,24 @@ private:
 public:
   explicit UnorderedArray() {}
 
+  u32 count() {
+    return m_count;
+  }
+
+  void remove_item(_Item& i) {
+    if (i.valid) {
+      i.valid = false;
+      m_count--;
+    }
+  }
+
   T* add() {
     _Item* p = _find_next_free();
     if (nullptr == p) {
       return nullptr;
     }
+
+    m_count++;
 
     p->valid = true;
     return &p->data;
@@ -89,6 +103,8 @@ public:
       return nullptr;
     }
     
+    m_count++;
+    
     p->data = v;
     p->valid = true;
     return &p->data;
@@ -98,6 +114,20 @@ public:
     return _find(v) != nullptr;
   }
 
+  bool remove_at(const u32 i) {
+    if (i >= MaxSize) {
+      return false;
+    }
+
+    if (!m_data[i].valid) {
+      return false;
+    }
+    
+    m_count--;
+    m_data[i].valid = false;
+    return true;
+  }
+
   bool remove(const T& v) {
     _Item* item = _find(v);
 
@@ -105,8 +135,9 @@ public:
       return false;
     }
     
+    m_count--;
+
     item->valid = false;
-    
     return true;
   }
 
