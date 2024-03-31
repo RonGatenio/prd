@@ -6,7 +6,14 @@
 #include "sanitizer_common/sanitizer_file.h"
 #include "cprd_common.h"
 #include "cprd_array.h"
+#include "cprd_unordered_array.h"
 
+typedef unsigned short dfsan_label;
+typedef unsigned long long size_t;
+extern "C" dfsan_label dfsan_create_label(const char *desc, void *userdata);
+extern "C" void dfsan_add_label(dfsan_label label, void *addr, size_t size);
+extern "C" dfsan_label dfsan_read_label(const void *addr, size_t size);
+extern "C" int dfsan_has_label(dfsan_label label, dfsan_label elem);
 
 namespace cprd {
 
@@ -97,6 +104,72 @@ struct pm_region {
   }
 
   bool contains(uptr addr) { return begin <= addr && addr < end; }
+};
+
+
+struct DependencyState {
+  dfsan_label label;
+  uptr addr;
+  uptr size;
+  uptr pc;
+};
+
+typedef AddrHashMap<DependencyState, 31051> LabelsHashMap;
+
+// This struct is stored in TLS.
+class CprdThreadState {
+ private:
+  UnorderedArray<DependencyState, 100> df_pending_reads;
+  // u8 df_used_labels;
+  // LabelsHashMap df_pending_reads;
+
+  Vector<uptr> flushes_cache;
+
+  CprdThreadState() = default;
+  ~CprdThreadState() = default;
+  CprdThreadState(const CprdThreadState&)= delete;
+  CprdThreadState& operator=(const CprdThreadState&)= delete;
+
+ public:
+  static CprdThreadState& s_get_instance();
+
+  void df_mark_read(uptr pc, uptr addr, u32 size) {
+    InternalScopedString label_name(2 * GetPageSizeCached());
+    label_name.append("pd-%p-%p", addr, pc);
+    
+    dfsan_label label = dfsan_create_label(label_name.data(), nullptr);
+    
+    TRACE_LOG("Adding label %x - %s", label, label_name.data());
+    
+    dfsan_add_label(label, (void*)addr, size); // not dfsan_set_label!
+
+    auto *dependency_state = df_pending_reads.add();
+    if (nullptr == dependency_state) {
+      WARN_LOG("No more available pending states", 1);
+    } else {
+      dependency_state->label = label;
+      dependency_state->addr = addr;
+      dependency_state->size = size;
+      dependency_state->pc = pc;
+    }
+  }
+
+  void df_process_write(uptr pc, uptr addr, u32 size) {
+    dfsan_label label = dfsan_read_label((void*)addr, size);
+
+    if (0 == label) {
+      return;
+    }
+
+    TRACE_LOG("Write has label %x", label);
+
+    for (auto& df_pending_read : df_pending_reads) {
+      if (dfsan_has_label(label, df_pending_read.label)) {
+        Printf("PD:%p:%p\n", df_pending_read.pc, pc);
+      }
+    }
+  }
+
 };
 
 class Cprd {
@@ -190,6 +263,14 @@ class Cprd {
 
     res.append("\n");
     Printf(res.data());
+
+
+    if (!kAccessIsWrite) {
+      // dfsan_set_label(1 << 0, (void*)addr, (int)(1 << kAccessSizeLog));
+      CprdThreadState::s_get_instance().df_mark_read(pc, addr, 1 << kAccessSizeLog);
+    } else {
+      CprdThreadState::s_get_instance().df_process_write(pc, addr, 1 << kAccessSizeLog);
+    }
 
   }
 

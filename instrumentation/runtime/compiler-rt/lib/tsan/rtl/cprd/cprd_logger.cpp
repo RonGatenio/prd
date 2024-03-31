@@ -73,4 +73,9 @@ Cprd& Cprd::s_get_instance() {
   return cprd;
 }
 
+CprdThreadState& CprdThreadState::s_get_instance() {
+  static thread_local CprdThreadState thread_state;
+  return thread_state;
+}
+
 }
