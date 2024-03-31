@@ -12,6 +12,7 @@ typedef unsigned short dfsan_label;
 typedef unsigned long long size_t;
 extern "C" dfsan_label dfsan_create_label(const char *desc, void *userdata);
 extern "C" void dfsan_add_label(dfsan_label label, void *addr, size_t size);
+extern "C" void dfsan_set_label(dfsan_label label, void *addr, size_t size);
 extern "C" dfsan_label dfsan_read_label(const void *addr, size_t size);
 extern "C" int dfsan_has_label(dfsan_label label, dfsan_label elem);
 
@@ -202,6 +203,8 @@ class Cprd {
   }
 
   void handle_mmap(uptr addr, u32 size, fd_t fd) {
+    dfsan_set_label(0, (void*)addr, RoundUpTo(size, GetPageSizeCached()));
+
     if (!m_pm_pool_candidates.contains(fd)) {
       return;
     }
@@ -215,6 +218,8 @@ class Cprd {
   }
 
   void handle_munmap(uptr addr, u32 size) {
+    dfsan_set_label(0, (void*)addr, RoundUpTo(size, GetPageSizeCached()));
+
     pm_region region;
     region.begin = addr;
     region.end = addr + size;
