@@ -25,5 +25,6 @@ make -j 4
 cp $BUILD_DIR/pass/prd/PrdPass.so $BIN_DIR/
 cp $BUILD_DIR/runtime/compiler-rt/lib/linux/libclang_rt.tsan_cxx-x86_64.a $BIN_DIR/
 cp $BUILD_DIR/runtime/compiler-rt/lib/linux/libclang_rt.tsan-x86_64.a $BIN_DIR/
+cp $BUILD_DIR/runtime/compiler-rt/lib/linux/libclang_rt.dfsan-x86_64.a $BIN_DIR/
 
-ar crsT $BIN_DIR/tsan-x86_64.a $BIN_DIR/libclang_rt.tsan*
+ar crsT $BIN_DIR/tsan-x86_64.a $BIN_DIR/libclang_rt.*
