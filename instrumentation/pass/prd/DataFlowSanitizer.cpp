@@ -126,7 +126,7 @@ const char kDFSanExternShadowPtrMask[] = "__dfsan_shadow_ptr_mask";
 // we have unfortunately encountered too much code (including Clang itself;
 // see PR14291) which performs misaligned access.
 static cl::opt<bool> ClPreserveAlignment(
-    "dfsan-preserve-alignment",
+    "cprd-dfsan-preserve-alignment",
     cl::desc("respect alignment requirements provided by input IR"), cl::Hidden,
     cl::init(false));
 
@@ -138,21 +138,21 @@ static cl::opt<bool> ClPreserveAlignment(
 // unknown.  The other supported annotations are "functional" and "discard",
 // which are described below under DataFlowSanitizer::WrapperKind.
 static cl::list<std::string> ClABIListFiles(
-    "dfsan-abilist",
+    "cprd-dfsan-abilist",
     cl::desc("File listing native ABI functions and how the pass treats them"),
     cl::Hidden);
 
 // Controls whether the pass uses IA_Args or IA_TLS as the ABI for instrumented
 // functions (see DataFlowSanitizer::InstrumentedABI below).
 static cl::opt<bool> ClArgsABI(
-    "dfsan-args-abi",
+    "cprd-dfsan-args-abi",
     cl::desc("Use the argument ABI rather than the TLS ABI"),
     cl::Hidden);
 
 // Controls whether the pass includes or ignores the labels of pointers in load
 // instructions.
 static cl::opt<bool> ClCombinePointerLabelsOnLoad(
-    "dfsan-combine-pointer-labels-on-load",
+    "cprd-dfsan-combine-pointer-labels-on-load",
     cl::desc("Combine the label of the pointer with the label of the data when "
              "loading from memory."),
     cl::Hidden, cl::init(true));
@@ -160,13 +160,13 @@ static cl::opt<bool> ClCombinePointerLabelsOnLoad(
 // Controls whether the pass includes or ignores the labels of pointers in
 // stores instructions.
 static cl::opt<bool> ClCombinePointerLabelsOnStore(
-    "dfsan-combine-pointer-labels-on-store",
+    "cprd-dfsan-combine-pointer-labels-on-store",
     cl::desc("Combine the label of the pointer with the label of the data when "
              "storing in memory."),
     cl::Hidden, cl::init(false));
 
 static cl::opt<bool> ClDebugNonzeroLabels(
-    "dfsan-debug-nonzero-labels",
+    "cprd-dfsan-debug-nonzero-labels",
     cl::desc("Insert calls to __dfsan_nonzero_label on observing a parameter, "
              "load or return with a nonzero label"),
     cl::Hidden);
@@ -182,21 +182,21 @@ static cl::opt<bool> ClDebugNonzeroLabels(
 //   void __dfsan_mem_transfer_callback(dfsan_label *Start, size_t Len);
 //   void __dfsan_cmp_callback(dfsan_label CombinedLabel);
 static cl::opt<bool> ClEventCallbacks(
-    "dfsan-event-callbacks",
+    "cprd-dfsan-event-callbacks",
     cl::desc("Insert calls to __dfsan_*_callback functions on data events."),
     cl::Hidden, cl::init(false));
 
 // Use a distinct bit for each base label, enabling faster unions with less
 // instrumentation.  Limits the max number of base labels to 16.
 static cl::opt<bool> ClFast16Labels(
-    "dfsan-fast-16-labels",
+    "cprd-dfsan-fast-16-labels",
     cl::desc("Use more efficient instrumentation, limiting the number of "
              "labels to 16."),
     cl::Hidden, cl::init(false));
 
 // Controls whether the pass tracks the control flow of select instructions.
 static cl::opt<bool> ClTrackSelectControlFlow(
-    "dfsan-track-select-control-flow",
+    "cprd-dfsan-track-select-control-flow",
     cl::desc("Propagate labels from condition values of select instructions "
              "to results."),
     cl::Hidden, cl::init(true));
