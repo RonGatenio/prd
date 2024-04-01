@@ -96,6 +96,7 @@ void get_symbol_info(InternalScopedString& iss, ThreadState *thr, uptr pc, bool 
 /* PM regions */
 #define PM_POOL_CAND_MAX 128
 #define PENDING_READS_MAX 10000
+#define PENDING_READS_LIFE_MAX 100
 
 struct pm_region {
   uptr begin;
@@ -137,6 +138,8 @@ class CprdThreadState {
     dfsan_label label = dfsan_read_label((void*)addr, size);
     
     if (0 == label) {
+      // Add new label if there isn't one already
+
       InternalScopedString label_name(2 * GetPageSizeCached());
       label_name.append("pd-%p-%p", addr, pc);
       
@@ -145,7 +148,6 @@ class CprdThreadState {
       label = dfsan_create_label(label_name.data(), nullptr);     
       
       dfsan_add_label(label, (void*)addr, size); // not dfsan_set_label!
-      // dfsan_set_label(label, (void*)addr, size); // not dfsan_set_label!
     }
 
     for (auto& df_pending_read : df_pending_reads) {
@@ -162,7 +164,7 @@ class CprdThreadState {
       dependency_state->addr = addr;
       dependency_state->size = size;
       dependency_state->pc = pc;
-      dependency_state->life = 100;
+      dependency_state->life = PENDING_READS_LIFE_MAX;
     }
   }
 
@@ -284,12 +286,17 @@ class Cprd {
     res.append("\n");
     Printf(res.data());
 
-
+    // Program dependency analysis
+#if CPRD_DEPENDENCY_ANALYSIS
+    /*
+      Note that this works because __tsan_write is called after the actual WRITE event
+    */
     if (!kAccessIsWrite) {
       CprdThreadState::s_get_instance().df_mark_read(pc, addr, 1 << kAccessSizeLog);
     } else {
       CprdThreadState::s_get_instance().df_process_write(pc, addr, 1 << kAccessSizeLog);
     }
+#endif
 
   }
 

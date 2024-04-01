@@ -10,5 +10,6 @@
 #define CPRD_SYMBOLIZE_PC false
 #define CPRD_SYMBOLIZE_CALLSTACK false
 
+#define CPRD_DEPENDENCY_ANALYSIS true
 
 #endif  // CPRD_CONFIG_H
