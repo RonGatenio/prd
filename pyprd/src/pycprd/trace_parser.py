@@ -112,7 +112,7 @@ class TraceParser:
 
         return self
 
-    def to_hbg(self, filter_volatile_nodes=True, debug=False, max_lines=None, make_daisy_chains=True) -> HBG:
+    def to_hbg(self, filter_volatile_nodes=False, debug=False, max_lines=None, make_daisy_chains=True) -> HBG:
         self.parse(debug=debug, max_lines=max_lines)
 
         return self._hbg_builder.build(filter_volatile_nodes=filter_volatile_nodes,

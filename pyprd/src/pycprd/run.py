@@ -1,5 +1,5 @@
 import argparse
-from .hbg_trace_parser import TraceParser
+from .trace_parser import TraceParser
 from .pdg import generate_mock_pdg_v2
 from .prd import PersistencyRaceDetector
 from .utils import timeit

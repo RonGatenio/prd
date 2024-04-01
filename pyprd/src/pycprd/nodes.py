@@ -140,6 +140,10 @@ class InstructionNode(AbstractNode):
 
     def get_cacheline_interval(self, cacheline_size=utils.DEFAULT_CACHELINE_SIZE):
         return utils.get_cacheline_interval(self.address, self.size, cacheline_size=cacheline_size)
+    
+    def is_contained_in_cachline(self, cacheline_size=utils.DEFAULT_CACHELINE_SIZE) -> bool:
+        ci = self.get_cacheline_interval(cacheline_size=cacheline_size)
+        return ci[1] - ci[0] == cacheline_size
 
     def __repr__(self) -> str:
         tid = self.tid
@@ -164,8 +168,14 @@ class InstructionNode(AbstractNode):
         if not isinstance(self.info, TraceEventInfo):
             raise Exception('invalid node info')
         
+        event_type = self.str_itype
+        if self.is_non_temporal:
+            event_type += '-NT'
+        if self.is_atomic:
+            event_type = 'Atomic' + event_type
+        
         info: TraceEventInfo = self.info
-        return f'T{self.tid} {self.str_itype}({self.address:#x}, {self.size}) {info.symbol} (trace line {self.trace_line_number}) (cachline {self.get_cacheline_address():#x})'
+        return f'T{self.tid} {event_type}({self.address:#x}, {self.size}) {info.symbol} (trace line {self.trace_line_number}) (cachline {self.get_cacheline_address():#x})'
 
 
 class WriteNode(InstructionNode):
