@@ -1,4 +1,3 @@
-// #include "sanitizer_common/sanitizer_file.h"
 #include "sanitizer_common/sanitizer_stacktrace_printer.h"
 #include "../tsan_symbolize.h"
 #include "cprd_logger.h"
@@ -7,7 +6,7 @@
 namespace cprd {
 
 
-void log_loaded_modules() {
+void Cprd::_s_log_loaded_modules() {
   static atomic_uint8_t printed_modules = {0};
 
   u8 cmp = 0;
@@ -20,7 +19,7 @@ void log_loaded_modules() {
   }
 }
 
-void log_callstack(InternalScopedString& iss, ThreadState *thr, uptr pc) {
+void Cprd::_s_log_callstack(InternalScopedString& iss, ThreadState *thr, uptr pc) {
   VarSizeStackTrace trace;
   ObtainCurrentStack(thr, pc, &trace);
   for (uptr si = trace.size; si > 0; si--) {
@@ -31,22 +30,22 @@ void log_callstack(InternalScopedString& iss, ThreadState *thr, uptr pc) {
     if ((pc & kExternalPCBit) == 0)
       pc1 = StackTrace::GetPreviousInstructionPc(pc);
 
-    iss.append("%p%c", pc1, _callstack_delimiter);
+    iss.append("%p%c", pc1, _s_callstack_delimiter);
   }
 }
 
 ALWAYS_INLINE USED
-void get_callstack_info(InternalScopedString& iss, ThreadState *thr, uptr pc, bool symbolize) {
+void Cprd::s_get_callstack_info(InternalScopedString& iss, ThreadState *thr, uptr pc, bool symbolize) {
   if (symbolize) {
-    CaptureCurrentStack(&iss, thr, pc, _callstack_delimiter);
+    CaptureCurrentStack(&iss, thr, pc, _s_callstack_delimiter);
   } else {
-    log_loaded_modules();
-    log_callstack(iss, thr, pc);
+    _s_log_loaded_modules();
+    _s_log_callstack(iss, thr, pc);
   }
 }
 
 ALWAYS_INLINE USED
-void get_symbol_info(InternalScopedString& iss, ThreadState *thr, uptr pc, bool symbolize) {
+void Cprd::s_get_symbol_info(InternalScopedString& iss, ThreadState *thr, uptr pc, bool symbolize) {
   SymbolizedStack *ent = SymbolizeCode(pc);
 
   uptr pc1 = pc;

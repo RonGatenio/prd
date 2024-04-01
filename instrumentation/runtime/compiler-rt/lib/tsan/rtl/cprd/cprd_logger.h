@@ -1,114 +1,29 @@
 #ifndef CRPD_LOGGER_H
 #define CRPD_LOGGER_H
 
+#include "dfsan/dfsan_interface.h"
 #include "../tsan_defs.h"
 #include "../tsan_rtl.h"
-#include "sanitizer_common/sanitizer_file.h"
 #include "cprd_common.h"
 #include "cprd_array.h"
 #include "cprd_unordered_array.h"
 
-typedef unsigned short dfsan_label;
-typedef unsigned long long size_t;
-extern "C" dfsan_label dfsan_create_label(const char *desc, void *userdata);
-extern "C" void dfsan_add_label(dfsan_label label, void *addr, size_t size);
-extern "C" void dfsan_set_label(dfsan_label label, void *addr, size_t size);
-extern "C" dfsan_label dfsan_read_label(const void *addr, size_t size);
-extern "C" int dfsan_has_label(dfsan_label label, dfsan_label elem);
-
 namespace cprd {
 
-// class AutoCloseFile {
-// private:
-//     fd_t fd;
-
-// static fd_t _s_open_file(const char *filename, FileAccessMode mode) {
-//     fd_t fd = OpenFile(filename, mode);
-//     if (kInvalidFd == fd) {
-//         throw std::Excption()
-//     }
-// }
-
-// public:
-//     explicit AutoCloseFile(const char *filename) {};
-
-// };
-
-// enum PrdEventType {
-//     PrdEventTypeHappensBeforeEdge,
-//     PrdEventTypeEpocInc,
-//     PrdEventTypeRead,
-//     PrdEventTypeWrite,
-//     PrdEventTypeFlush
-// };
-
-// class PrdEvent {
-// public:
-
-// private:
-//     PrdEventType m_type;
-// };
-
-// typedef struct _PRD_EVENT {
-
-// } PRD_EVENT, *PPPRD_EVENT;
-
-// ALWAYS_INLINE void _Log(int tid, char* type) {
-// }
-
-// ALWAYS_INLINE void LogHappensBeforeEdge() {
-// }
-
-// }
-
-// class Logger {
-// private:
-//     FileCloser logfile;
-
-//     static fd_t _s_open_file(const char *filename, FileAccessMode mode) {
-//         fd_t fd = OpenFile(filename, mode);
-//         if (kInvalidFd == fd) {
-//             throw 0; // TODO
-//         }
-//         return fd;
-//     }
-
-// public:
-//     explicit Logger(const char *filename) :
-//         logfile(_s_open_file(filename, WrOnly)) {}
-
-//     void log_epoch() {};
-//     void log_hb_edge() {};
-//     void log_read_write() {};
-//     void log_flush() {};
-//     void log_fence() {};
-// };
-
-char _callstack_delimiter = ',';
-char _info_delimiter = '|';
-
-void get_callstack_info(InternalScopedString& iss, ThreadState *thr, uptr pc, bool symbolize = false);
-
-void get_symbol_info(InternalScopedString& iss, ThreadState *thr, uptr pc, bool symbolize = false);
-
-
-
-/* PM regions */
 #define PM_POOL_CAND_MAX 128
 #define PENDING_READS_MAX 10000
 #define PENDING_READS_LIFE_MAX 100
 
-struct pm_region {
+struct PMRegion {
   uptr begin;
   uptr end;
 
-  bool operator==(const pm_region& other) const {
+  bool operator==(const PMRegion& other) const {
     return begin == other.begin && end == other.end;
   }
 
   bool contains(uptr addr) { return begin <= addr && addr < end; }
 };
-
 
 struct DependencyState {
   dfsan_label label;
@@ -117,8 +32,6 @@ struct DependencyState {
   uptr pc;
   u32 life;
 };
-
-typedef AddrHashMap<DependencyState, 31051> LabelsHashMap;
 
 // This struct is stored in TLS.
 class CprdThreadState {
@@ -180,11 +93,19 @@ class CprdThreadState {
     TRACE_LOG("Found %d pending reads", df_pending_reads.count());
 
     for (auto& df_pending_read : df_pending_reads) {
-      if (dfsan_has_label(label, df_pending_read.data.label)) {
-        Printf("PD:%p:%p\n", df_pending_read.data.pc, pc);
-        df_pending_reads.remove_item(df_pending_read);
+      if (df_pending_read.data.addr == addr) {
+        // Same var?
+        continue;
       }
+      
+      if (!dfsan_has_label(label, df_pending_read.data.label)) {
+        continue;
+      }
+
+      Printf("PD:%p:%p\n", df_pending_read.data.pc, pc);
+      df_pending_reads.remove_item(df_pending_read);
     }
+
     TRACE_LOG("Left %d pending reads", df_pending_reads.count());
   }
 
@@ -193,17 +114,26 @@ class CprdThreadState {
 class Cprd {
  private:
   Array<fd_t, PM_POOL_CAND_MAX> m_pm_pool_candidates;
-  Array<pm_region, PM_POOL_CAND_MAX> m_pm_regions;
+  Array<PMRegion, PM_POOL_CAND_MAX> m_pm_regions;
 
   static constexpr const char* _s_pm_pool_path_pattern = "pmem";
+
+  static constexpr const char _s_callstack_delimiter = ',';
+  static constexpr const char _s_info_delimiter = '|';
 
   Cprd() = default;
   ~Cprd() = default;
   Cprd(const Cprd&)= delete;
   Cprd& operator=(const Cprd&)= delete;
 
+  static void _s_log_callstack(InternalScopedString& iss, ThreadState *thr, uptr pc);
+  static void _s_log_loaded_modules();
+
  public:
   static Cprd& s_get_instance();
+
+  static void s_get_callstack_info(InternalScopedString& iss, ThreadState *thr, uptr pc, bool symbolize = false);
+  static void s_get_symbol_info(InternalScopedString& iss, ThreadState *thr, uptr pc, bool symbolize = false);
 
   void handle_open_file(const char* path, fd_t fd) {
     if (internal_strstr(path, _s_pm_pool_path_pattern) == nullptr) {
@@ -226,7 +156,7 @@ class Cprd {
       return;
     }
 
-    pm_region region;
+    PMRegion region;
     region.begin = addr;
     region.end = addr + size;
 
@@ -237,12 +167,13 @@ class Cprd {
   void handle_munmap(uptr addr, u32 size) {
     dfsan_set_label(0, (void*)addr, RoundUpTo(size, GetPageSizeCached()));
 
-    pm_region region;
+    PMRegion region;
     region.begin = addr;
     region.end = addr + size;
 
-    if (m_pm_regions.remove(region))
-    DEBUG_LOG("In handle_munmap; removed PM region %p, size %p", addr, size);
+    if (m_pm_regions.remove(region)) {
+      DEBUG_LOG("In handle_munmap; removed PM region %p, size %p", addr, size);
+    }
   }
 
   ALWAYS_INLINE USED
@@ -271,16 +202,16 @@ class Cprd {
               (void*)pc, 
               (void*)addr,
               (int)(1 << kAccessSizeLog));
-    get_symbol_info(res, thr, pc);
+    s_get_symbol_info(res, thr, pc);
 
     res.append(":%d:%d", kIsAtomic, kIsNonTemporal);
 
-    res.append("%c", _info_delimiter);
-    get_callstack_info(res, thr, pc);
+    res.append("%c", _s_info_delimiter);
+    s_get_callstack_info(res, thr, pc);
 
 #if CPRD_SYMBOLIZE_PC
     res.append("# ");
-    get_symbol_info(res, thr, pc, true);
+    s_get_symbol_info(res, thr, pc, true);
 #endif
 
     res.append("\n");
@@ -307,7 +238,7 @@ class Cprd {
 
   void instrument_fence(ThreadState *thr, uptr pc) {
     InternalScopedString res(2 * GetPageSizeCached());
-    get_symbol_info(res, thr, pc);
+    s_get_symbol_info(res, thr, pc);
 
     for (uptr i = 0; i < thr->flushes_cache.Size(); i++)
     {
@@ -315,6 +246,11 @@ class Cprd {
     }
     
     thr->flushes_cache.Reset();
+  }
+
+  void log_happens_before_edge(u64 source_thread, u64 source_epoch, u64 target_thread, u64 target_epoch, const char* comment = nullptr) {
+    const char* comment_prefix = comment ? "  # " : "";
+    Printf("%d:HB_EDGE:%d:%d:%d:%d%s%s\n", target_thread, source_thread, source_epoch, target_thread, target_epoch, comment_prefix, comment);
   }
 };
 

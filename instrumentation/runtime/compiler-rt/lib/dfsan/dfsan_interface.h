@@ -13,15 +13,12 @@
 #ifndef DFSAN_INTERFACE_H
 #define DFSAN_INTERFACE_H
 
-#include <stddef.h>
-#include <stdint.h>
-#include <sanitizer/common_interface_defs.h>
-
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-typedef uint16_t dfsan_label;
+typedef unsigned long long size_t;
+typedef unsigned short dfsan_label;
 
 /// Stores information associated with a specific label identifier.  A label
 /// may be a base label created using dfsan_create_label, with associated
