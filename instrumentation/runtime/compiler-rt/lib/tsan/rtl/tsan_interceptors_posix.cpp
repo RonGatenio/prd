@@ -30,7 +30,7 @@
 #include "tsan_rtl.h"
 #include "tsan_mman.h"
 #include "tsan_fd.h"
-#include "cprd/cprd_logger.h"
+#include "cprd/cprd.h"
 
 using namespace __tsan;
 

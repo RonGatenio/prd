@@ -13,7 +13,7 @@
 #include "tsan_fd.h"
 #include "tsan_rtl.h"
 #include <sanitizer_common/sanitizer_atomic.h>
-#include "cprd/cprd_logger.h"
+#include "cprd/cprd.h"
 
 namespace __tsan {
 

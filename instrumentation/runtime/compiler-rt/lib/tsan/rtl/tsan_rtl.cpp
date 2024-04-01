@@ -27,7 +27,7 @@
 #include "tsan_suppressions.h"
 #include "tsan_symbolize.h"
 #include "ubsan/ubsan_init.h"
-#include "cprd/cprd_logger.h"
+#include "cprd/cprd.h"
 
 #ifdef __SSE3__
 // <emmintrin.h> transitively includes <stdlib.h>,

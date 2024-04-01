@@ -1,6 +1,6 @@
 #include "sanitizer_common/sanitizer_stacktrace_printer.h"
 #include "../tsan_symbolize.h"
-#include "cprd_logger.h"
+#include "cprd.h"
 
 
 namespace cprd {

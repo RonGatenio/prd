@@ -111,10 +111,10 @@ set(TSAN_HEADERS
   rtl/tsan_update_shadow_word_inl.h)
 
 set(CPRD_SOURCES
-  rtl/cprd/cprd_logger.cpp)
+  rtl/cprd/cprd.cpp)
 
 set(CPRD_HEADERS
-  rtl/cprd/cprd_logger.h)
+  rtl/cprd/cprd.h)
 
 set(TSAN_RUNTIME_LIBRARIES)
 add_compiler_rt_component(tsan)
