@@ -1,3 +1,4 @@
+from collections import defaultdict
 import networkx as nx
 from typing import Iterable
 from . import nodes
@@ -22,6 +23,7 @@ class PDG:
 class PDGBuilder:
     def __init__(self):
         self._graph = nx.DiGraph()
+        self._dependencies: dict[int, set[int]] = defaultdict(set)
 
     def add_dependency(self, write_node: nodes.InstructionNode, read_node: nodes.InstructionNode):
         assert write_node.itype == nodes.NodeType.WRITE, f'expected a write node but got {write_node.itype}'
@@ -29,8 +31,30 @@ class PDGBuilder:
         assert write_node.tid == read_node.tid, 'expected tids to be the same'
 
         self._graph.add_edge(write_node, read_node)
+        
+    def add_dependency_pc(self, write_node_pc: int, read_node_pc: int):
+        self._dependencies[write_node_pc].add(read_node_pc)
 
-    def build(self):
+    def build(self, hbg: HBG = None):
+        if self._dependencies:
+            assert hbg, 'There are PC based dependencies, HBG is required'
+
+            for tid in hbg.tids:
+                pending_reads = defaultdict(set)
+                
+                for n in hbg.get_thread_nodes(tid):
+                    n: nodes.AbstractNode
+                    
+                    if n.itype == nodes.NodeType.READ:
+                        n: nodes.ReadNode
+                        pending_reads[n.pc].add(n)
+
+                    elif n.itype == nodes.NodeType.WRITE:
+                        n: nodes.WriteNode
+                        for read_pc in self._dependencies[n.pc]:
+                            for read_node in pending_reads[read_pc]:
+                                self.add_dependency(n, read_node)
+            
         return PDG(self._graph)
 
 
