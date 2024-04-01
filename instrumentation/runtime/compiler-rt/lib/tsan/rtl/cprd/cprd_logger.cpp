@@ -77,4 +77,122 @@ CprdThreadState& CprdThreadState::s_get_instance() {
   return thread_state;
 }
 
+void Cprd::handle_open_file(const char* path, fd_t fd) {
+  if (internal_strstr(path, _s_pm_pool_path_pattern) == nullptr) {
+    return;
+  }
+
+  m_pm_pool_candidates.push_back(fd);
+  DEBUG_LOG("In handle_open_file %s with fd %d", path, fd);
+}
+
+void Cprd::handle_close_file(fd_t fd) {
+  if (m_pm_pool_candidates.remove(fd))
+  DEBUG_LOG("In handle_close_file fd %d", fd);
+}
+
+void Cprd::handle_mmap(uptr addr, u32 size, fd_t fd) {
+  dfsan_set_label(0, (void*)addr, RoundUpTo(size, GetPageSizeCached()));
+
+  if (!m_pm_pool_candidates.contains(fd)) {
+    return;
+  }
+
+  PMRegion region;
+  region.begin = addr;
+  region.end = addr + size;
+
+  m_pm_regions.push_back(region);
+  DEBUG_LOG("In handle_mmap; added PM region %p, size %p, fd %d", addr, size, fd);
+}
+
+void Cprd::handle_munmap(uptr addr, u32 size) {
+  dfsan_set_label(0, (void*)addr, RoundUpTo(size, GetPageSizeCached()));
+
+  PMRegion region;
+  region.begin = addr;
+  region.end = addr + size;
+
+  if (m_pm_regions.remove(region)) {
+    DEBUG_LOG("In handle_munmap; removed PM region %p, size %p", addr, size);
+  }
+}
+
+ALWAYS_INLINE USED
+bool Cprd::is_pm_address(uptr addr) {
+  for (auto& region : m_pm_regions) {
+    if (region.contains(addr)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+ALWAYS_INLINE USED
+void Cprd::instrument_memory_access(ThreadState *thr, uptr addr, uptr pc, 
+  int kAccessSizeLog, bool kAccessIsWrite, bool kIsAtomic, bool kIsNonTemporal) {
+
+  if (!is_pm_address(addr)) {
+    return;
+  }
+
+  InternalScopedString res(2 * GetPageSizeCached());
+
+  res.append("%d:%s:%p:%p:%d:", 
+            (int)thr->fast_state.tid(), 
+            kAccessIsWrite ? "WRITE" : "READ", 
+            (void*)pc, 
+            (void*)addr,
+            (int)(1 << kAccessSizeLog));
+  s_get_symbol_info(res, thr, pc);
+
+  res.append(":%d:%d", kIsAtomic, kIsNonTemporal);
+
+  res.append("%c", _s_info_delimiter);
+  s_get_callstack_info(res, thr, pc);
+
+#if CPRD_SYMBOLIZE_PC
+  res.append("# ");
+  s_get_symbol_info(res, thr, pc, true);
+#endif
+
+  res.append("\n");
+  Printf(res.data());
+
+  // Program dependency analysis
+#if CPRD_DEPENDENCY_ANALYSIS
+  /*
+    Note that this works because __tsan_write is called after the actual WRITE event
+  */
+  if (!kAccessIsWrite) {
+    CprdThreadState::s_get_instance().df_mark_read(pc, addr, 1 << kAccessSizeLog);
+  } else {
+    CprdThreadState::s_get_instance().df_process_write(pc, addr, 1 << kAccessSizeLog);
+  }
+#endif
+
+}
+
+void Cprd::instrument_flush(ThreadState *thr, uptr pc, uptr addr) {
+  addr = RoundDown(addr, kCacheLineSize);
+  thr->flushes_cache.PushBack(addr);
+}
+
+void Cprd::instrument_fence(ThreadState *thr, uptr pc) {
+  InternalScopedString res(2 * GetPageSizeCached());
+  s_get_symbol_info(res, thr, pc);
+
+  for (uptr i = 0; i < thr->flushes_cache.Size(); i++)
+  {
+    Printf("%d:FLUSH:%p:%p:%d:%s\n", thr->tid, (void*)pc, (void*)thr->flushes_cache[i], kCacheLineSize, res.data());
+  }
+  
+  thr->flushes_cache.Reset();
+}
+
+void Cprd::log_happens_before_edge(u64 source_thread, u64 source_epoch, u64 target_thread, u64 target_epoch, const char* comment) {
+  const char* comment_prefix = comment ? "  # " : "";
+  Printf("%d:HB_EDGE:%d:%d:%d:%d%s%s\n", target_thread, source_thread, source_epoch, target_thread, target_epoch, comment_prefix, comment);
+}
+
 }
