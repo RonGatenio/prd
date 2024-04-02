@@ -71,7 +71,8 @@ class EpochNode(AbstractNode):
 class InstructionNode(AbstractNode):
     def __init__(self, itype: NodeType, tid: int, pc: int, address: int, size: int,
                  is_atomic = False, is_non_temporal = False,
-                 info: Any = None, trace_line_number: int = None):
+                 info: Any = None, trace_line_number: int = None,
+                 event_id: int = None):
         super().__init__(itype, tid)
         self._pc = pc
         self._address = address
@@ -80,6 +81,7 @@ class InstructionNode(AbstractNode):
         self._is_non_temporal = is_non_temporal
         self._info = info
         self._trace_line_number = trace_line_number
+        self._event_id = event_id
 
         assert size, "Size can't be 0"
 
@@ -118,6 +120,10 @@ class InstructionNode(AbstractNode):
     @property
     def trace_line_number(self):
         return self._trace_line_number
+    
+    @property
+    def event_id(self):
+        return self._event_id
     
     def is_interval_overlap(self, other: 'InstructionNode') -> bool:
         """
@@ -179,18 +185,18 @@ class InstructionNode(AbstractNode):
 
 
 class WriteNode(InstructionNode):
-    def __init__(self, tid: int, pc: int, address: int, size: int, is_atomic = False, is_non_temporal = False, info: Any = None, trace_line_number: int = None):
-        super().__init__(NodeType.WRITE, tid, pc, address, size, is_atomic, is_non_temporal, info, trace_line_number)
+    def __init__(self, tid: int, pc: int, address: int, size: int, is_atomic = False, is_non_temporal = False, info: Any = None, trace_line_number: int = None, event_id: int = None):
+        super().__init__(NodeType.WRITE, tid, pc, address, size, is_atomic, is_non_temporal, info, trace_line_number, event_id=event_id)
 
 
 class ReadNode(InstructionNode):
-    def __init__(self, tid: int, pc: int, address: int, size: int, is_atomic = False, is_non_temporal = False, info: Any = None, trace_line_number: int = None):
-        super().__init__(NodeType.READ, tid, pc, address, size, is_atomic, is_non_temporal, info, trace_line_number)
+    def __init__(self, tid: int, pc: int, address: int, size: int, is_atomic = False, is_non_temporal = False, info: Any = None, trace_line_number: int = None, event_id: int = None):
+        super().__init__(NodeType.READ, tid, pc, address, size, is_atomic, is_non_temporal, info, trace_line_number, event_id=event_id)
 
 
 class FlushNode(InstructionNode):
-    def __init__(self, tid: int, pc: int, address: int, size: int, is_atomic = False, is_non_temporal = False, info: Any = None, trace_line_number: int = None):
-        super().__init__(NodeType.FLUSH, tid, pc, address, size, is_atomic, is_non_temporal, info, trace_line_number)
+    def __init__(self, tid: int, pc: int, address: int, size: int, is_atomic = False, is_non_temporal = False, info: Any = None, trace_line_number: int = None, event_id: int = None):
+        super().__init__(NodeType.FLUSH, tid, pc, address, size, is_atomic, is_non_temporal, info, trace_line_number, event_id=event_id)
 
 
 def create_instruction_node(itype: NodeType,
@@ -201,11 +207,12 @@ def create_instruction_node(itype: NodeType,
                             is_atomic: bool = False,
                             is_non_temporal: bool = False,
                             info: Any = None,
-                            trace_line_number: int = None) -> InstructionNode:
+                            trace_line_number: int = None,
+                            event_id: int = None) -> InstructionNode:
     cls = {
         NodeType.READ:  ReadNode,
         NodeType.WRITE: WriteNode,
         NodeType.FLUSH: FlushNode,
     }[itype]
 
-    return cls(tid, pc, address, size, is_atomic, is_non_temporal, info, trace_line_number)
+    return cls(tid, pc, address, size, is_atomic, is_non_temporal, info, trace_line_number, event_id=event_id)

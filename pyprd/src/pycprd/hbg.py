@@ -457,8 +457,9 @@ class HBGBuilder:
 
     def add_instruction_node(self, itype: nodes.NodeType, tid: int, pc: int, address: int, size: int,
                              info: Any = None, trace_line_number: int = None,
-                             is_atomic = False, is_non_temporal = False):
-        n = nodes.create_instruction_node(itype, tid, pc, address, size, is_atomic, is_non_temporal, info, trace_line_number)
+                             is_atomic = False, is_non_temporal = False,
+                             event_id: int = None):
+        n = nodes.create_instruction_node(itype, tid, pc, address, size, is_atomic, is_non_temporal, info, trace_line_number, event_id)
         self._nodes.append(n)
         return n
 

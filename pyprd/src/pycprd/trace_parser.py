@@ -1,10 +1,12 @@
 import os
 from typing import Set, Tuple
+from collections import defaultdict
 
 from .pdg import PDG, PDGBuilder, generate_mock_pdg_v2, pdg_distance
 from .hbg import HBG, HBGBuilder
 from .trace_event_info import TraceEventInfo
 from .symbolizer import Symbolizer, Symbol
+from .nodes import InstructionNode
 
 
 _any_int = lambda x: int(x, 0)
@@ -15,6 +17,7 @@ class TraceParser:
         self._trace = map(str.strip, trace_lines)
         self._hbg_builder = HBGBuilder()
         self._pdg_builder = PDGBuilder()
+        self._events: dict[int, dict[int, InstructionNode]] = defaultdict(dict)
         self._name = name
         self._pmem_range = None
         self._ignore_ranges: Set[Tuple[int, int]] = set()
@@ -44,8 +47,16 @@ class TraceParser:
             dbg_print(f'Invalid line {line_number}')
             return
 
-        tid, key = parts[:2]
-        args = line.split('#')[0].strip().split(':')[2:]
+        args_index = 2
+        tid, key = parts[:args_index]
+
+        event_id = None
+        if key.isdigit():
+            args_index = 3
+            event_id, tid, key = parts[:args_index]
+            event_id = int(event_id)
+        
+        args = line.split('#')[0].strip().split(':')[args_index:]
 
         if not tid.isdigit():
             # Invalid tid
@@ -56,8 +67,14 @@ class TraceParser:
 
         match key:
             case 'PD':
-                read_pc, write_pc = tuple(map(_any_int, args))
-                self._pdg_builder.add_dependency_pc(read_node_pc=read_pc, write_node_pc=write_pc)
+                if len(args) == 2:
+                    read_pc, write_pc = tuple(map(_any_int, args))
+                    self._pdg_builder.add_dependency_pc(read_node_pc=read_pc, write_node_pc=write_pc)
+                else:
+                    read_pc, read_event_id, write_pc, write_event_id = tuple(map(_any_int, args))
+                    read_node = self._events[tid][read_event_id]
+                    write_node = self._events[tid][write_event_id]
+                    self._pdg_builder.add_dependency(read_node=read_node, write_node=write_node)
             case 'HB_EDGE':
                 src_tid, src_epoch, dst_tid, dst_epoch = tuple(map(_any_int, args))
                 self._hbg_builder.add_happens_before_edge(src_tid, src_epoch, dst_tid, dst_epoch)
@@ -76,14 +93,14 @@ class TraceParser:
                 name = args[2]
                 self._symbolizer.add_module(name, start, end-start)
             case 'READ' | 'WRITE' | 'FLUSH':
-                pc, address, size = parts[2:5]
+                pc, address, size = parts[args_index:args_index+3]
                 pc = _any_int(pc)
                 address = _any_int(address)
                 size = _any_int(size)
                 
                 is_atomic = is_non_temporal = False
                 
-                info = parts[5:]
+                info = parts[args_index+3:]
                 info = ':'.join(info) if info else ''
                 
                 if info.startswith('0x'):
@@ -103,7 +120,9 @@ class TraceParser:
                 else:
                     info = info.split('|')[0]
                     
-                self._hbg_builder.add_instruction_node(key, tid, pc, address, size, info, line_number, is_atomic=is_atomic, is_non_temporal=is_non_temporal)
+                node = self._hbg_builder.add_instruction_node(key, tid, pc, address, size, info, line_number, is_atomic=is_atomic, is_non_temporal=is_non_temporal, event_id=event_id)
+                if node.event_id:
+                    self._events[node.tid][node.event_id] = node
             case _:
                 # Invalid key
                 dbg_print(f'Invalid key {key} in line {line_number}')

@@ -27,6 +27,7 @@ struct PMRegion {
 
 struct DependencyState {
   dfsan_label label;
+  u64 event_id;
   uptr addr;
   uptr size;
   uptr pc;
@@ -38,6 +39,7 @@ class CprdThreadState {
  private:
   UnorderedArray<DependencyState, PENDING_READS_MAX> df_pending_reads;
   Vector<uptr> flushes_cache;
+  u64 event_counter;
 
   CprdThreadState() = default;
   ~CprdThreadState() = default;
@@ -47,8 +49,9 @@ class CprdThreadState {
  public:
   static CprdThreadState& s_get_instance();
 
-  void df_mark_read(u64 tid, uptr pc, uptr addr, u32 size);
-  void df_process_write(u64 tid, uptr pc, uptr addr, u32 size);
+  u64 make_event_id() { return event_counter++; }
+  void df_mark_read(u64 event_id, u64 tid, uptr pc, uptr addr, u32 size);
+  void df_process_write(u64 event_id, u64 tid, uptr pc, uptr addr, u32 size);
 
 };
 
