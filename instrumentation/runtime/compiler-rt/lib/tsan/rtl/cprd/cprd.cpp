@@ -245,8 +245,11 @@ void CprdThreadState::df_process_write(u64 event_id, u64 tid, uptr pc, uptr addr
   TRACE_LOG("Found %d pending reads", df_pending_reads.count());
 
   for (auto& df_pending_read : df_pending_reads) {
-    if (df_pending_read.data.addr == addr) {
-      // Same var?
+    uptr write_addr_cacheline = RoundDown(addr, kCacheLineSize);
+    uptr read_addr_cacheline  = RoundDown(df_pending_read.data.addr, kCacheLineSize);
+
+    // Ignore if variables are on the same cacheline
+    if (write_addr_cacheline == read_addr_cacheline) {
       continue;
     }
     
@@ -255,6 +258,7 @@ void CprdThreadState::df_process_write(u64 event_id, u64 tid, uptr pc, uptr addr
     }
 
     Printf("%llu:PD:%p:%llu:%p:%llu\n", tid, df_pending_read.data.pc, df_pending_read.data.event_id, pc, event_id);
+
     df_pending_reads.remove_item(df_pending_read);
   }
 
