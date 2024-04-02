@@ -191,8 +191,10 @@ class PersistencyRaceDetector:
         self._ignore_read_node_persistency  = ignore_read_node_persistency
         self._show_only_first_bug_in_thread = show_only_first_bug_in_thread
 
-        self._time_first_stage  = None
-        self._time_second_stage = None
+        self._time_first_stage  = 0
+        self._time_second_stage = 0
+        self._time_finding_bugs = 0
+        self._time_chain_traversal = 0
         
         self._race_counter_dropped_by_read_persistency = 0
 
@@ -217,9 +219,11 @@ class PersistencyRaceDetector:
             lines.append(f"{INDENT}Total races by instructions      {sum(map(len, self._races.races_by_pc.values())):,}")
             lines.append(f"{INDENT}Total races by callstack (info)  {sum(map(len, self._races.races_by_info.values())):,}")
             lines.append(f"{INDENT}Total races by read instructions {len(list(self._races.race_nodes_by_read_pc())):,}")
-            lines.append(f"{INDENT}Duration                         {self._time_first_stage + self._time_second_stage:.3f} sec")
-            lines.append(f"{INDENT}{INDENT}1st stage duration {self._time_first_stage:.3f} sec")
-            lines.append(f"{INDENT}{INDENT}2nd stage duration {self._time_second_stage:.3f} sec")
+            lines.append(f"{INDENT}Duration                         {self._time_first_stage + self._time_second_stage:.2f} sec")
+            lines.append(f"{INDENT}{INDENT}1st stage duration {self._time_first_stage:.2f} sec")
+            lines.append(f"{INDENT}{INDENT}2nd stage duration {self._time_second_stage:.2f} sec")
+            lines.append(f"{INDENT}{INDENT}{INDENT}finding bugs    {self._time_finding_bugs:.2f} sec")
+            lines.append(f"{INDENT}{INDENT}{INDENT}chain traversal {self._time_finding_bugs:.2f} sec")
 
         max_line_size = max(map(len, lines))
         lines.insert(0, f'{" CPRD Stats ":#^{max_line_size}}')
@@ -307,38 +311,40 @@ class PersistencyRaceDetector:
                 else:
                     chain = daisy_chains.get_chain_by_thread(tid, read_node.get_cacheline_address())
 
-                for write_node in chain:
-                    write_node: WriteNode
-                    
-                    # If we read after a non-temporal write, than the write must have been persisted
-                    if write_node.is_non_temporal:
-                        continue
-                    
-                    # Is a different var
-                    if not write_node.is_interval_overlap(read_node):
-                        continue
-
-                    write_node_loc = self._hbg.get_node_location(write_node)
-
-                    # Is already persisted
-                    if not self._ignore_persisted_before_index:
-                        if pvc.is_event_persisted(*write_node_loc):
+                with utils.timeit() as _chain_duration:
+                    for write_node in chain:
+                        write_node: WriteNode
+                        
+                        # If we read after a non-temporal write, than the write must have been persisted
+                        if write_node.is_non_temporal:
+                            continue
+                        
+                        # Is a different var
+                        if not write_node.is_interval_overlap(read_node):
                             continue
 
-                    # Is happens after the read
-                    if not self._ignore_happens_after_index:
-                        if vc_per_read_node[read_node].is_happens_after(*write_node_loc):
+                        write_node_loc = self._hbg.get_node_location(write_node)
+
+                        # Is already persisted
+                        if not self._ignore_persisted_before_index:
+                            if pvc.is_event_persisted(*write_node_loc):
+                                continue
+
+                        # Is happens after the read
+                        if not self._ignore_happens_after_index:
+                            if vc_per_read_node[read_node].is_happens_after(*write_node_loc):
+                                break
+
+                        # It is a bug! Report it!
+                        race = PersistencyRace(read_node, write_node, dependent_node,
+                                            is_write_hb_dependent=pvc.is_event_happened_before(*write_node_loc))
+                        self._races.add_race(race)
+                        
+                        yield race
+
+                        if self._show_only_first_bug_in_thread:
                             break
-
-                    # It is a bug! Report it!
-                    race = PersistencyRace(read_node, write_node, dependent_node,
-                                           is_write_hb_dependent=pvc.is_event_happened_before(*write_node_loc))
-                    self._races.add_race(race)
-                    
-                    yield race
-
-                    if self._show_only_first_bug_in_thread:
-                        break
+                self._time_chain_traversal += _chain_duration.total
 
     def _do_persisted_before_vector_clocks_analysis(self, vc_per_read_node: Dict[ReadNode, ReversedVectorClock]):
         pvc_per_thread:          Dict[ThreadId, Dict[Cacheline, PersistencyVectorClock]]  = utils.DefaultDictByKey(lambda tid: defaultdict(lambda: PersistencyVectorClock(tid)))
@@ -357,7 +363,9 @@ class PersistencyRaceDetector:
                     dirty_cachelines[n.tid].add(n.get_cacheline_address())
 
                     # Find bugs
-                    yield from self._find_bugs(n, pvc_per_thread, vc_per_read_node)
+                    with utils.timeit() as _find_bugs_duration:
+                        yield from self._find_bugs(n, pvc_per_thread, vc_per_read_node)
+                    self._time_finding_bugs += _find_bugs_duration.total
 
                 case NodeType.READ:
                     n: ReadNode
