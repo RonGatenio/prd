@@ -165,9 +165,9 @@ void Cprd::instrument_memory_access(ThreadState *thr, uptr addr, uptr pc,
     Note that this works because __tsan_write is called after the actual WRITE event
   */
   if (!kAccessIsWrite) {
-    CprdThreadState::s_get_instance().df_mark_read(pc, addr, 1 << kAccessSizeLog);
+    CprdThreadState::s_get_instance().df_mark_read(thr->fast_state.tid(), pc, addr, 1 << kAccessSizeLog);
   } else {
-    CprdThreadState::s_get_instance().df_process_write(pc, addr, 1 << kAccessSizeLog);
+    CprdThreadState::s_get_instance().df_process_write(thr->fast_state.tid(), pc, addr, 1 << kAccessSizeLog);
   }
 #endif
 
@@ -195,7 +195,7 @@ void Cprd::log_happens_before_edge(u64 source_thread, u64 source_epoch, u64 targ
   Printf("%d:HB_EDGE:%d:%d:%d:%d%s%s\n", target_thread, source_thread, source_epoch, target_thread, target_epoch, comment_prefix, comment);
 }
 
-void CprdThreadState::df_mark_read(uptr pc, uptr addr, u32 size) {
+void CprdThreadState::df_mark_read(u64 tid, uptr pc, uptr addr, u32 size) {
   dfsan_label label = dfsan_read_label((void*)addr, size);
   
   if (0 == label) {
@@ -229,7 +229,7 @@ void CprdThreadState::df_mark_read(uptr pc, uptr addr, u32 size) {
   }
 }
 
-void CprdThreadState::df_process_write(uptr pc, uptr addr, u32 size) {
+void CprdThreadState::df_process_write(u64 tid, uptr pc, uptr addr, u32 size) {
   dfsan_label label = dfsan_read_label((void*)addr, size);
 
   if (0 == label) {
@@ -250,7 +250,7 @@ void CprdThreadState::df_process_write(uptr pc, uptr addr, u32 size) {
       continue;
     }
 
-    Printf("PD:%p:%p\n", df_pending_read.data.pc, pc);
+    Printf("%llu:PD:%p:%p\n", tid, df_pending_read.data.pc, pc);
     df_pending_reads.remove_item(df_pending_read);
   }
 

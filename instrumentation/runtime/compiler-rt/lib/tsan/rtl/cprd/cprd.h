@@ -47,8 +47,8 @@ class CprdThreadState {
  public:
   static CprdThreadState& s_get_instance();
 
-  void df_mark_read(uptr pc, uptr addr, u32 size);
-  void df_process_write(uptr pc, uptr addr, u32 size);
+  void df_mark_read(u64 tid, uptr pc, uptr addr, u32 size);
+  void df_process_write(u64 tid, uptr pc, uptr addr, u32 size);
 
 };
 
