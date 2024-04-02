@@ -1,5 +1,7 @@
 import os
 from typing import Set, Tuple
+
+from .pdg import PDG, PDGBuilder, generate_mock_pdg_v2, pdg_distance
 from .hbg import HBG, HBGBuilder
 from .trace_event_info import TraceEventInfo
 from .symbolizer import Symbolizer, Symbol
@@ -12,6 +14,7 @@ class TraceParser:
     def __init__(self, trace_lines, name=None):
         self._trace = map(str.strip, trace_lines)
         self._hbg_builder = HBGBuilder()
+        self._pdg_builder = PDGBuilder()
         self._name = name
         self._pmem_range = None
         self._ignore_ranges: Set[Tuple[int, int]] = set()
@@ -52,6 +55,9 @@ class TraceParser:
         tid = int(tid)
 
         match key:
+            case 'PD':
+                read_pc, write_pc = tuple(map(_any_int, args))
+                self._pdg_builder.add_dependency_pc(read_node_pc=read_pc, write_node_pc=write_pc)
             case 'HB_EDGE':
                 src_tid, src_epoch, dst_tid, dst_epoch = tuple(map(_any_int, args))
                 self._hbg_builder.add_happens_before_edge(src_tid, src_epoch, dst_tid, dst_epoch)
@@ -112,8 +118,22 @@ class TraceParser:
 
         return self
 
-    def to_hbg(self, filter_volatile_nodes=True, debug=False, max_lines=None, make_daisy_chains=True) -> HBG:
+    def build_hbg(self, filter_volatile_nodes=False, debug=False, max_lines=None, make_daisy_chains=True) -> HBG:
         self.parse(debug=debug, max_lines=max_lines)
 
         return self._hbg_builder.build(filter_volatile_nodes=filter_volatile_nodes,
                                        pmem_range=self._pmem_range, make_daisy_chains=make_daisy_chains, ignore_ranges=self._ignore_ranges)
+        
+    def build_pdg(self, hbg: HBG, compare_to_mock=False) -> PDG:
+        if not self._pdg_builder.total_dependencies:
+            print('Fallback to mock PDG')
+            return generate_mock_pdg_v2(hbg)
+
+        pdg = self._pdg_builder.build(hbg)
+        
+        if compare_to_mock:
+            _pdg = generate_mock_pdg_v2(hbg)
+            distance, distance_per_read = pdg_distance(hbg, _pdg, pdg)
+            print(f'PDG - distance to mock {distance}')
+        
+        return pdg
