@@ -34,13 +34,13 @@ def main():
         trace = TraceParser.from_file(args.trace)
 
     with timeit('hbg build'):
-        hbg = trace.to_hbg(filter_volatile_nodes=False)
+        hbg = trace.build_hbg(filter_volatile_nodes=False)
 
     with timeit('hbg stats'):
         print(hbg.stats(True))
 
     with timeit('pdg build'):
-        pdg = generate_mock_pdg_v2(hbg)
+        pdg = trace.build_pdg(hbg, True)
 
     prd = run(hbg, pdg,
         ignore_inter_thread_edges=False,
