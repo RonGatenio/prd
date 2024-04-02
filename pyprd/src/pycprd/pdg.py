@@ -24,6 +24,11 @@ class PDGBuilder:
     def __init__(self):
         self._graph = nx.DiGraph()
         self._dependencies: dict[int, set[int]] = defaultdict(set)
+        self._total_dependencies = 0
+        
+    @property
+    def total_dependencies(self):
+        return self._total_dependencies
 
     def add_dependency(self, write_node: nodes.InstructionNode, read_node: nodes.InstructionNode):
         assert write_node.itype == nodes.NodeType.WRITE, f'expected a write node but got {write_node.itype}'
@@ -31,9 +36,11 @@ class PDGBuilder:
         assert write_node.tid == read_node.tid, 'expected tids to be the same'
 
         self._graph.add_edge(write_node, read_node)
+        self._total_dependencies += 1
         
     def add_dependency_pc(self, write_node_pc: int, read_node_pc: int):
         self._dependencies[write_node_pc].add(read_node_pc)
+        self._total_dependencies += 1
 
     def build(self, hbg: HBG = None):
         if self._dependencies:
