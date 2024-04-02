@@ -6,10 +6,12 @@ from typing import Tuple, Dict
 import subprocess
 import intervaltree
 import lief
+from . import utils
 
 
 LIB_DIR_PATH         = os.environ.get('LIB_DIR_PATH', './lib')
 LLVM_SYMBOLIZER_PATH = os.environ.get('LLVM_SYMBOLIZER_PATH', 'llvm-symbolizer')
+LLVM_CXXFILT_PATH    = os.environ.get('LLVM_CXXFILT_PATH', 'llvm-cxxfilt')
 
 
 LLVM_SYMBOLIZER_TIMEOUT   = 1.5
@@ -88,6 +90,28 @@ class Symbolizer:
             
         return module.name, module_offset
     
+    def _call_proc(self, cmd_args: list, input: str, max_tries=LLVM_SYMBOLIZER_MAX_TRIES, timeout=LLVM_SYMBOLIZER_TIMEOUT):
+        tries = 0
+        while True:
+            try:
+                p = subprocess.Popen(cmd_args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                stdout, stderr = p.communicate(utils.to_bytes(input), timeout)
+                return stdout, stderr
+            except subprocess.TimeoutExpired:
+                tries += 1
+                if tries >= max_tries:
+                    raise
+                
+    def demangle(self, symbol_name: str):
+        import ipdb; ipdb.set_trace()
+        symbol_name = symbol_name.split('$')[-1]
+        stdout, stderr = self._call_proc([LLVM_CXXFILT_PATH], symbol_name)
+
+        if stderr:
+            return symbol_name
+        
+        return stdout.decode('utf-8').strip()
+    
     @functools.cache
     def get_debug_info(self, address: int) -> Tuple[str, str, int, int] | None:
         start, end, module = self.get_module(address)
@@ -95,16 +119,7 @@ class Symbolizer:
         if not module:
             return None
         
-        tries = 0
-        while True:
-            try:
-                p = subprocess.Popen([LLVM_SYMBOLIZER_PATH], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                stdout, stderr = p.communicate(f'{module.path} {address - start}\n'.encode('utf-8'), LLVM_SYMBOLIZER_TIMEOUT)
-                break
-            except subprocess.TimeoutExpired:
-                tries += 1
-                if tries >= LLVM_SYMBOLIZER_MAX_TRIES:
-                    raise
+        stdout, stderr = self._call_proc([LLVM_SYMBOLIZER_PATH], f'{module.path} {address - start}\n')
         
         if stderr:
             return None # '??', '??', 0, 0
@@ -151,6 +166,12 @@ class Symbol:
         if dbg_info:
             self.symbol, self.file, self.line, self.column = dbg_info
             self.filename = os.path.basename(self.file)
+            
+            try:
+                # Best effort demangling (mainly to demangke after dfsan)
+                self.symbol = self._symbolizer.demangle(self.symbol)
+            except:
+                pass
         
         self._symbolized = True
     

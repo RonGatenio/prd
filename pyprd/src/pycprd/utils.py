@@ -47,3 +47,14 @@ class DefaultDictByKey(collections.defaultdict):
 
 def dict_printer(d: dict):
     pass
+
+
+def to_bytes(data):
+    # Check if the data is already a bytes object
+    if isinstance(data, bytes):
+        return data
+    # Check if the data is a string and needs conversion to bytes
+    elif isinstance(data, str):
+        return data.encode('utf-8')
+    else:
+        raise ValueError("Input must be an instance of str or bytes.")
