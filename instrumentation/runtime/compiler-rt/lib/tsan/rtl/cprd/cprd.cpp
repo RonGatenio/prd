@@ -195,4 +195,66 @@ void Cprd::log_happens_before_edge(u64 source_thread, u64 source_epoch, u64 targ
   Printf("%d:HB_EDGE:%d:%d:%d:%d%s%s\n", target_thread, source_thread, source_epoch, target_thread, target_epoch, comment_prefix, comment);
 }
 
+void CprdThreadState::df_mark_read(uptr pc, uptr addr, u32 size) {
+  dfsan_label label = dfsan_read_label((void*)addr, size);
+  
+  if (0 == label) {
+    // Add new label if there isn't one already
+
+    InternalScopedString label_name(2 * GetPageSizeCached());
+    label_name.append("pd-%p-%p", addr, pc);
+    
+    TRACE_LOG("Creating label %x - %s", label, label_name.data());
+
+    label = dfsan_create_label(label_name.data(), nullptr);     
+    
+    dfsan_add_label(label, (void*)addr, size); // not dfsan_set_label!
+  }
+
+  for (auto& df_pending_read : df_pending_reads) {
+    if (0 == --df_pending_read.data.life) {
+      df_pending_reads.remove_item(df_pending_read);
+    }
+  }
+
+  auto *dependency_state = df_pending_reads.add();
+  if (nullptr == dependency_state) {
+    WARN_LOG("No more available pending states (max is %d)", PENDING_READS_MAX);
+  } else {
+    dependency_state->label = label;
+    dependency_state->addr = addr;
+    dependency_state->size = size;
+    dependency_state->pc = pc;
+    dependency_state->life = PENDING_READS_LIFE_MAX;
+  }
+}
+
+void CprdThreadState::df_process_write(uptr pc, uptr addr, u32 size) {
+  dfsan_label label = dfsan_read_label((void*)addr, size);
+
+  if (0 == label) {
+    return;
+  }
+
+  TRACE_LOG("Write has label %x", label);
+
+  TRACE_LOG("Found %d pending reads", df_pending_reads.count());
+
+  for (auto& df_pending_read : df_pending_reads) {
+    if (df_pending_read.data.addr == addr) {
+      // Same var?
+      continue;
+    }
+    
+    if (!dfsan_has_label(label, df_pending_read.data.label)) {
+      continue;
+    }
+
+    Printf("PD:%p:%p\n", df_pending_read.data.pc, pc);
+    df_pending_reads.remove_item(df_pending_read);
+  }
+
+  TRACE_LOG("Left %d pending reads", df_pending_reads.count());
+}
+
 }
