@@ -18,6 +18,12 @@ LLVM_SYMBOLIZER_TIMEOUT   = 1.5
 LLVM_SYMBOLIZER_MAX_TRIES = 4
 
 
+REMOVEABLE_SYMBOL_PREFIXES = {
+    'dfs$',
+    'dfsw$',
+}
+
+
 class Module:
     def __init__(self, path):
         self._path = path
@@ -103,8 +109,11 @@ class Symbolizer:
                     raise
                 
     def demangle(self, symbol_name: str):
-        import ipdb; ipdb.set_trace()
-        symbol_name = symbol_name.split('$')[-1]
+        for prefix in REMOVEABLE_SYMBOL_PREFIXES:
+            if symbol_name.startswith(prefix):
+                symbol_name = symbol_name.removeprefix(prefix)
+                break
+
         stdout, stderr = self._call_proc([LLVM_CXXFILT_PATH], symbol_name)
 
         if stderr:
