@@ -133,7 +133,7 @@ class TraceParser:
         
         if compare_to_mock:
             _pdg = generate_mock_pdg_v2(hbg)
-            distance, distance_per_read = pdg_distance(hbg, _pdg, pdg)
-            print(f'PDG - distance to mock {distance}')
+            distance, distance_per_read, missing_dependants = pdg_distance(hbg, _pdg, pdg)
+            print(f'PDG - distance to mock {distance} - reads without dependants {missing_dependants}')
         
         return pdg
