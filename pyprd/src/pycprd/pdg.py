@@ -1,4 +1,5 @@
 from collections import defaultdict
+from statistics import mean
 import networkx as nx
 from typing import Iterable
 from . import nodes
@@ -107,3 +108,22 @@ def generate_mock_pdg_v2(hbg: HBG) -> PDG:
                         read_instruction_nodes.remove(read_node)
 
     return pdgbuilder.build()
+
+
+def pdg_distance(hbg: HBG, pdg1: PDG, pdg2: PDG) -> tuple[int, dict[nodes.ReadNode, int]]:
+    distance_per_read = {}
+
+    for tid in hbg.tids:
+        write_nodes = (n for n in hbg.get_thread_nodes(tid) if n.itype == nodes.NodeType.WRITE)
+        write_locations = {w: i for i, w in enumerate(write_nodes)}
+        
+        read_nodes = (n for n in hbg.get_thread_nodes(tid) if n.itype == nodes.NodeType.READ)
+        for r in read_nodes:
+            pdg1_first_dependant_write_index = min(write_locations[w] for w in pdg1.get_dependants(r))
+            pdg2_first_dependant_write_index = min(write_locations[w] for w in pdg2.get_dependants(r))
+            
+            _distance = pdg2_first_dependant_write_index - pdg1_first_dependant_write_index
+            distance_per_read[r] = _distance
+                
+    distance = mean(distance_per_read.values())
+    return distance, distance_per_read
