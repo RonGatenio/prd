@@ -223,7 +223,7 @@ class PersistencyRaceDetector:
             lines.append(f"{INDENT}{INDENT}1st stage duration {self._time_first_stage:.2f} sec")
             lines.append(f"{INDENT}{INDENT}2nd stage duration {self._time_second_stage:.2f} sec")
             lines.append(f"{INDENT}{INDENT}{INDENT}finding bugs    {self._time_finding_bugs:.2f} sec")
-            lines.append(f"{INDENT}{INDENT}{INDENT}chain traversal {self._time_finding_bugs:.2f} sec")
+            lines.append(f"{INDENT}{INDENT}{INDENT}chain traversal {self._time_chain_traversal:.2f} sec")
 
         max_line_size = max(map(len, lines))
         lines.insert(0, f'{" CPRD Stats ":#^{max_line_size}}')
