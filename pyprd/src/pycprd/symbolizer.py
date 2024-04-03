@@ -96,11 +96,11 @@ class Symbolizer:
             
         return module.name, module_offset
     
-    def _call_proc(self, cmd_args: list, input: str, max_tries=LLVM_SYMBOLIZER_MAX_TRIES, timeout=LLVM_SYMBOLIZER_TIMEOUT):
+    def _call_proc(self, cmd: str, input: str, max_tries=LLVM_SYMBOLIZER_MAX_TRIES, timeout=LLVM_SYMBOLIZER_TIMEOUT):
         tries = 0
         while True:
             try:
-                p = subprocess.Popen(cmd_args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                p = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                 stdout, stderr = p.communicate(utils.to_bytes(input), timeout)
                 return stdout, stderr
             except subprocess.TimeoutExpired:
@@ -114,7 +114,7 @@ class Symbolizer:
                 symbol_name = symbol_name.removeprefix(prefix)
                 break
 
-        stdout, stderr = self._call_proc([LLVM_CXXFILT_PATH], symbol_name)
+        stdout, stderr = self._call_proc(LLVM_CXXFILT_PATH, symbol_name)
 
         if stderr:
             return symbol_name
@@ -128,7 +128,7 @@ class Symbolizer:
         if not module:
             return None
         
-        stdout, stderr = self._call_proc([LLVM_SYMBOLIZER_PATH], f'{module.path} {address - start}\n')
+        stdout, stderr = self._call_proc(LLVM_SYMBOLIZER_PATH, f'{module.path} {address - start}\n')
         
         if stderr:
             return None # '??', '??', 0, 0
