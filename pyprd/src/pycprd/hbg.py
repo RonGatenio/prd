@@ -388,15 +388,15 @@ class HBG:
         return self._graph.nodes()
 
     @functools.cached_property
-    def write_nodes(self) -> Set[nodes.InstructionNode]:
+    def write_nodes(self) -> Set[nodes.WriteNode]:
         return self.get_nodes_by_type(nodes.NodeType.WRITE)
 
     @functools.cached_property
-    def read_nodes(self) -> Set[nodes.InstructionNode]:
+    def read_nodes(self) -> Set[nodes.ReadNode]:
         return self.get_nodes_by_type(nodes.NodeType.READ)
 
     @functools.cached_property
-    def flush_nodes(self) -> Set[nodes.InstructionNode]:
+    def flush_nodes(self) -> Set[nodes.FlushNode]:
         return self.get_nodes_by_type(nodes.NodeType.FLUSH)
 
     @functools.cached_property
