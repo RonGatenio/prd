@@ -20,7 +20,7 @@ def defined_function_list(object):
   functions = []
   readelf_proc = subprocess.Popen(['readelf', '-s', '-W', object],
                                   stdout=subprocess.PIPE)
-  readelf = readelf_proc.communicate()[0].split('\n')
+  readelf = readelf_proc.communicate()[0].decode('utf-8').split('\n')
   if readelf_proc.returncode != 0:
     raise subprocess.CalledProcessError(readelf_proc.returncode, 'readelf')
   for line in readelf:
@@ -86,10 +86,11 @@ for l in libs:
   if os.path.exists(l):
     functions += defined_function_list(l)
   else:
-    print >> sys.stderr, 'warning: library %s not found' % l
+    # print ('warning: library %s not found' % l)
+    pass
 
 functions = list(set(functions))
 functions.sort()
 
 for f in functions:
-  print 'fun:%s=uninstrumented' % f
+  print ('fun:%s=uninstrumented' % f)

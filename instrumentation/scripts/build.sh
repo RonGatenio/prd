@@ -9,22 +9,20 @@ SCRIPTS_DIR="$(cd "$(dirname "$0")" && pwd)"
 . $SCRIPTS_DIR/setup-env.sh
 
 SRC_DIR=$SCRIPTS_DIR/..
-ROOT_DIR=$SRC_DIR/..
-BUILD_DIR=$ROOT_DIR/build
-BIN_DIR=$BUILD_DIR/bin
 
 # Create build folder
-mkdir $BUILD_DIR
-mkdir $BIN_DIR
+mkdir $APP_BUILD
+mkdir $APP_BIN
+mkdir $APP_SHARE
 
-pushd $BUILD_DIR
+pushd $APP_BUILD
 
 cmake $SRC_DIR
-make -j 4
+make -j
 
-cp $BUILD_DIR/pass/prd/PrdPass.so $BIN_DIR/
-cp $BUILD_DIR/runtime/compiler-rt/lib/linux/libclang_rt.tsan_cxx-x86_64.a $BIN_DIR/
-cp $BUILD_DIR/runtime/compiler-rt/lib/linux/libclang_rt.tsan-x86_64.a $BIN_DIR/
-cp $BUILD_DIR/runtime/compiler-rt/lib/linux/libclang_rt.dfsan-x86_64.a $BIN_DIR/
+cp $APP_BUILD/pass/prd/PrdPass.so $APP_BIN/
+cp $APP_BUILD/runtime/compiler-rt/lib/linux/libclang_rt.tsan_cxx-x86_64.a $APP_BIN/
+cp $APP_BUILD/runtime/compiler-rt/lib/linux/libclang_rt.tsan-x86_64.a $APP_BIN/
+cp $APP_BUILD/runtime/compiler-rt/lib/linux/libclang_rt.dfsan-x86_64.a $APP_BIN/
 
-ar crsT $BIN_DIR/cprd-x86_64.a $BIN_DIR/libclang_rt.*
+ar crsT $APP_BIN/cprd-x86_64.a $APP_BIN/libclang_rt.*

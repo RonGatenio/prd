@@ -103,6 +103,9 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include <iostream>
+
+#define DEFAULT_ABI_LIST APP_SHARE "/dfsan_abilist.txt"
 
 using namespace llvm;
 
@@ -581,8 +584,12 @@ public:
 DataFlowSanitizer::DataFlowSanitizer(
     const std::vector<std::string> &ABIListFiles) {
   std::vector<std::string> AllABIListFiles(std::move(ABIListFiles));
+
+  AllABIListFiles.push_back(DEFAULT_ABI_LIST);
+
   llvm::append_range(AllABIListFiles, ClABIListFiles);
   // FIXME: should we propagate vfs::FileSystem to this constructor?
+
   ABIList.set(
       SpecialCaseList::createOrDie(AllABIListFiles, *vfs::getRealFileSystem()));
 }

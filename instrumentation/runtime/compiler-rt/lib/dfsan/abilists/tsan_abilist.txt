@@ -1,0 +1,8 @@
+###############################################################################
+# TSan interface functions
+###############################################################################
+fun:*_tsan_*=uninstrumented
+fun:*_tsan_*=discard
+
+fun:tsan.module_ctor=uninstrumented
+fun:tsan.module_ctor=discard

@@ -48,13 +48,23 @@ add_custom_target(dfsan_abilist ALL
   DEPENDS ${dfsan_abilist_filename})
 add_custom_command(OUTPUT ${dfsan_abilist_filename}
                    VERBATIM
+
                    COMMAND
-                    ${CMAKE_COMMAND} -E make_directory ${dfsan_abilist_dir}
+                     ${CMAKE_COMMAND} -E make_directory ${dfsan_abilist_dir}
+
                    COMMAND
-                     cat ${CMAKE_CURRENT_SOURCE_DIR}/done_abilist.txt
-                         ${CMAKE_CURRENT_SOURCE_DIR}/libc_ubuntu1404_abilist.txt
+                     cat ${CMAKE_CURRENT_SOURCE_DIR}/abilists/done_abilist.txt
+                         ${CMAKE_CURRENT_SOURCE_DIR}/abilists/libc_ubuntu1404_abilist.txt
+                         ${CMAKE_CURRENT_SOURCE_DIR}/abilists/tsan_abilist.txt
+                         ${CMAKE_CURRENT_SOURCE_DIR}/abilists/pmdk_abilist.txt
                          > ${dfsan_abilist_filename}
-                   DEPENDS done_abilist.txt libc_ubuntu1404_abilist.txt)
+
+                   COMMAND
+                     python3 ${CMAKE_CURRENT_SOURCE_DIR}/scripts/build-libc-list.py --with-libstdcxx >> ${dfsan_abilist_filename}
+
+                   COMMAND
+                     cp ${dfsan_abilist_filename} $ENV{APP_SHARE}
+                   DEPENDS abilists/done_abilist.txt abilists/libc_ubuntu1404_abilist.txt abilists/tsan_abilist.txt abilists/pmdk_abilist.txt)
 add_dependencies(dfsan dfsan_abilist)
 # install(FILES ${dfsan_abilist_filename}
-#         DESTINATION ${COMPILER_RT_INSTALL_PATH}/share)
+#         DESTINATION $ENV{APP_SHARE})

@@ -23,13 +23,14 @@ RUN apt install -y dos2unix mlocate less
 # Install jemalloc and tbb
 RUN apt install -y libtbb-dev libjemalloc-dev
 
-# Set env
+# Install gdb for debugging
+RUN apt install -y gdb
+
+# Set llvm env
 ENV PATH /usr/lib/llvm-${LLVM_VERSION}/bin:$PATH
 
 RUN ln -s /usr/include/llvm-${LLVM_VERSION} /usr/include/llvm
 RUN ln -s /usr/include/llvm-c-${LLVM_VERSION} /usr/include/llvm-c
-
-RUN echo . /app/instrumentation/scripts/setup-env.sh >> ~/.bashrc
 
 
 #####################################################################
@@ -44,11 +45,16 @@ WORKDIR /app
 # Copy instrumentation folder to container
 COPY instrumentation /app/instrumentation
 
-# Build pass and runtime lib
-RUN /app/instrumentation/scripts/build.sh
+# Setup scripts
+WORKDIR /app/instrumentation/scripts
+RUN dos2unix *.sh
 
-# Add bin path to PATH
-ENV PATH /app/build/bin:$PATH
+# Setup env
+RUN ./setup-env.sh
+RUN cat /app/instrumentation/scripts/setup-env.sh >> ~/.bashrc
+
+# Build pass and runtime lib
+RUN ./build.sh
 
 # Copy pyprd folder to container
 COPY pyprd /app/pyprd
@@ -124,143 +130,6 @@ RUN pycprd ${CPRD_RESULTS_TRACES}/fast-fair-pmdk-mixed.trace          > ${CPRD_R
 # RUN pycprd ${CPRD_RESULTS_TRACES}/fast-fair-pmdk-mixed-recovery.trace > ${CPRD_RESULTS_RACES}/fastfair-mixed-recovery.races
 
 
-#####################################################################
-# Example stage
-#####################################################################
-
-# FROM build AS example
-
-# COPY --from=build /app /app
-
-# RUN clang -O0 -g -fpass-plugin=/app/build/bin/PrdPass.so -I/app/instrumentation/example/ /app/instrumentation/example/test.c /app/instrumentation/example/sec.c -L/app/build/bin -l:tsan-x86_64.a -o test.exe \
-#     -fuse-ld=gold \
-#     -lm -ldl -lpthread \
-#     -z muldefs \
-#     -mclwb -mclflushopt \
-#     -v
-
-
-# Compile example
-# RUN clang -g -O0 -c -emit-llvm -fPIC -fPIE -I/app/instrumentation/example/ /app/instrumentation/example/test.c /app/instrumentation/example/sec.c
-
-# Disasm the bytecode
-# RUN llvm-dis test.bc
-
-# # Run pass on example
-# RUN opt -load /app/build/bin/PrdPass.so test.bc sec.bc -enable-new-pm=0 -tsan2 > test_instrumented.bc
-
-# # Disasm the instrumented bytecode
-# RUN llvm-dis test_instrumented.bc
-
-# # Compile bytecode to machine code
-# RUN llc -asm-verbose=false -O0 -filetype=obj test_instrumented.bc -o test_instrumented.o
-
-# # Link instrumented binary with runtime lib
-# RUN clang test_instrumented.o \
-#     -o test_instrumented.exe \
-#     /app/build/bin/tsan-x86_64.a \
-#     -fuse-ld=gold \
-#     -lm -ldl -lpthread \
-#     -z muldefs \
-#     -mclwb -mclflushopt \
-#     -v
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# # # Compile pass
-# # RUN clang -g3 -shared -o /app/libtsantestpass.so /app/instrumentation/prd/tsanpass.cpp -v -I/usr/include/llvm/ -I/usr/include/llvm-c/ -fPIC
-
-
-# # # Compile runtime lib
-
-
-
-# # # RUN opt-11 -load ./libtsantestpass.so sample.ll -enable-new-pm=0 -S -bsab
-# # # RUN opt -load ./libtsantestpass.so sample.ll -enable-new-pm=0 -bsab > a.bc
-
-
-
-# # # RUN opt -load ./libtsantestpass.so sample.ll -enable-new-pm=0 -tsan2 > a.bc
-# # # RUN llc -asm-verbose=false -O0 -filetype=obj a.bc -o a.o
-# # # RUN llvm-dis a.bc
-
-
-
-# # # RUN clang a.o -o a.exe
-# # # RUN clang a.o -o a.exe src/bin/libclang_rt.tsan_cxx-x86_64.a src/bin/libclang_rt.tsan-x86_64.a
-# # # RUN clang a.o -o a.exe src/bin/libclang_rt.tsan_cxx-x86_64.a src/bin/libclang_rt.tsan-x86_64.a -fuse-ld=gold -lm
-# #     # -fuse-ld=gold see https://github.com/android/ndk/issues/1088
-# #     # -lm because of signgam see https://gcc.gnu.org/legacy-ml/gcc-patches/2013-12/msg00510.html
-# # # RUN clang a.o -o a.exe -Lsrc/bin
-
-
-# # # ENTRYPOINT ["tail", "-f", "/dev/null"]
-# # # ENTRYPOINT ["cat", "x.txt", "&&", "/bin/bash"]
-# # # ENTRYPOINT ["echo", "x.txt", "&&", "/bin/bash"]
-# # # ENTRYPOINT ["/bin/bash"]
-# # WORKDIR /app/instrumentation/runtime/compiler-rt
-# # RUN cmake .
-# # RUN make -j 2
-
-
-
-
-# # WORKDIR /app
-
-# # RUN clang -g -O0 -c -emit-llvm -fPIC -fPIE ./src/example/test.c
-# # RUN llvm-dis test.bc
-
-# # RUN opt -load ./libtsantestpass.so test.bc -enable-new-pm=0 -tsan2 > test_instrumented.bc
-# # RUN llvm-dis test_instrumented.bc
-
-# # RUN llc -asm-verbose=false -O0 -filetype=obj test_instrumented.bc -o test_instrumented.o
-
-# # RUN clang test_instrumented.o \
-# #     -o test_instrumented.exe \
-# #     /app/instrumentation/runtime/compiler-rt/lib/linux/libclang_rt.tsan-x86_64.a \
-# #     /app/instrumentation/runtime/compiler-rt/lib/linux/libclang_rt.tsan_cxx-x86_64.a \
-# #     -fuse-ld=gold \
-# #     -lm -ldl -lpthread \
-# #     -z muldefs \
-# #     -mclwb -mclflushopt \
-# #     -v
-# #     # src/bin/libclang_rt.tsan_cxx-x86_64.a src/bin/libclang_rt.tsan-x86_64.a \
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# ENTRYPOINT ["cmake", "."]
 ENTRYPOINT ["/bin/bash"]
-# ENTRYPOINT ["make"]
-# CMD /bin/echo "Welcome, $name"
+
 
