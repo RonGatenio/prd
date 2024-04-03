@@ -88,48 +88,9 @@ RUN mkdir -p ${CPRD_RESULTS_TRACES}
 ENV CPRD_RESULTS_RACES /app/results/races
 RUN mkdir -p ${CPRD_RESULTS_RACES}
 
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# RECIPE (Converting Concurrent DRAM Indexes to Persistent-Memory Indexes)
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-WORKDIR /app/benchmarks/RECIPE
-
+# Setup benchmarks
+WORKDIR /app/benchmarks
 RUN dos2unix *.sh
-RUN ./compile.sh
-RUN ./run.sh ; exit 0
-RUN cp *.trace ${CPRD_RESULTS_TRACES}
-
-RUN pycprd ${CPRD_RESULTS_TRACES}/pclht.trace          > ${CPRD_RESULTS_RACES}/pclht.races
-# RUN pycprd ${CPRD_RESULTS_TRACES}/pclht-recovery.trace > ${CPRD_RESULTS_RACES}/pclht-recovery.races
-
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# CCEH (Cacheline-Concious Extendible Hashing)
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-WORKDIR /app/benchmarks/CCEH
-
-RUN dos2unix *.sh
-RUN ./compile.sh
-RUN ./run_pmdk.sh ; exit 0
-RUN cp *.trace ${CPRD_RESULTS_TRACES}
-
-RUN pycprd ${CPRD_RESULTS_TRACES}/multi_threaded_cceh.trace          > ${CPRD_RESULTS_RACES}/cceh.races
-# RUN pycprd ${CPRD_RESULTS_TRACES}/multi_threaded_cceh-recovery.trace > ${CPRD_RESULTS_RACES}/cceh-recovery.races
-
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# FAST-FAIR (Failure-Atomic ShifT(FAST) and Failure-Atomic In-place Rebalancing(FAIR))
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-WORKDIR /app/benchmarks/FAST_FAIR
-
-RUN dos2unix *.sh
-RUN ./compile_pmdk.sh
-RUN ./run_pmdk.sh ; exit 0
-RUN cp *.trace ${CPRD_RESULTS_TRACES}
-
-RUN pycprd ${CPRD_RESULTS_TRACES}/fast-fair-pmdk.trace                > ${CPRD_RESULTS_RACES}/fastfair.races
-# RUN pycprd ${CPRD_RESULTS_TRACES}/fast-fair-pmdk-recovery.trace       > ${CPRD_RESULTS_RACES}/fastfair-recovery.races
-RUN pycprd ${CPRD_RESULTS_TRACES}/fast-fair-pmdk-mixed.trace          > ${CPRD_RESULTS_RACES}/fastfair-mixed.races
-# RUN pycprd ${CPRD_RESULTS_TRACES}/fast-fair-pmdk-mixed-recovery.trace > ${CPRD_RESULTS_RACES}/fastfair-mixed-recovery.races
-
+RUN ./run.sh
 
 ENTRYPOINT ["/bin/bash"]
-
-
