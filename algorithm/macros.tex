@@ -1,0 +1,184 @@
+
+\usepackage{mathtools}
+\usepackage{enumitem}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{sansmath}
+\usepackage[ruled,linesnumbered]{algorithm2e}
+\usepackage{float}
+\usepackage{calc}
+\usepackage{xifthen}
+\usepackage[english]{babel}
+\usepackage{amsthm, thmtools}
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Macros
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% ---------------------------------------------------------
+% Fonts
+% ---------------------------------------------------------
+
+\newcommand{\FontSet}[1]{\ensuremath{\mathsf{#1}}}
+% \renewcommand{\FontSet}[1]{\ensuremath{#1}}
+
+
+% ---------------------------------------------------------
+% Aux
+% ---------------------------------------------------------
+
+\newcommand{\DefSet}[2][]{\ensuremath{\FontSet{#2}\ifthenelse{\isempty{#1}}{}{_{#1}}}}
+\newcommand{\DefFunc}[3]{\ensuremath{
+        \FontSet{#1}
+        \ifthenelse{\isempty{#2}}{}{_{#2}}
+        \ifthenelse{\isempty{#3}}{}{({#3})}
+    }}
+
+
+% ---------------------------------------------------------
+% Formal Notation
+% ---------------------------------------------------------
+
+\newcommand{\such}{\ensuremath{.\;}}
+
+
+% ---------------------------------------------------------
+% Math Sets
+% ---------------------------------------------------------
+
+\newcommand{\N}{\DefSet{\mathbb{N}}}
+% \newcommand{\EmptySet}{\DefSet{\emptyset}}
+\newcommand{\EmptySet}{\DefSet{\varnothing}}
+
+
+% ---------------------------------------------------------
+% Sets
+% ---------------------------------------------------------
+
+\newcommand{\Nodes}{\DefSet{Ev}}
+% \renewcommand{\Nodes}{\DefSet{Events}}
+\newcommand{\HBEdges}{\DefSet{E_{hb}}}
+\newcommand{\PDEdges}{\DefSet{E_{pd}}}
+\newcommand{\HBG}{\DefSet{HBG}}
+\newcommand{\PDG}{\DefSet{PDG}}
+\newcommand{\DefGraph}[3]{\DefSet{#1(#2, #3)}}
+
+\newcommand{\Vars}{\DefSet{Vars}}
+\newcommand{\Threads}{\DefSet{T}}
+
+\newcommand{\ReadNodes}[1][]{\DefSet[#1]{R}}
+\newcommand{\WriteNodes}[1][]{\DefSet[#1]{W}}
+\newcommand{\FlushNodes}[1][]{\DefSet[#1]{F}}
+
+% \newcommand{\Path}{\DefSet{P}}
+\newcommand{\Path}{\overset{\to}{\DefSet{p}}}
+
+\newcommand{\PersistenceRaces}{\DefSet{PersistenceRaces}}
+\newcommand{\races}{\DefSet{Races}}
+% \newcommand{\races}{\ensuremath{Races}} % TODO: choose
+
+
+% ---------------------------------------------------------
+% Functions
+% ---------------------------------------------------------
+
+\newcommand{\var}[1]{\DefFunc{var}{}{#1}}
+\newcommand{\loc}[1]{\DefFunc{loc}{}{#1}}
+% \newcommand{\thread}[1]{\DefFunc{t}{}{#1}}
+\newcommand{\thread}[1]{\DefFunc{thread}{}{#1}}
+% \renewcommand{\thread}[1]{\DefFunc{thr}{}{#1}}
+\newcommand{\idx}[1]{\DefFunc{idx}{}{#1}}
+
+\newcommand{\HAVC}[2]{\DefFunc{HAVC}{#1}{#2}}
+\newcommand{\HBVC}[2]{\DefFunc{HBVC}{#1}{#2}}
+\newcommand{\PBVC}[2]{\DefFunc{PBVC}{#1}{#2}}
+
+\newcommand{\havc}[2]{\DefFunc{havc}{#1}{#2}}
+\newcommand{\hbvc}[2]{\DefFunc{hbvc}{#1}{#2}}
+\newcommand{\pbvc}[2]{\DefFunc{pbvc}{#1}{#2}}
+
+
+% ---------------------------------------------------------
+% Relations
+% ---------------------------------------------------------
+
+% \newcommand{\HBSign}{\prec}
+\newcommand{\HBSign}{\overset{hb}{\prec}}
+\newcommand{\HB}[2]{\ensuremath{{#1} \HBSign {#2}}}
+
+% \newcommand{\PDSign}{\overset{pd}{\to}}
+\newcommand{\PDSign}{\overset{depends}{\to}}
+\newcommand{\PD}[2]{\ensuremath{{#1} \PDSign {#2}}}
+
+
+% ---------------------------------------------------------
+% Variables
+% ---------------------------------------------------------
+
+\newcommand{\VarX}{\ensuremath{x}}
+\newcommand{\VarY}{\ensuremath{y}}
+
+\newcommand{\Thread}{\ensuremath{t}}
+\newcommand{\ThreadOther}{\ensuremath{t'}}
+
+\newcommand{\IndexI}{\ensuremath{i}}
+\newcommand{\IndexJ}{\ensuremath{j}}
+
+\newcommand{\NodeV}{\ensuremath{v}}
+\newcommand{\NodeU}{\ensuremath{u}}
+\newcommand{\NodeParent}{\ensuremath{p}}
+\newcommand{\NodeChild}{\ensuremath{c}}
+\newcommand{\NodeE}{\ensuremath{e}}
+\newcommand{\NodeR}{\ensuremath{r}}
+\newcommand{\NodeW}{\ensuremath{w}}
+\newcommand{\NodeF}{\ensuremath{f}}
+
+\newcommand{\NodeWEx}{\ensuremath{w'}}
+
+
+% ---------------------------------------------------------
+% Text Constatnts
+% ---------------------------------------------------------
+
+\newcommand{\EventNode}{event\xspace}
+\newcommand{\EventNodes}{{\EventNode}s\xspace}
+
+
+% ---------------------------------------------------------
+% Theorems and Proofs
+% ---------------------------------------------------------
+
+% % Plain environments:
+% \theoremstyle{plain}
+% \newtheorem{theorem}{Theorem}[section]
+% \newtheorem{corollary}[theorem]{Corollary}
+% \newtheorem{claim}[theorem]{Claim}
+% \newtheorem{lemma}[theorem]{Lemma}
+% \newtheorem{proposition}[theorem]{Proposition}
+% \newtheorem{result}[theorem]{Result}
+
+% % Definition environments:
+% \theoremstyle{definition}
+% \newtheorem{definition}[theorem]{Definition}
+
+% % Remark environments:
+% \theoremstyle{remark}
+% \newtheorem{remark}[theorem]{Remark}
+
+% % QED symbol
+% \renewcommand\qedsymbol{$\blacksquare$}
+% \renewcommand\qedsymbol{}
+
+
+% % ---------------------------------------------------------
+% % Hyperlinks
+% % ---------------------------------------------------------
+
+% \newcommand{\linkref}[2]{\hyperref[#1]{#2~\ref*{#1}}}
+% \newcommand{\algref}[1]{\linkref{#1}{Algorithm}}
+% \newcommand{\lineref}[1]{\linkref{#1}{Line}}
+
+
