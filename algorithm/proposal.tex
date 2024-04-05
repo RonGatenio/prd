@@ -1,0 +1,163 @@
+\documentclass[a4paper,12pt]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{xcolor}
+\usepackage[full]{textcomp}
+\usepackage{hyperref}
+\usepackage{amssymb}
+\usepackage{mathtools}
+\usepackage{amsthm}
+\usepackage[shortlabels,inline]{enumitem}
+\usepackage{lmodern}
+
+\usepackage[nottoc]{tocbibind}
+
+\usepackage[left=1.5cm,right=1.5cm]{geometry}
+\usepackage{setspace}
+\onehalfspacing % or \doublespacing
+
+\usepackage{latexsym}
+\usepackage{color}
+\usepackage{tabularx}
+\usepackage{url}
+
+\usepackage{enumitem}
+\usepackage{comment}
+\usepackage{bbm}
+
+\usepackage{array}
+\usepackage{epsfig}
+\usepackage{fullpage}
+
+\usepackage{graphicx}
+\graphicspath{ {./images/} }
+
+
+
+
+\title{Concurrent Persistency Race Bug Detector\\
+\large{Ron Gatenio\\Advisor: Prof. Erez Petrank}
+\date{July 2023}
+}
+\begin{document}
+
+\maketitle
+\begin{abstract}
+The introduction of new NVM technologies with byte-addressable access and DRAM performances has increased the interest in developing crash-consistent software.
+This type of software introduces a new type of inconsistency bugs between the volatile CPU cache and the persistent NVM state.
+This research proposal deals with the detection process of a concurrent NVM bug, and is aimed at designing a bug detector that analyzes the program trace using a graph search algorithm.
+\end{abstract}
+
+
+
+\section{Introduction}
+Non-volatile memory (NVM) technologies, such as Intel’s Optane DC Persistent Memory, offer both a persistence of similar to disks with a performance close to that of DRAM. NVM storage is accessed, like DRAM, with load and store instructions. This provides new opportunities for designing a crash-consistent software without the high storage overhead. However, designing and implementing such programs is difficult. NVM data on a volatile cache may not persist after a crash and it may also evict cache lines in an arbitrary order, that may differ from the program’s store order.
+
+To ensure consistency of NVM state, developers need to explicitly evict cache lines to the NVM. This can be done with explicit flush (e.g., CLWB) and fence (e.g., SFENCE) instructions. Due to the need to ensure correct cache line evictions, even experienced programmers may introduce inconsistency bugs, if they are not experienced with PM programming practices. This introduces a need for special bug detectors that could assist developers in finding such complicated bugs. Previous bug detectors, aimed at detecting data inconsistencies, won’t necessarily be able to find NVM related bugs. This type of programming model, that uses byte addressable persistent memory, didn’t exist before. 
+
+In this work, we focus on a specific type of bug that can be introduced in concurrent NVM programs. Our bug occurs when an NVM location is affecting the data written to another NVM location before being persisted. Such bug can cause an inconsistent NVM state after a crash. In the following, we refer to this bug as “Concurrent Persistency Race”.
+
+\section{Related Works}
+\paragraph{PMRace} \cite{Chen22} – a NVM bug detector designed for concurrent NVM programs.
+Until recently, most works didn’t focus on NVM bugs in concurrent programs, mostly due to the complex search space that thread scheduling introduces.
+In ASPLOS 2022, Chen, Zhangyu, et al. introduced PMRace, that focuses on bug detection in concurrent NVM programs. 
+PMRace is a fuzzing-based bug detector that is aimed at detecting 2 types of PM bugs:
+\begin{itemize}
+    \item PM inter-thread inconsistencies – a program execution in which one thread makes durable side effects based on non-persisted data written by another thread. This is the definition of our concurrent persistency race.
+    \item PM synchronization inconsistencies - an inconsistency between a persistent synchronization variable (e.g., a lock, a mutex, etc.) and the non-persistent thread state.
+\end{itemize}
+PMRace detects PM inter-thread inconsistencies by finding all pairs of read/write operations to the same PM addresses (named PM alias pairs). It later simulates a delay after the write operation that allows the read operation to continue and to hopefully introduce the inconsistency bug.
+
+PMRace tries to maximize its coverage of PM alias pairs to detect more bugs. To find the inconsistencies, PMRace detects program dependency relations and sees if an NVM location, that is dependent on the PM alias pair’s data, is modified with un-persisted data.
+
+\paragraph{Witcher} \cite{Fu21} – a crash consistency bug detector for NVM software that focuses on exploring the NVM state space.
+Witcher uses an LLVM pass to trace the program's execution and to detect possible violations of NVM state. It finds likely invariants on the program’s persistence order and tests its correctness by simulating a crash. Later it checks the equivalence of the NVM state with and without the simulated crash and finds NVM violations if the states are different.
+Witcher is designed to be scalable (doesn’t suffer from test space explosion), automatic (doesn’t require manual source code annotations), and precise (doesn’t produce false positives).
+Witcher doesn’t focus on exploring thread interleaving, and therefore isn’t suited to find difficult concurrency NVM bugs. They leave this for future work.
+
+\paragraph{VSV-D} (Vector Space Verification – Durability) \cite{Peterson21} – a dynamic analysis tool that checks durable linearizability at runtime.
+Requires user annotations – granularity of operations is defined by the user.
+Mostly verifies that all required NVM data is guaranteed to be flushed.
+
+\paragraph{XFDetector} (Cross-Failure Detector) \cite{Liu20}
+Detects NVM bugs between the pre-failure and post-failure stages, named Cross-Failure Bugs.
+These bugs can be categorized into 2 classes:
+\begin{itemize}
+    \item Cross-failure races – a post-failure operation that relies on data that wasn’t persisted in the pre-failure stage.
+    \item Cross-failure semantic bugs – a post-failure operation that reads data that might be persistent but is considered invalid by program semantics.
+\end{itemize}
+
+\paragraph{PMTest} \cite{Liu19}
+Supplies 2 low-level program checkers:
+\begin{itemize}
+\item isPersist – checks if an NVM memory location is persisted.
+\item isOrderedBefore – checks if an NVM memory location is persisted before another location.
+\end{itemize}
+
+Using these checkers, the user can assert program invariants and detect inconsistency bugs.
+
+\paragraph{Recipe} \cite{Lee19} is an approach for converting concurrent DRAM data structures into crash consistent data structures for persistent memory.
+
+The common conversion step is to insert a cache line flush and memory fence instructions after each store. 
+This approach can produce a bug where data that is modified in one thread can be read by another thread before being persisted. This data can later be used to update other NVM locations that might get persisted before the original data persists. If a crash occurs before the original data persists but after the dependent data persists in another thread, an inconsistency bug will occur. The NVM state after the crash is no longer consistent.
+
+In this work we call such bug a Concurrent Persistency Race, and this is the bug that we hope to detect with our bug detector.
+
+
+\section{Goals}
+Our goal is to design a bug detector for concurrent PM programs that can detect Concurrent Persistency Races.
+Unlike PMRace \cite{Chen22} that is a fuzzing-based bug detector, our bug detector will rely on a graph search algorithm that hopefully will be a new and interesting way to look at bug detections of this type.
+We hope to find new bugs in known concurrent NVM programs.
+
+\section{Research Directions}
+We plan on implementing a full “Concurrent Persistency Race” detector. The detector is constructed from 3 main stages:
+
+\includegraphics[width=13cm]{universe}
+
+\begin{itemize}
+    \item The 1st stage is an LLVM pass that will detect happens-before relations and program dependency relations in a program execution.
+This LLVM pass is based on Google’s LLVM ThreadSanitizer \cite{Serebryany09} (used for detecting happens-before relations), and Giri \cite{Liu} (used for detecting program dependencies).
+    \item In the 2nd stage, using the trace information from the LLVM pass, we will construct 2 graphs out of the executed instructions. One graph is connected by happens-before edges (happens-before graph), and the other graph is connected by program dependencies (program dependency graph).
+    \item The 3rd stage is a “Concurrent Persistency Race” algorithm. Given the 2 graphs we will design an algorithm that finds possible concurrent persistency races.
+\end{itemize}
+
+\newpage
+
+\bibliographystyle{unsrt}
+
+\begin{thebibliography}{9}
+
+\bibitem{Chen22}
+Chen, Zhangyu, et al. "Efficiently detecting concurrency bugs in persistent memory programs."Proceedings of the 27th ACM International Conference on Architectural Support for Programming Languages and Operating Systems. 2022.
+
+\bibitem{Fu21}
+Fu, Xinwei, et al. "Witcher: Systematic crash consistency testing for non-volatile memory key-value stores."Proceedings of the ACM SIGOPS 28th Symposium on Operating Systems Principles. 2021.
+
+\bibitem{Peterson21}
+Peterson, Christina, and Damian Dechev. "An Efficient Dynamic Analysis Tool for Checking Durable Linearizability."2021 International Conference on Code Quality (ICCQ). IEEE, 2021.
+
+\bibitem{Liu20}
+Liu, Sihang, et al. "Cross-failure bug detection in persistent memory programs."Proceedings of the Twenty-Fifth International Conference on Architectural Support for Programming Languages and Operating Systems. 2020.
+
+\bibitem{Liu19}
+Liu, Sihang, et al. "PMTest: A fast and flexible testing framework for persistent memory programs."Proceedings of the Twenty-Fourth International Conference on Architectural Support for Programming Languages and Operating Systems. 2019.
+
+\bibitem{Lee19}
+Lee, Se Kwon, et al. "Recipe: Converting concurrent dram indexes to persistent-memory indexes."Proceedings of the 27th ACM Symposium on Operating Systems Principles. 2019.
+
+
+\bibitem{Liu}
+Liu, Mingliang. "Enhancing Giri: Dynamic Slicing in LLVM."
+
+\bibitem{Serebryany09}
+Serebryany, Konstantin, and Timur Iskhodzhanov. "ThreadSanitizer: data race detection in practice."Proceedings of the workshop on binary instrumentation and applications. 2009.
+
+
+
+
+\end{thebibliography}
+
+
+
+\end{document}
