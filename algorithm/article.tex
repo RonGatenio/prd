@@ -1,21 +1,10 @@
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Template for ASPLOS papers.
-%
-% History:
-% 
-% ASPLOS originally used jpaper.cls for submission but required acmart.cls for the
-% final camera-ready version. To avoid a change in format, starting ASPLOS 2024 Fall 
-% cycle, both the submission and the camera-ready versions started using acmart.cls.
-%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-% use the base acmart.cls version 1.92
-% use the sigplan proceeding template with the default 10 pt fonts
-% nonacm option removes ACM related text in the submission. 
 \documentclass[nonacm,sigplan]{acmart}
 
+% includes
 \input{macros.tex}
 
+% packages
+\usepackage{lipsum}
 
 % enable page numbers
 \settopmatter{printfolios=true}
@@ -25,25 +14,71 @@
 
 \begin{document}
 
-\title{ESPLOS: The Espresso-Powered Latte Operating System}
+\title{Concurrent Persistency Race Bug Detector}
 
-%\author{...} % removed for anonymity
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Authors
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+% TODO: removed for anonymity
+
+\author{Ron Gatenio}
+\affiliation{%
+  \institution{Technion}
+  \country{Israel}
+}
+\email{ron.gatenio@campus.technion.ac.il}
+
+\author{Erez Petrank}
+\affiliation{%
+  \institution{Technion}
+  \country{Israel}
+}
+\email{erez@cs.technion.ac.il}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Abstract
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \begin{abstract}
-Please look at the ASPLOS Call For Papers for formatting instructions.
 
-ESPLOS, the Espresso-Powered Latte Operating System, is an innovative platform that combines an operating system (OS), a domain-specific programming language (PL), and a sophisticated compiler to consistently brew perfect espresso shots and create stunning latte art. This paper introduces ESPLOS and presents simulation results, evaluation data, and user studies, highlighting its significant advancements in coffee machine technology.
+The introduction of new NVM technologies with byte addressable access and DRAM performance has increased interest in developing crash-consistent software.
+This type of software introduces a new type of inconsistency bugs between the volatile CPU cache and the persistent NVM state.
+
+This research introduces CPRD, a concurrent NVM bug detector that analyzes the program trace using a graph search algorithm.
+
 \end{abstract}
 
 \maketitle % should come after the abstract
 \pagestyle{plain} % should come right after \maketitle
 
-
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Introduction
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Introduction}
-The art and science of coffee preparation have evolved significantly over the years. Coffee machines have become more advanced, yet achieving the perfect espresso shot and creating consistent, stunning latte art remain challenging tasks. This paper presents ESPLOS, the Espresso-Powered Latte Operating System, an integrated solution that not only controls the brewing process but also orchestrates intricate latte art.
+\iffalse
+Background
+This paper presents CPRD, ...
+The sections are ...
+\fi
 
-\subsection{Key Contribution}
-The primary contribution of this paper is the introduction of ESPLOS, a comprehensive system consisting of an operating system (OS), a specialized programming language (PL), and a sophisticated compiler. ESPLOS leverages these components to achieve unparalleled consistency in espresso shot quality and latte art, combining the precision of software with the artistry of coffee making.
+Nonvolatile memory (NVM) technologies, such as Intel’s Optane DC Persistent Memory, offer both persistence similar to disks with performance close to that of DRAM. NVM storage is accessed, like DRAM, with load and store instructions. This provides new opportunities for designing a crash-consistent software without high storage overhead. However, designing and implementing such programs is difficult. NVM data on a volatile cache may not persist after a crash, and it may also evict cache lines in an arbitrary order, which may differ from the program’s store order.
+
+To ensure consistency of NVM state, developers need to explicitly evict cache lines to the NVM. This can be done with explicit flush (e.g., CLWB) and fence (e.g., SFENCE) instructions. Due to the need to ensure correct cache line evictions, even experienced programmers may introduce inconsistency bugs, if they are not experienced with PM programming practices. This introduces a need for special bug detectors that could help developers find such complicated bugs. Previous bug detectors, aimed at detecting data inconsistencies, won’t necessarily be able to find NVM related bugs. This type of programming model that uses byte addressable persistent memory didn't exist before. 
+
+In this work, we focus on a specific type of bug that can be introduced in concurrent NVM programs. Our bug occurs when an NVM location is affecting the data written to another NVM location before being persisted. Such bug can cause an inconsistent NVM state after a crash. In the following, we refer to this bug as “Concurrent Persistency Race”.
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Introduction
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+
+
+
+
+
 
 \section{Background}
 Coffee has a rich history dating back to its discovery in Ethiopia in the 15th century. The journey of coffee preparation has evolved from traditional methods to today's modern espresso machines. Despite these advancements, achieving both the perfect espresso shot and latte art consistently has remained a complex challenge.
@@ -118,7 +153,7 @@ ESPLOS distinguishes itself by providing a comprehensive and integrated solution
 
 
 \section{Conclusions}
-In this paper, we introduced ESPLOS, the Espresso-Powered Latte Operating System, which represents a revolutionary leap in coffee machine technology. By developing an integrated system comprising an operating system, programming language, and compiler, we have achieved unparalleled consistency in espresso shot quality and the creation of stunning latte art. ESPLOS sets new standards for the coffee industry, offering coffee enthusiasts and professional baristas the tools to consistently create exquisite coffee beverages.
+\lipsum[1][1-3]
 
 \section{Acknowledgments}
 We extend our gratitude to the coffee experts and baristas who participated in the evaluation of ESPLOS, as well as the ASPLOS reviewers for their valuable insights and feedback.

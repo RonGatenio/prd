@@ -1,43 +1,315 @@
-@article{first_reference,
-  author = {John Smith and Krishna Das},
-  title = {Advancements in Coffee Machine Operating Systems},
-  journal = {ACM Coffee Surveys},
-  year = {2015}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% PMem Bug Detectors
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Mumak
+% TODO: New - didn't read yet - references PMRace
+@inproceedings{mumak2023,
+  title={Mumak: Efficient and Black-Box Bug Detection for Persistent Memory},
+  author={Gon{\c{c}}alves, Jo{\~a}o and Matos, Miguel and Rodrigues, Rodrigo},
+  booktitle={Proceedings of the Eighteenth European Conference on Computer Systems},
+  pages={734--750},
+  year={2023}
 }
 
-@inproceedings{second_reference,
-  author = {Alemu, Selamawit and Berhanu, Tadesse and Habte, Meseret},
-  title = {Coffee Machine Programming Languages: A Survey},
-  booktitle = {Proceedings of the 23rd Annual ACM SIGCOFF Conference on Coffee Languages Design and Impelementation},
-  year = {2017}
+% PMRace
+% detects concurrent PM races - detects our bug
+@inproceedings{pmrace2022,
+  title={Efficiently detecting concurrency bugs in persistent memory programs},
+  author={Chen, Zhangyu and Hua, Yu and Zhang, Yongle and Ding, Luochangqi},
+  booktitle={Proceedings of the 27th ACM International Conference on Architectural Support for Programming Languages and Operating Systems},
+  pages={873--887},
+  year={2022}
 }
 
-@article{third_reference,
-  author = {Berhanu, Tadesse and Silva, Isabella and Mendez, Juan},
-  title = {The Art of Latte Art Automation},
-  journal = {JavaBrew Journal},
-  year = {2018}
+% Witcher
+@inproceedings{fu2021witcher,
+  title={Witcher: Systematic crash consistency testing for non-volatile memory key-value stores},
+  author={Fu, Xinwei and Kim, Wook-Hee and Shreepathi, Ajay Paddayuru and Ismail, Mohannad and Wadkar, Sunny and Lee, Dongyoon and Min, Changwoo},
+  booktitle={Proceedings of the ACM SIGOPS 28th Symposium on Operating Systems Principles},
+  pages={100--115},
+  year={2021}
 }
 
-@article{fourth_reference,
-  author = {Espresso, Oliver},
-  title = {Commercial Coffee Machines and Customization},
-  journal = {CoffeeTech Quarterly},
-  year = {2019}
+% XFDetector
+% Detects NVM bugs between the pre-failure and post-failure stages, named Cross-Failure Bugs
+@inproceedings{xfdetector2020,
+  title={Cross-failure bug detection in persistent memory programs},
+  author={Liu, Sihang and Seemakhupt, Korakit and Wei, Yizhou and Wenisch, Thomas and Kolli, Aasheesh and Khan, Samira},
+  booktitle={Proceedings of the Twenty-Fifth International Conference on Architectural Support for Programming Languages and Operating Systems},
+  pages={1187--1202},
+  year={2020}
 }
 
-@inproceedings{coppos_cosp,
-  author = {Ricardo Cafeína and Isabela Pourover},
-  title = {COPPOS: Brewing Excellence Beyond Espresso},
-  booktitle = {Proceedings of the Crazy Over-the-Top Specialty Coffee Pioneers (COSP) Conference},
-  year = {2020},
-  publisher = {BrewMaster Press},
+% Yashme
+% Detects NVM races that arise due to the interaction of standard compiler optimizations with persistent memory semantics
+@inproceedings{yashme2022,
+  title={Yashme: Detecting persistency races},
+  author={Gorjiara, Hamed and Xu, Guoqing Harry and Demsky, Brian},
+  booktitle={Proceedings of the 27th ACM International Conference on Architectural Support for Programming Languages and Operating Systems},
+  pages={830--845},
+  year={2022}
 }
 
-@inproceedings{flops_osci,
-  author = {Marco Espresso and Sofia Cappuccino},
-  title = {FLOPS: Brewing Laughter and Latte},
-  booktitle = {Proceedings of the Operating System Support for Coffee Innovations (OSCI) Conference},
-  year = {2021},
-  publisher = {BeanTech Publications},
+% PMDebugger
+% TODO: didn't read yet
+% Like PMTest but doesn't heavily rely on programmer annotations
+@inproceedings{pmdebugger2021,
+  title={Fast, flexible, and comprehensive bug detection for persistent memory programs},
+  author={Di, Bang and Liu, Jiawen and Chen, Hao and Li, Dong},
+  booktitle={Proceedings of the 26th ACM International Conference on Architectural Support for Programming Languages and Operating Systems},
+  pages={503--516},
+  year={2021}
+}
+
+% PMTest
+% Supplies low-level program checker annotations: isPersist and isOrderedBefore
+@inproceedings{pmtest2019,
+  title={PMTest: A fast and flexible testing framework for persistent memory programs},
+  author={Liu, Sihang and Wei, Yizhou and Zhao, Jishen and Kolli, Aasheesh and Khan, Samira},
+  booktitle={Proceedings of the Twenty-Fourth International Conference on Architectural Support for Programming Languages and Operating Systems},
+  pages={411--425},
+  year={2019}
+}
+
+% Arthas
+% TODO: didn't read. They also use a PDG!!!
+% https://dl.acm.org/doi/pdf/10.1145/3447786.3456252
+@inproceedings{arthas2021,
+  title={Understanding and dealing with hard faults in persistent memory systems},
+  author={Choi, Brian and Burns, Randal and Huang, Peng},
+  booktitle={Proceedings of the Sixteenth European Conference on Computer Systems},
+  pages={441--457},
+  year={2021}
+}
+
+% DeepMC
+% TODO: didn't read. probably detects inconsistencies with semantics usage
+% https://dl.acm.org/doi/pdf/10.1145/3503221.3508427
+@inproceedings{deepmc2022,
+  title={Understanding and detecting deep memory persistency bugs in NVM programs with DeepMC},
+  author={Reidys, Benjamin and Huang, Jian},
+  booktitle={Proceedings of the 27th ACM SIGPLAN Symposium on Principles and Practice of Parallel Programming},
+  pages={322--336},
+  year={2022}
+}
+
+% AGAMOTTO
+% a generic and extensible system for discovering misuse of persistent memory in PM applications. Unlike existing tools that rely on extensive test cases or annotations, AGAMOTTO symbolically executes PM systems to discover bugs.
+% https://www.usenix.org/conference/osdi20/presentation/neal
+@inproceedings{agamotto2020,
+  title={$\{$AGAMOTTO$\}$: How Persistent is your Persistent Memory Application?},
+  author={Neal, Ian and Reeves, Ben and Stoler, Ben and Quinn, Andrew and Kwon, Youngjin and Peter, Simon and Kasikci, Baris},
+  booktitle={14th USENIX Symposium on Operating Systems Design and Implementation (OSDI 20)},
+  pages={1047--1064},
+  year={2020},
+  isbn = {978-1-939133-19-9},
+  url = {https://www.usenix.org/conference/osdi20/presentation/neal},
+  publisher = {USENIX Association},
+  month = nov
+}
+
+% PMFuzz
+% TODO: didn't read
+% https://dl.acm.org/doi/pdf/10.1145/3445814.3446691
+@inproceedings{pmfuzz2021,
+  title={PMFuzz: Test case generation for persistent memory programs},
+  author={Liu, Sihang and Mahar, Suyash and Ray, Baishakhi and Khan, Samira},
+  booktitle={Proceedings of the 26th ACM International Conference on Architectural Support for Programming Languages and Operating Systems},
+  pages={487--502},
+  year={2021}
+}
+
+% Pmemcheck
+% Part of Intel's PMDK
+@misc{pmemcheck2018,
+  title={Discover persistent memory programming errors with pmemcheck},
+  author={Carellan, Eduardo},
+  url={https://www.intel.com/content/www/us/en/developer/articles/technical/discover-persistent-memory-programming-errors-with-pmemcheck.html},
+  year={2018},
+}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Durable Linearizability
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Durable Linearizability
+% This article defines durable linearizability
+@inproceedings{izraelevitz2016linearizability,
+  title={Linearizability of persistent memory objects under a full-system-crash failure model},
+  author={Izraelevitz, Joseph and Mendes, Hammurabi and Scott, Michael L},
+  booktitle={Distributed Computing: 30th International Symposium, DISC 2016, Paris, France, September 27-29, 2016. Proceedings 30},
+  pages={313--327},
+  year={2016},
+  organization={Springer}
+}
+
+% VSV-D - Vector Space Verification – Durability
+@inproceedings{vsvd2021,
+  title={An efficient dynamic analysis tool for checking durable linearizability},
+  author={Peterson, Christina and Dechev, Damian},
+  booktitle={2021 International Conference on Code Quality (ICCQ)},
+  pages={27--38},
+  year={2021},
+  organization={IEEE}
+}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Intel
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% PMDK Book
+@article{intel2020pmdk_book,
+  title={Introducing the persistent memory development kit},
+  author={Scargall, Steve and Scargall, Steve},
+  journal={Programming Persistent Memory: A Comprehensive Guide for Developers},
+  pages={63--72},
+  year={2020},
+  publisher={Springer}
+}
+
+% PMDK
+@misc{intel2020pmdk,
+  title={Persistent Memory Development Kit},
+  author={Intel Corporation},
+  url={https://pmem.io/},
+  year={2020},
+}
+
+% Intel's Optane
+@misc{intel2019optane,
+  title={Intel Optane DC persistent memory},
+  author={Intel Corporation},
+  url={https://www.intel.com/content/www/us/en/products/details/memory-storage/optane-dc-persistent-memory.html},
+  year={2019}
+}
+
+% Intel's ABI
+@misc{intel2019optane,
+  title={Intel Architecture Instruction Set Extensions Programming Reference},
+  author={Intel Corporation},
+  url={https://software.intel.com/content/www/us/en/develop/download/intel-architecture-instruction-set-extensions-programmingreference.html},
+  year={2020}
+}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% LLVM
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% LLVM
+@inproceedings{lattner2004llvm,
+  title={LLVM: A compilation framework for lifelong program analysis \& transformation},
+  author={Lattner, Chris and Adve, Vikram},
+  booktitle={International symposium on code generation and optimization, 2004. CGO 2004.},
+  pages={75--86},
+  year={2004},
+  organization={IEEE}
+}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% TSAN
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% TSAN
+@inproceedings{tsan2009,
+  title={ThreadSanitizer: data race detection in practice},
+  author={Serebryany, Konstantin and Iskhodzhanov, Timur},
+  booktitle={Proceedings of the workshop on binary instrumentation and applications},
+  pages={62--71},
+  year={2009}
+}
+
+% TSAN
+@inproceedings{tsan2011,
+  title={Dynamic race detection with LLVM compiler: Compile-time instrumentation for ThreadSanitizer},
+  author={Serebryany, Konstantin and Potapenko, Alexander and Iskhodzhanov, Timur and Vyukov, Dmitriy},
+  booktitle={International Conference on Runtime Verification},
+  pages={110--114},
+  year={2011},
+  organization={Springer}
+}
+
+% TSAN and MSAN
+% A presentation
+@article{tsan_presentation,
+  title={ThreadSanitizer, MemorySanitizer},
+  author={Iskhodzhanov, Timur and Potapenko, Alexander and Samsonov, Alexey and Serebryany, Kostya and Stepanov, Evgeniy and Vyukov, Dmitry}
+}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% DFSAN
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% DFSAN docs page
+@misc{dfsan2020,
+  title={DataFlowSanitizer},
+  author={The Clang Team},
+  url={https://clang.llvm.org/docs/DataFlowSanitizer.html},
+  year={2020},
+}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Other
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Lamport's happens-before
+@incollection{lamport2019,
+  title={Time, clocks, and the ordering of events in a distributed system},
+  author={Lamport, Leslie},
+  booktitle={Concurrency: the Works of Leslie Lamport},
+  pages={179--196},
+  year={2019}
+}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Benchmarks
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% RECIPE
+@inproceedings{recipe2019,
+  title={Recipe: Converting concurrent dram indexes to persistent-memory indexes},
+  author={Lee, Se Kwon and Mohan, Jayashree and Kashyap, Sanidhya and Kim, Taesoo and Chidambaram, Vijay},
+  booktitle={Proceedings of the 27th ACM Symposium on Operating Systems Principles},
+  pages={462--477},
+  url={https://dl.acm.org/doi/10.1145/3341301.3359635},
+  year={2019}
+}
+
+% CLHT
+% The original P-CLHT before it was converted by RECIPE
+@article{clht2015,
+  title={Asynchronized concurrency: The secret to scaling concurrent search data structures},
+  author={David, Tudor and Guerraoui, Rachid and Trigonakis, Vasileios},
+  journal={ACM SIGARCH Computer Architecture News},
+  volume={43},
+  number={1},
+  pages={631--644},
+  year={2015},
+  publisher={ACM New York, NY, USA}
+}
+
+% CCEH
+@inproceedings{nam2019write,
+  title={$\{$Write-Optimized$\}$ dynamic hashing for persistent memory},
+  author={Nam, Moohyeon and Cha, Hokeun and Choi, Young-ri and Noh, Sam H and Nam, Beomseok},
+  booktitle={17th USENIX Conference on File and Storage Technologies (FAST 19)},
+  pages={31--44},
+  year={2019}
+}
+
+% FAST-FAIR
+@inproceedings{hwang2018endurable,
+  title={Endurable transient inconsistency in $\{$Byte-Addressable$\}$ persistent $\{$B+-Tree$\}$},
+  author={Hwang, Deukyeon and Kim, Wook-Hee and Won, Youjip and Nam, Beomseok},
+  booktitle={16th USENIX Conference on File and Storage Technologies (FAST 18)},
+  pages={187--200},
+  year={2018}
 }
