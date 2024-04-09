@@ -3,7 +3,7 @@
 \usepackage{enumitem}
 \usepackage{amsmath}
 \usepackage{amsfonts}
-\usepackage{amssymb}
+% \usepackage{amssymb}
 \usepackage{sansmath}
 \usepackage[ruled,linesnumbered]{algorithm2e}
 \usepackage{float}
@@ -17,6 +17,20 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Macros
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% ---------------------------------------------------------
+% Names
+% ---------------------------------------------------------
+
+\newcommand{\cprd}{CPRD\xspace}
+\newcommand{\myrace}{Concurrent Persistency Race\xspace}
+\newcommand{\pmracerace}{PM Inter-thread Inconsistency\xspace}
+\newcommand{\race}{\myrace}
+% \renewcommand{\race}{PM Inter-thread Inconsistency\xspace}
+
+\newcommand{\racerange}{\myrace Range}
+\newcommand{\racedetector}{\myrace Detector}
+
 
 % ---------------------------------------------------------
 % Fonts
@@ -63,7 +77,10 @@
 \newcommand{\HBEdges}{\DefSet{E_{hb}}}
 \newcommand{\PDEdges}{\DefSet{E_{pd}}}
 \newcommand{\HBG}{\DefSet{HBG}}
+\newcommand{\HBGName}{Happen-Before Graph\xspace}
 \newcommand{\PDG}{\DefSet{PDG}}
+\renewcommand{\PDG}{\DefSet{DDG}}
+\newcommand{\PDGName}{Dynamic Program Dependence Graph\xspace}
 \newcommand{\DefGraph}[3]{\DefSet{#1(#2, #3)}}
 
 \newcommand{\Vars}{\DefSet{Vars}}
@@ -145,6 +162,15 @@
 
 \newcommand{\EventNode}{event\xspace}
 \newcommand{\EventNodes}{{\EventNode}s\xspace}
+
+
+% ---------------------------------------------------------
+% Formating
+% ---------------------------------------------------------
+
+\newcommand{\myparagraph}[1]{\paragraph{#1}}
+% \renewcommand{\myparagraph}[1]{\textbf{#1}:}
+
 
 
 % ---------------------------------------------------------

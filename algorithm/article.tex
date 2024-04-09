@@ -25,6 +25,7 @@
 \author{Ron Gatenio}
 \affiliation{%
   \institution{Technion}
+  \city{Haifa}
   \country{Israel}
 }
 \email{ron.gatenio@campus.technion.ac.il}
@@ -32,6 +33,7 @@
 \author{Erez Petrank}
 \affiliation{%
   \institution{Technion}
+  \city{Haifa}
   \country{Israel}
 }
 \email{erez@cs.technion.ac.il}
@@ -52,114 +54,274 @@ This research introduces CPRD, a concurrent NVM bug detector that analyzes the p
 \maketitle % should come after the abstract
 \pagestyle{plain} % should come right after \maketitle
 
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Introduction
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Introduction}
+
 \iffalse
+TODO:
 Background
 This paper presents CPRD, ...
 The sections are ...
 \fi
 
-Nonvolatile memory (NVM) technologies, such as Intel’s Optane DC Persistent Memory, offer both persistence similar to disks with performance close to that of DRAM. NVM storage is accessed, like DRAM, with load and store instructions. This provides new opportunities for designing a crash-consistent software without high storage overhead. However, designing and implementing such programs is difficult. NVM data on a volatile cache may not persist after a crash, and it may also evict cache lines in an arbitrary order, which may differ from the program’s store order.
+Nonvolatile memory (NVM) technologies, such as Intel’s Optane DC Persistent Memory \cite{intel2019optane}, offer both persistence similar to disks with performance close to that of DRAM. NVM storage is accessed, like DRAM, with load and store instructions. This provides new opportunities to design crash-consistent software without high storage overhead. However, designing and implementing such programs is difficult. NVM data on a volatile cache may not persist after a crash, and it may also evict cache lines in an arbitrary order, which may differ from the program’s store order.
 
-To ensure consistency of NVM state, developers need to explicitly evict cache lines to the NVM. This can be done with explicit flush (e.g., CLWB) and fence (e.g., SFENCE) instructions. Due to the need to ensure correct cache line evictions, even experienced programmers may introduce inconsistency bugs, if they are not experienced with PM programming practices. This introduces a need for special bug detectors that could help developers find such complicated bugs. Previous bug detectors, aimed at detecting data inconsistencies, won’t necessarily be able to find NVM related bugs. This type of programming model that uses byte addressable persistent memory didn't exist before. 
+To ensure consistency of NVM state, developers need to explicitly evict cache lines to the NVM. This can be done with explicit flush (e.g., CLWB) and fence (e.g., SFENCE) instructions \cite{intel2020abi}. Due to the need to ensure correct cache line evictions, even experienced programmers may introduce inconsistency bugs, if they are not experienced with PM programming practices. This introduces a need for special bug detectors that could help developers find such complicated bugs. Previous bug detectors, aimed at detecting data inconsistencies, won’t necessarily be able to find NVM related bugs. This type of programming model that uses byte addressable persistent memory did not exist before. 
 
-In this work, we focus on a specific type of bug that can be introduced in concurrent NVM programs. Our bug occurs when an NVM location is affecting the data written to another NVM location before being persisted. Such bug can cause an inconsistent NVM state after a crash. In the following, we refer to this bug as “Concurrent Persistency Race”.
+In this work, we focus on a specific type of bug that can be introduced in concurrent NVM programs. Previously coined as \pmracerace \cite{pmrace2022}, a bug that occurs when an NVM location affects data written to another NVM location before being persisted. Such bug can cause an inconsistent NVM state after a crash if the affected written address got persisted before the read address. In the following, we refer to this bug as \race.
+
+Previous work \cite{pmrace2022} attempted to detect the bug using a smart fuzzing technique to explore the inter-thread interleaving of the program.
+We attempt to solve the interleaving exploration using a vector clock analysis that detects happen-before relations between program events \cite{lamport2019}.
+To do this, we use LLVM's ThreadSanitizer \cite{tsan2009}.
+In addition, we want to detect all write events to persistent memory that are affected by a read event from persistent memory. We will use data-flow analysis to determine whether a read event affects a write event later in the execution.
+For this, we will use LLVM's DataFlowSanitizer \cite{dfsan2020}.
+
+Using both the happen-before analysis and the data-flow analysis we can construct 2 graphs that represent the relations between all execution events.
+A \HBGName, denoted as $\HBG$, and a \PDGName \cite{dpdg1991} denoted as $\PDG$
+\myrace detector will use the 2 graphs to traverse the program execution trace and report all discovered bugs using the algorithm presented later in \autoref{sec:algorithm}.
+
+
+% ChatGPT:
+% Concurrent Persistency Race Detector (CPRD) is a novel tool designed to identify and analyze concurrent persistency races in applications leveraging persistent memory, such as Intel's Optane DC Persistent Memory. With the advent of non-volatile memory technologies, ensuring the correctness of persistent data structures in the face of concurrent accesses and system failures has become paramount. CPRD addresses this challenge by instrumenting the target application, generating a detailed execution trace that includes memory access, synchronization events, and flush operations to persistent memory. By constructing and analyzing a Happens-Before graph (HBG) from the execution trace, CPRD effectively identifies potential data races that could lead to inconsistencies in persistent memory, thus aiding developers in the design of robust and error-free persistent memory applications.
+
+% ChatGPT:
+% This document presents an algorithm designed to identify and mitigate Concurrent Persistence Races (CPR) in multithreaded applications. At its core, the algorithm instruments a given program to trace execution, thereby generating a detailed log of memory accesses, synchronization events, and flush operations. Utilizing this trace, we construct a Happens-Before Graph (HBG) and a Program Dependency Graph (PDG), fundamental structures for understanding the temporal and dependency relations between different program events.
+% Our approach innovates on existing methods by offering a more precise detection of potential persistence races, leveraging advanced vector clock techniques to account for the nuanced interplay of read, write, and flush events across threads. The ultimate goal is to offer developers a tool for preemptively identifying race conditions that could lead to inconsistent or erroneous program states in persistent memory environments. This document details the algorithm's theoretical foundation, practical implementation, and expected outcomes, aiming to provide a comprehensive framework for enhancing program reliability and performance in concurrent systems.
+
+
+% TODO: write about other sections
+% TODO: conclude the intro
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Introduction
+% Background and Preliminaries
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% \section{Preliminaries}
+% \section{Background}
+\section{Background and Preliminaries}
+
+\subsection{Persistent Memory Programming}
+% TODO: write
+
+\subsection{Program Instrumentation}
+Program instrumentation allows us to record runtime events that occur during program execution.
+Using LLVM's IR instrumentation %TODO: cite?
+we will record every PM access (reads and writes) and every flush/fence instructions.
+In addition, we will use LLVM's ThreadSanitizer to obtain happen-before edges between recorded instructions, and LLVM's DataFlowSanitizer to obtain program dependency relations between execution events in runtime.
+
+% TODO: rewrite
+
+\myparagraph{Happen-Before Analysis}
+LLVM's ThreadSanitizer \cite{tsan2009}, originally developed by Google, is a data race detection tool that instruments program execution and reports data races, using a vector clock analysis \cite{lamport2019}.
+In Lamport's original paper, vector clocks are updated when a process sends a message to another process. In the case of ThreadSanitizer, the messages are considered to be any event in one thread that is guarantied to happen before another event in another thread.
+Events like thread creation, join operations, lock acquisitions and releases, and use of atomic primitives like InterlockIncrement, InterlockXchg etc.
+
+We utilize ThreadSanitizer's precise instrumentation and vector clock updates in order to record happen-before edges between program events.
+
+% TODO: rewrite
+
+\myparagraph{Dynamic Program Dependence Analysis}
+LLVM's Data-Flow Sanitizer \cite{dfsan2020} is a tool used to detect the effects of program events on one another
+
+% TODO: complete
+
+\subsection{\race}
+
+% TODO: write
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Algorithm
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Algorithm}
+\label{sec:algorithm}
+
+% Moving forward, we denote the set of all variables as $\Vars$, and similarly, $\Threads$ represents all threads in the trace. The complete set of event nodes is indicated by $\Nodes$, with subsets $\ReadNodes, \WriteNodes, \FlushNodes$ representing the Read, Write, and Flush nodes, respectively.
+
+The program trace events are categorized into event nodes $\Nodes$, happens-before $\HBEdges$ and program dependency edges $\PDEdges$.
+The subsets $\ReadNodes, \WriteNodes, \FlushNodes$ represent the \textbf{Read}, \textbf{Write}, and \textbf{Flush} nodes, respectively.
+For each event node $\NodeV$ we will define $\var{\NodeV} \in \Vars$ to be the variable (memory address) that is accessed/modified/flushed in the event node $\NodeV$, and $\thread{\NodeV} \in \Threads$ be the thread that the event at node $\NodeV$ occurs in.
+In addition we will give each event in the trace an incrementing ID, denoted as $\idx{\NodeV}$. Note that in each thread, the ID increases as program execution moves forward.
+
+% \race occurs when a PM modification is affected by an un-persisted PM read. In order to detect the race we want to inquire the persistence state of the read address in the said PM read event, when executing said PM modification.
+
+A \race emerges when a modification to persistent memory (PM) is influenced by a read operation from an area in PM that has not yet been persisted (and are located in different cache lines).
+To detect such race, it is crucial to assess the persistence status of the memory address involved in the read operation at the time the corresponding PM modification is executed. 
 
 
 
 
 
+Before we formally define it, we want to define the state of the persistency 
+For each event node in the trace we want to know the persistency state
+
+Before formally defining \cprd, we will define 2
+
+
+Using these notations, we will formally define \cprd
+
+\begin{definition}
+    \label{def:race}
+    We define a \race between a read node $\NodeR \in \ReadNodes$ and a write node $\NodeW \in \WriteNodes$ if both affect overlapping memory locations and $\exists \NodeWEx \in \WriteNodes$ such that $\NodeWEx$ affects a different cache line and is program-dependent on $\NodeR$
+$$
+
+\begin{aligned}
+    & \var{\NodeR} = \var{\NodeW} \\
+    & \exists \NodeWEx \in \WriteNodes \such \var{\NodeR} \neq \var{\NodeWEx} \land \thread{\NodeR} = \thread{\NodeWEx} \\
+    & \PD{\NodeWEx}{\NodeR} \\
+    & \PBVC{\NodeWEx}{\thread{\NodeW}, \var{\NodeW}} < \idx{\NodeW} < \HAVC{\NodeR}{\thread{\NodeW}}
+\end{aligned}
+
+
+\var{\NodeR} = \var{\NodeW} \\
+\exists \NodeWEx \in \WriteNodes \such \var{\NodeR} \neq \var{\NodeWEx} \land \thread{\NodeR} = \thread{\NodeWEx} \\
+\PD{\NodeWEx}{\NodeR} \\
+\PBVC{\NodeWEx}{\thread{\NodeW}, \var{\NodeW}} < \idx{\NodeW} < \HAVC{\NodeR}{\thread{\NodeW}}
+$$
 
 
 
-\section{Background}
-Coffee has a rich history dating back to its discovery in Ethiopia in the 15th century. The journey of coffee preparation has evolved from traditional methods to today's modern espresso machines. Despite these advancements, achieving both the perfect espresso shot and latte art consistently has remained a complex challenge.
+$$
+    {\PersistenceRaces} = \left\{ (\NodeR, \NodeW) \middle| \ 
+    \begin{aligned}
+        & \NodeR \in \ReadNodes, \NodeW \in \WriteNodes, \var{\NodeR} = \var{\NodeW} \\
+        & \exists \NodeWEx \in \WriteNodes \such \var{\NodeR} \neq \var{\NodeWEx} \land \thread{\NodeR} = \thread{\NodeWEx} \\
+        & \PD{\NodeWEx}{\NodeR} \\
+        & \PBVC{\NodeWEx}{\thread{\NodeW}, \var{\NodeW}} < \idx{\NodeW} < \HAVC{\NodeR}{\thread{\NodeW}}
+    \end{aligned}
+    \right\}
+$$
+\end{definition}
 
-\section{System Overview}
-ESPLOS comprises the following components:
+In \ref{def:race}
 
-\textbf{ESPLOS Operating System:} This core component provides real-time control over machine parameters, ensuring precise brewing by regulating water temperature, pressure, and brewing time.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Algorithm
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Algorithm}
+\label{sec:algorithm}
+TODO: overview
 
-\textbf{ESPLOS Programming Language:} A domain-specific language designed for coffee machine control allows users to define coffee recipes with precision.
+\subsection{Program Instrumentation}
+TODO: TSAN
+TODO: DFSAN
 
-\textbf{ESPLOS Compiler:} Translates high-level programming language code into machine-readable instructions, optimizing the brewing process for consistency.
+\subsection{Algorithm?}
+The program trace contains events and relations between them. \\
+Each event has a type: Read, Write, or Flush. \\
+Each event operates on a variable (a memory address in PM space).
 
-\section{Simulation Results}
-We conducted simulations to assess ESPLOS's performance. The results demonstrated an 18\% improvement in shot drawing time compared to previous systems. The simulations also showed a 24\% increase in coffee throughput.
-
-\section{Evaluation}
-
-In this section, we present a comprehensive evaluation of ESPLOS in comparison to the prior systems, FLOPS~\cite{flops_osci} and COPPOS~\cite{coppos_cosp}. Our assessment focuses on two critical aspects: brewing time and brewing quality, as illustrated in Figure \ref{fig:brewing_time} and Figure \ref{fig:brewing_quality}.
-
-\subsection{Brewing Time Comparison}
-
-As depicted in Figure \ref{fig:brewing_time}, the brewing time is a vital factor in assessing the efficiency of coffee preparation systems. ESPLOS, our innovative Espresso-Powered Latte Operating System, demonstrates a significant advantage in brewing time across different coffee bean roast strengths (Light, Medium, and Dark). It is crucial to note that the figures are presented to scale, with each system's performance normalized for a fair comparison.
-
-ESPLOS consistently outperforms both FLOPS and COPPOS, delivering notably shorter brewing times. The margin of improvement is most pronounced when using Dark roast beans, where ESPLOS excels at optimizing the coffee brewing process. These results clearly highlight the advantage of ESPLOS in terms of operational efficiency.
-
-\subsection{Brewing Quality Comparison}
-
-In Figure \ref{fig:brewing_quality}, we assess the brewing quality, a measure of the overall coffee quality based on user ratings. ESPLOS again demonstrates its prowess by consistently achieving higher brewing quality scores. Users rated the coffee prepared by ESPLOS as the finest, with an average score close to 4.8 out of 5, indicating a remarkable improvement in coffee quality.
-
-While both FLOPS and COPPOS deliver satisfactory results, their brewing quality scores are marginally lower than that of ESPLOS. The differences are most evident when using Light and Dark roast beans, with ESPLOS consistently producing superior coffee quality.
-
-\subsection{Summary of Results}
-
-The evaluation results emphasize the superiority of ESPLOS as the Espresso-Powered Latte Operating System. In both brewing time and brewing quality, ESPLOS exhibits exceptional performance, outclassing FLOPS and COPPOS. The efficient brewing times and consistently superior coffee quality achieved by ESPLOS make it a standout solution for coffee enthusiasts and professional baristas.
-
-These results not only highlight the technological advancements introduced by ESPLOS but also underscore its potential to revolutionize the coffee industry. ESPLOS empowers users to consistently create exquisite coffee beverages while enjoying the benefits of a faster brewing process. With ESPLOS, coffee preparation reaches new heights in terms of both efficiency and quality.
-
-
-\begin{figure}
-    \centering
-    % \includegraphics[width=0.8\linewidth]{brewing_time_comparison.pdf}
-    \caption{Brewing Time Comparison}
-    \label{fig:brewing_time}
-    \Description{abc}
-\end{figure}
-
-\begin{figure}
-    \centering
-    % \includegraphics[width=0.8\linewidth]{brewing_quality_comparison.pdf}
-    \caption{Brewing Quality Comparison}
-    \label{fig:brewing_quality}
-    \Description{efg}
-\end{figure}
-
-\subsection{User Study for Coffee Quality}
-We conducted a user study with 100 participants to assess coffee quality. Users consistently rated the coffee prepared using ESPLOS at 4.8 out of 5, reflecting an exceptional improvement in quality.
+We will define some groups on the collection of data from the program trace:
+\begin{itemize}
+    \item Let $\Vars$ be all variables in the trace.
+    \item Let $\Threads$ be all threads in the trace.
+    \item Let $\Nodes$ be all event nodes in the trace.
+    \item Let $\ReadNodes, \WriteNodes, \FlushNodes$ be all the Read, Write, and Flush nodes in the trace respectively.
+    % \item Let $\ReadNodes[\VarX], \WriteNodes[\VarX], \FlushNodes[\VarX]$ be all the Read, Write, and Flush nodes in the trace, respectively, such that the variable operated by the node is $\VarX$.
+    \item Let $\var{\NodeV} = \VarX$ be the variable operated by node $\NodeV$. \hfill $\NodeV \in \Nodes, \VarX \in \Vars$
+    \item Let $\loc{\NodeV} = (\Thread, \IndexI)$ be the location of node $\NodeV$, the $\IndexI^{th}$ node in thread $\Thread$. \hfill $\NodeV \in \Nodes, \Thread \in \Threads, \IndexI \in \N$
+    \item Let $\thread{\NodeV}$ be the thread the event $\NodeV \in \Nodes$ occurred on.
+    \item Let $\idx{\NodeV}$ be the index of the event $\NodeV \in \Nodes$ in the program trace.
+\end{itemize}
 
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Implementation
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Implementation}
+
+% TODO: add image of full system
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Related Work}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Related Work}
+TODO: intro
+
+\textbf{Persistent Memory Bugs Detectors:}
+Like PMRACE \cite{pmrace2022}, which focuses on finding concurrent bugs. 
+Others like Yashme \cite{yashme2022}, Witcher \cite{witcher2021}, PMDebugger \cite{pmdebugger2021}, XFDetector \cite{xfdetector2020}, PMTest \cite{pmtest2019}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 The concept of operating systems for coffee machines is not entirely novel. Previous attempts have focused on various aspects of coffee preparation and automation. Here, we provide a brief overview of these endeavors and highlight how ESPLOS improves upon them.
 
-\textbf{Early Operating Systems for Coffee Machines:} Early operating systems for coffee machines~\cite{first_reference} primarily aimed at automating brewing processes, such as water temperature control and brewing time. These systems contributed to more consistent coffee quality but often lacked the finesse required for espresso shots and latte art. ESPLOS extends this concept by introducing precise control mechanisms for latte art and implementing advanced temperature regulation techniques.
-
-\textbf{Coffee Machine Programming Languages:} Some coffee machines have integrated rudimentary programming languages~\cite{second_reference} that allowed users to customize brewing parameters. These languages, however, were often limited in scope and complexity. ESPLOS introduces a domain-specific programming language designed for precise coffee control, enabling users to create complex coffee recipes with ease.
-
-\textbf{Latte Art Systems:} A few specialized systems focused on latte art automation~\cite{third_reference}, but they did not offer a holistic solution. ESPLOS combines espresso shot quality and latte art, ensuring that the two aspects work in harmony. It offers a comprehensive platform that empowers users to master both the technical and artistic dimensions of coffee preparation.
-
-\textbf{Commercial Solutions:} Several commercial coffee machines offer programmable brewing options~\cite{fourth_reference}. While these machines have made coffee preparation more convenient, they often lack the open, adaptable nature of ESPLOS. Our system is designed to be flexible, allowing users to tailor their coffee experience precisely to their preferences.
-
-ESPLOS distinguishes itself by providing a comprehensive and integrated solution that combines precise espresso shot quality and the creation of consistent, stunning latte art. By bridging the gap between coffee craftsmanship and technology, ESPLOS sets a new standard for coffee quality and consistency.
 
 
+\textbf{PMRace} \cite{pmrace2022} – a NVM bug detector designed for concurrent NVM programs.
+Until recently, most works didn’t focus on NVM bugs in concurrent programs, mostly due to the complex search space that thread scheduling introduces.
+In ASPLOS 2022, Chen, Zhangyu, et al. introduced PMRace, that focuses on bug detection in concurrent NVM programs. 
+PMRace is a fuzzing-based bug detector that is aimed at detecting 2 types of PM bugs:
+\begin{itemize}
+    \item PM inter-thread inconsistencies – a program execution in which one thread makes durable side effects based on non-persisted data written by another thread. This is the definition of our concurrent persistency race.
+    \item PM synchronization inconsistencies - an inconsistency between a persistent synchronization variable (e.g., a lock, a mutex, etc.) and the non-persistent thread state.
+\end{itemize}
+PMRace detects PM inter-thread inconsistencies by finding all pairs of read/write operations to the same PM addresses (named PM alias pairs). It later simulates a delay after the write operation that allows the read operation to continue and to hopefully introduce the inconsistency bug.
+
+PMRace tries to maximize its coverage of PM alias pairs to detect more bugs. To find the inconsistencies, PMRace detects program dependency relations and sees if an NVM location, that is dependent on the PM alias pair’s data, is modified with un-persisted data.
+
+\paragraph{Witcher} \cite{witcher2021} – a crash consistency bug detector for NVM software that focuses on exploring the NVM state space.
+Witcher uses an LLVM pass to trace the program's execution and to detect possible violations of NVM state. It finds likely invariants on the program’s persistence order and tests its correctness by simulating a crash. Later it checks the equivalence of the NVM state with and without the simulated crash and finds NVM violations if the states are different.
+Witcher is designed to be scalable (doesn’t suffer from test space explosion), automatic (doesn’t require manual source code annotations), and precise (doesn’t produce false positives).
+Witcher doesn’t focus on exploring thread interleaving, and therefore isn’t suited to find difficult concurrency NVM bugs. They leave this for future work.
+
+\paragraph{VSV-D} (Vector Space Verification – Durability) \cite{vsvd2021} – a dynamic analysis tool that checks durable linearizability at runtime.
+Requires user annotations – granularity of operations is defined by the user.
+Mostly verifies that all required NVM data is guaranteed to be flushed.
+
+\paragraph{XFDetector} (Cross-Failure Detector) \cite{xfdetector2020}
+Detects NVM bugs between the pre-failure and post-failure stages, named Cross-Failure Bugs.
+These bugs can be categorized into 2 classes:
+\begin{itemize}
+    \item Cross-failure races – a post-failure operation that relies on data that wasn’t persisted in the pre-failure stage.
+    \item Cross-failure semantic bugs – a post-failure operation that reads data that might be persistent but is considered invalid by program semantics.
+\end{itemize}
+
+\paragraph{PMTest} \cite{pmtest2019}
+Supplies 2 low-level program checkers:
+\begin{itemize}
+\item isPersist – checks if an NVM memory location is persisted.
+\item isOrderedBefore – checks if an NVM memory location is persisted before another location.
+\end{itemize}
+
+Using these checkers, the user can assert program invariants and detect inconsistency bugs.
+
+\textbf{Recipe} \cite{recipe2019} an approach for converting concurrent DRAM data structures into crash consistent data structures for persistent memory.
+
+The common conversion step is to insert a cache line flush and memory fence instructions after each store. 
+This approach can produce a bug where data that is modified in one thread can be read by another thread before being persisted. This data can later be used to update other NVM locations that might get persisted before the original data persists. If a crash occurs before the original data persists but after the dependent data persists in another thread, an inconsistency bug will occur. The NVM state after the crash is no longer consistent.
+
+In this work we call such bug a Concurrent Persistency Race, and this is the bug that we hope to detect with our bug detector.
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Conclusions
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Conclusions}
 \lipsum[1][1-3]
 
-\section{Acknowledgments}
-We extend our gratitude to the coffee experts and baristas who participated in the evaluation of ESPLOS, as well as the ASPLOS reviewers for their valuable insights and feedback.
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Bibliography
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \bibliographystyle{plain}
 \bibliography{references}
 
 \end{document}
-
