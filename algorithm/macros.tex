@@ -106,7 +106,7 @@
 \newcommand{\loc}[1]{\DefFunc{loc}{}{#1}}
 % \newcommand{\thread}[1]{\DefFunc{t}{}{#1}}
 \newcommand{\thread}[1]{\DefFunc{thread}{}{#1}}
-% \renewcommand{\thread}[1]{\DefFunc{thr}{}{#1}}
+\renewcommand{\thread}[1]{\DefFunc{thr}{}{#1}}
 \newcommand{\idx}[1]{\DefFunc{idx}{}{#1}}
 
 \newcommand{\HAVC}[2]{\DefFunc{HAVC}{#1}{#2}}
@@ -124,6 +124,7 @@
 
 % \newcommand{\HBSign}{\prec}
 \newcommand{\HBSign}{\overset{hb}{\prec}}
+% \renewcommand{\HBSign}{\ensuremath{\FontSet{happen-before}}}
 \newcommand{\HB}[2]{\ensuremath{{#1} \HBSign {#2}}}
 
 % \newcommand{\PDSign}{\overset{pd}{\to}}
@@ -208,3 +209,16 @@
 % \newcommand{\lineref}[1]{\linkref{#1}{Line}}
 
 
+% ---------------------------------------------------------
+% Algorithm
+% ---------------------------------------------------------
+
+\DontPrintSemicolon
+\SetNoFillComment
+\SetKwComment{Comment}{/* }{ */}
+\SetKw{Continue}{continue}
+\SetKw{Assert}{assert}
+\SetKwProg{Fn}{Function}{:}{}
+\SetKwFunction{FHAVC}{HAVC-Builder}
+\SetKwFunction{FPBVC}{PBVC-Builder}
+\SetKwFunction{FCPRD}{CPRD}
