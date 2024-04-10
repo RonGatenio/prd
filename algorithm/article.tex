@@ -1,4 +1,5 @@
 \documentclass[nonacm,sigplan]{acmart}
+% \documentclass[a4paper,12pt]{article}
 
 % includes
 \input{macros.tex}
@@ -140,15 +141,18 @@ LLVM's Data-Flow Sanitizer \cite{dfsan2020} is a tool used to detect the effects
 \label{sec:algorithm}
 
 In the following section we will present the algorithm used to detect {\cprd}s.
-First we will define the \cprd formally and later present the algorithm of detecting it.
+First, we will define \cprd formally and later present the algorithm to detect it.
 
 Events within the program trace are organized into three main categories: event nodes $\Nodes$, happens-before edges $\HBEdges$, and program dependency edges $\PDEdges$. Specifically, the subsets $\ReadNodes, \WriteNodes, \FlushNodes$ denote the \textbf{Read}, \textbf{Write}, and \textbf{Flush} nodes, highlighting the types of operations performed at each node.
 For every event node $\NodeV$, we assign $\var{\NodeV} \in \Vars$ to indicate the variable (or memory address) that is being accessed, modified, or flushed. Additionally, $\thread{\NodeV} \in \Threads$ identifies the thread in which the event at node $\NodeV$ occurs.
 Furthermore, each event in the trace is assigned a sequential ID, represented by $\idx{\NodeV}$. It's important to note that within each thread, this ID increments sequentially, reflecting the forward progression of program execution.
-We denote \HBGName as $\HBG = (\Nodes, \HBEdges)$. We say that an event node $\NodeE_1$ happen-before $\NodeE_2$ if there is a path in $\HBG$ from $\NodeE_1$ to $\NodeE_2$.
-% We denote \PDGName as $\PDG = (\Nodes, \PDEdges)$.
+We denote \HBGName as $\HBG = (\Nodes, \HBEdges)$. We say that an event node $\NodeE_1$ happen-before $\NodeE_2$ if there is a path in $\HBG$ from $\NodeE_1$ to $\NodeE_2$. Note that $\HBG$ is a directed acyclic graph (DAG) since no 2 events can happen-before each other.
+% TODO: should the following explanation be here or somewhere else?
+% TODO: The following is the explnation about the structure of the PDG and that each read has only one write... This explnation requires an understanding of the race
+We denote \PDGName as $\PDG = (\Nodes, \PDEdges)$. $\PDEdges$ contain only $\NodeWEx \to \NodeR$ edges, meaning that $\NodeWEx$ is program-dependent on node $\NodeR$.
+% TODO: explain that the \racerange for the earliest write is the largest...
 
-A \race emerges when a modification to persistent memory (PM) is influenced by a read operation from an area in PM that has not yet been persisted (and are located in different cache lines).
+A \race emerges when a modification of persistent memory (PM) is influenced by a read operation from an area in PM that has not yet persisted (and is located on different cache lines).
 To detect such race, we assess the persistence status of the memory address $\VarX$ involved in the read operation at the time the corresponding PM modification is executed. 
 
 $\VarX$ is considered persisted at the moment of the event node $\NodeWEx$ if it meets one of the following conditions: A Flush event precedes $\NodeWEx$ and occurs after the read event $\NodeR$ that influences it, or, for every write event to $\VarX$ not succeeding the read event $\NodeR$, there exists a Flush event that precedes $\NodeWEx$. This ensures that $\VarX$ is in a persisted state by the time $\NodeWEx$ takes place, having been flushed following the influencing read operation or write operations that might have affected the read.
@@ -163,7 +167,7 @@ $\VarX$ is considered persisted at the moment of the event node $\NodeWEx$ if it
 
 % To evaluate the persistence status of memory location $\VarX$ at any point during execution, we introduce two functions for each event node $\NodeV \in \Nodes$. The function $\HBVC{\NodeV}{\Thread,\VarX}$ identifies the index of the last node in thread $\Thread$ concerning variable $\VarX$ that precedes node $\NodeV$. The function $\PBVC{\NodeV}{\Thread,\VarX}$ determines the index of the last node in thread $\Thread$ concerning variable $\VarX$ that was persisted prior to node $\NodeV$. This implies the node occurred before a flush event targeting the same cache line.
 To evaluate the persistence status of memory location $\VarX$ at any point during execution, for each node we $\NodeV \in \Nodes$ introduce the function $\PBVC{\NodeV}{\Thread,\VarX}$ that determines the index of the last node in thread $\Thread$ concerning variable $\VarX$ that was persisted prior to node $\NodeV$. This implies the node occurred before a flush event targeting the same cache line.
-In addition, for each event node we introduce the function, $\HAVC{\NodeV}{\Thread}$ which identifies the index of the first node in thread $\Thread$ that happen-after node $\NodeV$.
+In addition, for each event node we introduce the function $\HAVC{\NodeV}{\Thread}$ which identifies the index of the first node in thread $\Thread$ that happen-after node $\NodeV$.
 
 Using these functions, we will redefine \cprd as follows.
 \begin{definition}
@@ -175,11 +179,22 @@ Using these functions, we will redefine \cprd as follows.
 \end{definition}
 
 % TODO: show interval image
+Essentially, if the \readnode isn't persisted, we define an interval in each thread between the persistency point of $\VarX$ and the point that happen-after the read (meaning it has no affect on the read value). We call this interval \racerange, and it is defined for each write node and for each thread.
+% TODO: not explained great
 
-Essentially, if the read event isn't persisted, we define an interval in each thread between the persistency point of $\VarX$ and the point that happen-after the read (meaning it has no affect on the read value).
+
 
 \subsection{Algorithm}
 The algorithm is comprised of three main stages: in \autoref{alg:havc} we construct the $\HAVC{}{}$ for each node, in \autoref{alg:pbvc} we construct $\PBVC{}{}$ for each node, and in \autoref{alg:cprd}, we identify {\cprd}s based on the two functions.
+
+
+% ---------------------------------------------------------
+% Algorithm - 1. HAVC
+% ---------------------------------------------------------
+
+\myparagraph{Happens-After Vector Clocks Builder}
+In \autoref{alg:havc} we iterate over all nodes in the $\HBG$ in post-order search (which insures that we traverse each node after visiting all of its children) and update $\havc{}{}$ accordingly.
+By the end of this algorithm, $\havc{\NodeV}{\Thread} = \HAVC{\NodeV}{\Thread}$ for all nodes $\NodeV \in \Nodes$ and all $\Thread \in \Threads$.
 
 \begin{algorithm}
     \caption{Happens-After Vector Clocks Builder}
@@ -204,6 +219,16 @@ The algorithm is comprised of three main stages: in \autoref{alg:havc} we constr
         \KwRet $\havc{}{}$\;
     } 
 \end{algorithm}
+
+
+% ---------------------------------------------------------
+% Algorithm - 2. PBVC
+% ---------------------------------------------------------
+
+\myparagraph{Persisted-Before Vector Clocks Builder}
+In \autoref{alg:pbvc} we iterate over all nodes in the $\HBG$ in a reversed post-order search (which insures that we traverse each node after visiting all of its parents).
+We define an auxilary function named $\HBVC{}{}$ that is calculated in $\hbvc{}{}$.
+The function $\HBVC{\NodeV}{\Thread,\VarX}$ identifies the index of the last node in thread $\Thread$ concerning variable $\VarX$ that precedes node $\NodeV$.
 
 \begin{algorithm}
     \caption{Persisted-Before Vector Clocks Builder}
@@ -250,6 +275,15 @@ The algorithm is comprised of three main stages: in \autoref{alg:havc} we constr
 \end{algorithm}
 
 
+% ---------------------------------------------------------
+% Algorithm - 3. CPRD
+% ---------------------------------------------------------
+
+\myparagraph{Concurrent Persistence Race Detector}
+In \autoref{alg:cprd} we use the previously built $\HAVC{}{}$ and $\PBVC{}{}$ to find the {\racerange}s of each write event node.
+For each write node $\NodeWEx \in \WriteNodes$ we look at the dependent read node $\NodeR \in \ReadNodes$
+% TODO
+
 \begin{algorithm}
     \caption{Concurrent Persistence Race Detector}
     \label{alg:cprd}
@@ -293,6 +327,42 @@ The algorithm is comprised of three main stages: in \autoref{alg:havc} we constr
 \end{algorithm}
 
 
+% ---------------------------------------------------------
+% Algorithm - Improvments
+% ---------------------------------------------------------
+
+\subsection{Algorithm Improvements}
+
+In practice, we combine the 2 last algorithm to one iteration over all the nodes. This is acceptable since when reaching a node $\NodeV$ we already know $\HAVC{\NodeV}{}$ and $\PBVC{\NodeV}{}$.
+
+In addition, 
+
+\subsection{Correctness}
+\subsection{Complexity}
+
+Note that the maximum amount of parents/children is $\abs{\Threads}$ since we only allow one happen-before relation from each node to each thread.
+We will also assume that practically, $\abs{\Threads} << \abs{\Nodes}$
+
+Part 1 - $\bigO{\abs{\Nodes}\cdot\abs{\Threads}^2} \approx \bigO{\abs{\Nodes}}$
+
+Part 2 - $\bigO{\abs{\Nodes}\cdot\left(\abs{\Threads} + \abs{\Threads}^2\cdot\abs{\Vars} \right)} \approx \bigO{\abs{\Nodes}\cdot\abs{\Vars}} \approx \bigO{\abs{\Nodes}^2}$
+
+Part 3
+
+Since each read node has only one possible edge or less (since we keep only the edge to the first write in that thread), $\abs{\PDEdges} \leq \abs{\ReadNodes}$.
+
+In \autoref{alg:cprd} we effectively iterate over all edges in $\PDEdges$. So, 
+$\bigO{\abs{\PDEdges}\cdot\abs{\WriteNodes}} \approx \bigO{\abs{\Nodes}^2}$
+
+
+In practice, we store linked lists in each thread between event nodes that affect the same cache line. This allows us to quickly iterate over the possible violating write nodes in the \racerange.
+
+The most important optimization is that of dirty cache lines bookkeeping.
+We maintain in each thread a set of all cache lines that were operated by the event nodes (written to, read from or flushed)
+Empirically this reduces the amount of vector updates, since we only update vectors that there is high chance that were updated since the last merge....
+% TODO: this needs more explnation, also, place in the optimization/imporovments subsection. Can we show some complexity calculation here?
+
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Implementation
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -303,6 +373,12 @@ The algorithm is comprised of three main stages: in \autoref{alg:havc} we constr
 \subsection{Program Instrumentation}
 TODO: TSAN
 TODO: DFSAN
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Evaluation
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Evaluation}
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
