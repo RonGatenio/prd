@@ -43,10 +43,10 @@
 #endif
 
 #if !defined(__APPLE__)
-# define ASM_HIDDEN(symbol) .hidden symbol
+# define ASM_HIDDEN(symbol) .hidden dfs$##symbol
 # define ASM_TYPE_FUNCTION(symbol) .type symbol, %function
 # define ASM_SIZE(symbol) .size symbol, .-symbol
-# define ASM_SYMBOL(symbol) symbol
+# define ASM_SYMBOL(symbol) dfs$##symbol
 # define ASM_SYMBOL_INTERCEPTOR(symbol) symbol
 # define ASM_WRAPPER_NAME(symbol) __interceptor_##symbol
 #else

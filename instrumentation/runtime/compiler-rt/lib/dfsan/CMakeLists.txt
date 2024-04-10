@@ -41,30 +41,3 @@ foreach(arch ${DFSAN_SUPPORTED_ARCH})
   add_dependencies(dfsan
     clang_rt.dfsan-${arch}-symbols)
 endforeach()
-
-set(dfsan_abilist_dir ${COMPILER_RT_OUTPUT_DIR}/share)
-set(dfsan_abilist_filename ${dfsan_abilist_dir}/dfsan_abilist.txt)
-add_custom_target(dfsan_abilist ALL
-  DEPENDS ${dfsan_abilist_filename})
-add_custom_command(OUTPUT ${dfsan_abilist_filename}
-                   VERBATIM
-
-                   COMMAND
-                     ${CMAKE_COMMAND} -E make_directory ${dfsan_abilist_dir}
-
-                   COMMAND
-                     cat ${CMAKE_CURRENT_SOURCE_DIR}/abilists/done_abilist.txt
-                         ${CMAKE_CURRENT_SOURCE_DIR}/abilists/libc_ubuntu1404_abilist.txt
-                         ${CMAKE_CURRENT_SOURCE_DIR}/abilists/tsan_abilist.txt
-                         ${CMAKE_CURRENT_SOURCE_DIR}/abilists/pmdk_abilist.txt
-                         > ${dfsan_abilist_filename}
-
-                   COMMAND
-                     python3 ${CMAKE_CURRENT_SOURCE_DIR}/scripts/build-libc-list.py --with-libstdcxx >> ${dfsan_abilist_filename}
-
-                   COMMAND
-                     cp ${dfsan_abilist_filename} $ENV{APP_SHARE}
-                   DEPENDS abilists/done_abilist.txt abilists/libc_ubuntu1404_abilist.txt abilists/tsan_abilist.txt abilists/pmdk_abilist.txt)
-add_dependencies(dfsan dfsan_abilist)
-# install(FILES ${dfsan_abilist_filename}
-#         DESTINATION $ENV{APP_SHARE})

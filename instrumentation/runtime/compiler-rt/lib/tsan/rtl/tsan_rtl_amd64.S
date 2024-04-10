@@ -10,6 +10,8 @@
 #endif
 
 ASM_HIDDEN(__tsan_trace_switch)
+; .globl __tsan_trace_switch_thunk
+; __tsan_trace_switch_thunk:
 .globl ASM_SYMBOL(__tsan_trace_switch_thunk)
 ASM_SYMBOL(__tsan_trace_switch_thunk):
   CFI_STARTPROC

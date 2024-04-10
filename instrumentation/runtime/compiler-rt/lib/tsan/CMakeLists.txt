@@ -19,6 +19,7 @@ if(COMPILER_RT_TSAN_DEBUG_OUTPUT)
 endif()
 
 set(TSAN_RTL_CFLAGS ${TSAN_CFLAGS})
+list(APPEND TSAN_RTL_CFLAGS -fpass-plugin=/app/build/bin/DFSanPass.so)
 append_list_if(COMPILER_RT_HAS_MSSE3_FLAG -msse3 TSAN_RTL_CFLAGS)
 append_list_if(SANITIZER_LIMIT_FRAME_SIZE -Wframe-larger-than=530
                TSAN_RTL_CFLAGS)

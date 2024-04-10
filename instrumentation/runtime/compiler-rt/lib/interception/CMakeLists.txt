@@ -17,6 +17,7 @@ set(INTERCEPTION_HEADERS
 include_directories(..)
 
 set(INTERCEPTION_CFLAGS ${SANITIZER_COMMON_CFLAGS})
+list(APPEND INTERCEPTION_CFLAGS -fpass-plugin=/app/build/bin/DFSanPass.so)
 append_rtti_flag(OFF INTERCEPTION_CFLAGS)
 
 add_compiler_rt_object_libraries(RTInterception

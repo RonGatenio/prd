@@ -32,9 +32,12 @@
 #include "llvm/Transforms/Utils/EscapeEnumerator.h"
 #include "llvm/Transforms/Utils/Local.h"
 #include "llvm/Transforms/Utils/ModuleUtils.h"
+#include "llvm/IR/PassManager.h"
+#include "llvm/Pass.h"
+#include "llvm/Passes/PassBuilder.h"
+#include "llvm/Passes/PassPlugin.h"
 
-#include "tsanpass.h"
-#include "../dfsan/DataFlowSanitizer.h"
+#include "DataFlowSanitizer.h"
 
 using namespace llvm;
 
@@ -42,13 +45,11 @@ extern "C" LLVM_ATTRIBUTE_WEAK ::llvm::PassPluginLibraryInfo
 llvmGetPassPluginInfo() {
     return {
         .APIVersion = LLVM_PLUGIN_API_VERSION,
-        .PluginName = "PrdPass",
+        .PluginName = "DFSanPass",
         .PluginVersion = LLVM_VERSION_STRING,
         .RegisterPassBuilderCallbacks = [](PassBuilder &PB) {
           PB.registerOptimizerLastEPCallback(
             [](ModulePassManager &MPM, auto) {
-              MPM.addPass(PrdModulePass());
-              MPM.addPass(createModuleToFunctionPassAdaptor(PrdFunctionPass()));
               MPM.addPass(CprdDataFlowSanitizerPass());
               return true;
           });

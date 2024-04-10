@@ -1169,7 +1169,7 @@ bool DataFlowSanitizer::runImpl(Module &M) {
       } else {
         addGlobalNamePrefix(&F);
       }
-    } else if (!IsZeroArgsVoidRet || getWrapperKind(&F) == WK_Custom) {
+    } else if ((!IsZeroArgsVoidRet || getWrapperKind(&F) == WK_Custom) && !F.isVarArg()) {
       // Build a wrapper function for F.  The wrapper simply calls F, and is
       // added to FnsToInstrument so that any instrumentation according to its
       // WrapperKind is done in the second pass below.

@@ -20,7 +20,7 @@
 
 // Setup defaults for compile definitions.
 #ifndef TSAN_NO_HISTORY
-# define TSAN_NO_HISTORY 0
+# define TSAN_NO_HISTORY 1
 #endif
 
 #ifndef TSAN_COLLECT_STATS

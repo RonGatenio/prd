@@ -1,8 +1,21 @@
 ###############################################################################
 # TSan interface functions
 ###############################################################################
-fun:*_tsan_*=uninstrumented
-fun:*_tsan_*=discard
+#fun:*_tsan_*=uninstrumented
+#fun:*_tsan_*=discard
 
-fun:tsan.module_ctor=uninstrumented
-fun:tsan.module_ctor=discard
+#fun:tsan.module_ctor=uninstrumented
+#fun:tsan.module_ctor=discard
+#src:sanitizer_common/*=uninstrumented
+#src:sanitizer_common/*=discard
+fun:*_sanitizer*=uninstrumented
+fun:*_sanitizer*=discard
+
+fun:*_ubsan*=uninstrumented
+fun:*_ubsan*=discard
+
+fun:*printf=uninstrumented
+fun:*printf=discard
+
+fun:*interceptor*=uninstrumented
+fun:*interceptor*=discard

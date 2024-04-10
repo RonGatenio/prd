@@ -21,5 +21,8 @@ add_definitions($ENV{LLVM_DEFINITIONS})
 include_directories($ENV{LLVM_INCLUDE_DIRS})
 link_directories($ENV{LLVM_LIBRARY_DIRS})
 
+add_definitions(-DAPP_SHARE="$ENV{APP_SHARE}")
+
 # Our pass lives in this subdirectory.
 add_subdirectory(prd)
+add_subdirectory(dfsan)
