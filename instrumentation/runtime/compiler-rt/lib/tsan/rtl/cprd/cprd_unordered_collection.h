@@ -18,7 +18,9 @@ private:
 
 public:
   class Iterator {
-  private:
+    friend class UnorderedCollection;
+
+  protected:
     UnorderedCollection& m_collection;
     u32 m_index;
 
@@ -142,11 +144,11 @@ public:
     return _find(v) != nullptr;
   }
 
-  Iterator begin() const {
+  Iterator begin() {
       return Iterator(*this, 0);
   }
 
-  Iterator end() const {
+  Iterator end() {
       return Iterator(*this, MaxSize);
   }
 };

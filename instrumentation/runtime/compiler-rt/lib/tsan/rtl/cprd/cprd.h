@@ -6,7 +6,7 @@
 #include "../tsan_rtl.h"
 #include "cprd_common.h"
 #include "cprd_array.h"
-#include "cprd_unordered_array.h"
+#include "cprd_unordered_collection.h"
 
 namespace cprd {
 
@@ -34,17 +34,23 @@ struct DependencyState {
   u32 life;
 };
 
+typedef UnorderedCollection<DependencyState, PENDING_READS_MAX> PendingReadsCollection;
+
 // This struct is stored in TLS.
 class CprdThreadState {
  private:
-  UnorderedArray<DependencyState, PENDING_READS_MAX> df_pending_reads;
+  PendingReadsCollection df_pending_reads;
   Vector<uptr> flushes_cache;
   u64 event_counter;
+  Vector<dfsan_label> m_unused_labels;
 
   CprdThreadState() = default;
   ~CprdThreadState() = default;
   CprdThreadState(const CprdThreadState&)= delete;
   CprdThreadState& operator=(const CprdThreadState&)= delete;
+
+  dfsan_label get_unused_label();
+  void remove_pending_read(PendingReadsCollection::Iterator& it);
 
  public:
   static CprdThreadState& s_get_instance();

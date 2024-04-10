@@ -198,25 +198,54 @@ void Cprd::log_happens_before_edge(u64 source_thread, u64 source_epoch, u64 targ
   Printf("%d:HB_EDGE:%d:%d:%d:%d%s%s\n", target_thread, source_thread, source_epoch, target_thread, target_epoch, comment_prefix, comment);
 }
 
+dfsan_label CprdThreadState::get_unused_label() {
+  if (0 != m_unused_labels.Size()) {
+    dfsan_label unused_label = m_unused_labels[m_unused_labels.Size() - 1];
+    m_unused_labels.PopBack();
+
+    TRACE_LOG("Using an unused label %hx", unused_label);
+
+    return unused_label;
+  }
+
+  dfsan_label label = dfsan_create_label(nullptr, nullptr);
+  TRACE_LOG("Created new label %hx", label);
+
+  return label;
+}
+
+void CprdThreadState::remove_pending_read(PendingReadsCollection::Iterator& it) {
+  m_unused_labels.PushBack(it->label);
+  df_pending_reads.remove(it);
+}
+
 void CprdThreadState::df_mark_read(u64 event_id, u64 tid, uptr pc, uptr addr, u32 size) {
   dfsan_label label = dfsan_read_label((void*)addr, size);
   
   if (0 == label) {
     // Add new label if there isn't one already
 
-    InternalScopedString label_name(2 * GetPageSizeCached());
-    label_name.append("pd-%p-%p", addr, pc);
-    
-    TRACE_LOG("Creating label %x - %s", label, label_name.data());
+    // if (DFSAN_MAX_LABELS < dfsan_get_label_count()) {
+    //   TRACE_LOG("Labels count is %llx (max allowed is %llx), flushing dfsan (we will lose some PDs)", dfsan_get_label_count(), DFSAN_MAX_LABELS);
+    //   Printf("Labels count is %p (max allowed is %p), flushing dfsan (we will lose some PDs)", dfsan_get_label_count(), DFSAN_MAX_LABELS);
+    //   dfsan_flush();
+    // }
 
-    label = dfsan_create_label(label_name.data(), nullptr);     
+    // InternalScopedString label_name(2 * GetPageSizeCached());
+    // label_name.append("pd-%p-%p", addr, pc);
+    
+    // TRACE_LOG("Creating label %hx - %s", label, label_name.data());
+    // Printf("Creating label\n");
+
+    // label = dfsan_create_label(label_name.data(), nullptr);
+    label = get_unused_label();
     
     dfsan_add_label(label, (void*)addr, size); // not dfsan_set_label!
   }
 
-  for (auto& df_pending_read : df_pending_reads) {
-    if (0 == --df_pending_read.data.life) {
-      df_pending_reads.remove_item(df_pending_read);
+  for (auto it = df_pending_reads.begin(); it != df_pending_reads.end(); ++it) {
+    if (0 == --it->life) {
+      remove_pending_read(it);
     }
   }
 
@@ -230,36 +259,41 @@ void CprdThreadState::df_mark_read(u64 event_id, u64 tid, uptr pc, uptr addr, u3
     dependency_state->size = size;
     dependency_state->pc = pc;
     dependency_state->life = PENDING_READS_LIFE_MAX;
+    TRACE_LOG("Added a pending read on %p at %p of size %d with label %hx", addr, pc, size, label);
   }
 }
 
 void CprdThreadState::df_process_write(u64 event_id, u64 tid, uptr pc, uptr addr, u32 size) {
-  dfsan_label label = dfsan_read_label((void*)addr, size);
+  dfsan_label label_content = dfsan_read_label((void*)addr, size);
+  dfsan_label label_address = dfsan_get_label(addr);
 
-  if (0 == label) {
+  if ((0 == label_content) && (0 == label_address)) {
+    // No label found
     return;
   }
 
-  TRACE_LOG("Write has label %x", label);
+  TRACE_LOG("labels for %p of size %d at %p: label_content=%hx, label_address=%hx", addr, size, pc, label_content, label_address);
 
   TRACE_LOG("Found %d pending reads", df_pending_reads.count());
 
-  for (auto& df_pending_read : df_pending_reads) {
+  for (auto it = df_pending_reads.begin(); it != df_pending_reads.end(); ++it) {
     uptr write_addr_cacheline = RoundDown(addr, kCacheLineSize);
-    uptr read_addr_cacheline  = RoundDown(df_pending_read.data.addr, kCacheLineSize);
+    uptr read_addr_cacheline  = RoundDown(it->addr, kCacheLineSize);
 
     // Ignore if variables are on the same cacheline
     if (write_addr_cacheline == read_addr_cacheline) {
+      TRACE_LOG("Ignored - same cacheline %p", write_addr_cacheline);
       continue;
     }
     
-    if (!dfsan_has_label(label, df_pending_read.data.label)) {
+    if (!dfsan_has_label(label_content, it->label) && !dfsan_has_label(label_address, it->label)) {
+      TRACE_LOG("Ignored - no label %hx", it->label);
       continue;
     }
 
-    Printf("%llu:PD:%p:%llu:%p:%llu\n", tid, df_pending_read.data.pc, df_pending_read.data.event_id, pc, event_id);
+    Printf("%llu:PD:%p:%llu:%p:%llu\n", tid, it->pc, it->event_id, pc, event_id);
 
-    df_pending_reads.remove_item(df_pending_read);
+    remove_pending_read(it);
   }
 
   TRACE_LOG("Left %d pending reads", df_pending_reads.count());
