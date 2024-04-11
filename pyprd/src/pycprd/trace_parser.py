@@ -17,7 +17,7 @@ class TraceParser:
         self._trace = map(str.strip, trace_lines)
         self._hbg_builder = HBGBuilder()
         self._pdg_builder = PDGBuilder()
-        self._events: dict[int, dict[int, InstructionNode]] = defaultdict(dict)
+        self._events: dict[int, dict[int, InstructionNode]] = defaultdict(dict)     # tid -> idx -> node
         self._name = name
         self._pmem_range = None
         self._ignore_ranges: Set[Tuple[int, int]] = set()
@@ -121,7 +121,7 @@ class TraceParser:
                     info = info.split('|')[0]
                     
                 node = self._hbg_builder.add_instruction_node(key, tid, pc, address, size, info, line_number, is_atomic=is_atomic, is_non_temporal=is_non_temporal, event_id=event_id)
-                if node.event_id:
+                if node.event_id is not None:
                     self._events[node.tid][node.event_id] = node
             case _:
                 # Invalid key

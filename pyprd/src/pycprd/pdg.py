@@ -10,6 +10,8 @@ from .hbg import HBG
 class PDG:
     def __init__(self, base_graph: nx.DiGraph):
         self._graph = base_graph
+        
+        assert nx.is_directed_acyclic_graph(self._graph), 'PDG graph is not a DAG'
 
     def get_dependencies(self, write_node: nodes.InstructionNode) -> Iterable[nodes.InstructionNode]:
         if write_node not in self._graph:
