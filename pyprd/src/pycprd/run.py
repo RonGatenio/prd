@@ -27,6 +27,7 @@ def run(hbg, pdg,
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("trace")
+    parser.add_argument("--mock-pdg", action='store_true', default=False)
 
     args = parser.parse_args()
 
@@ -40,7 +41,10 @@ def main():
         print(hbg.stats(True))
 
     with timeit('pdg build'):
-        pdg = trace.build_pdg(hbg, True)
+        if args.mock_pdg:
+            pdg = generate_mock_pdg_v2(hbg)
+        else:
+            pdg = trace.build_pdg(hbg, True)
 
     prd = run(hbg, pdg,
         ignore_inter_thread_edges=False,
@@ -74,13 +78,13 @@ def main():
     #     ignore_read_node_persistency=True,
     #     show_only_first_bug_in_thread=False)
     
-    run(hbg, pdg,
-        ignore_inter_thread_edges=True,
-        ignore_flush_nodes=True,
-        ignore_persisted_before_index=True,
-        ignore_happens_after_index=True,
-        ignore_read_node_persistency=True,
-        show_only_first_bug_in_thread=False)
+    # run(hbg, pdg,
+    #     ignore_inter_thread_edges=True,
+    #     ignore_flush_nodes=True,
+    #     ignore_persisted_before_index=True,
+    #     ignore_happens_after_index=True,
+    #     ignore_read_node_persistency=True,
+    #     show_only_first_bug_in_thread=False)
 
     print('')
     
