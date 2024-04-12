@@ -75,12 +75,12 @@ To ensure consistency of NVM state, developers need to explicitly evict cache li
 In this work, we focus on a specific type of bug that can be introduced in concurrent NVM programs. Previously coined as \pmracerace \cite{pmrace2022}, a bug that occurs when an NVM location affects data written to another NVM location before being persisted. Such bug can cause an inconsistent NVM state after a crash if the affected written address got persisted before the read address. In the following, we refer to this bug as \race.
 
 Previous work \cite{pmrace2022} attempted to detect the bug using a smart fuzzing technique to explore the inter-thread interleaving of the program.
-We attempt to solve the interleaving exploration using a vector clock analysis that detects happen-before relations between program events \cite{lamport1978}.
+We attempt to solve the interleaving exploration using a vector clock analysis that detects happens-before relations between program events \cite{lamport1978}.
 To do this, we use LLVM's ThreadSanitizer \cite{tsan2009}.
 In addition, we want to detect all write events to persistent memory that are affected by a read event from persistent memory. We will use data-flow analysis to determine whether a read event affects a write event later in the execution.
 For this, we will use LLVM's DataFlowSanitizer \cite{dfsan2020}.
 
-Using both the happen-before analysis and the data-flow analysis we can construct 2 graphs that represent the relations between all execution events.
+Using both the happens-before analysis and the data-flow analysis we can construct 2 graphs that represent the relations between all execution events.
 A \HBGName, denoted as $\HBG$, and a \PDGName \cite{dpdg1991} denoted as $\PDG$
 \myrace detector will use the 2 graphs to traverse the program execution trace and report all discovered bugs using the algorithm presented later in \autoref{sec:algorithm}.
 
@@ -101,8 +101,8 @@ A \HBGName, denoted as $\HBG$, and a \PDGName \cite{dpdg1991} denoted as $\PDG$
 % Background and Preliminaries
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % \section{Preliminaries}
-% \section{Background}
-\section{Background and Preliminaries}
+\section{Background}
+% \section{Background and Preliminaries}
 
 \subsection{Persistent Memory Programming}
 % TODO: write
@@ -111,16 +111,16 @@ A \HBGName, denoted as $\HBG$, and a \PDGName \cite{dpdg1991} denoted as $\PDG$
 Program instrumentation allows us to record runtime events that occur during program execution.
 Using LLVM's IR instrumentation %TODO: cite?
 we will record every PM access (reads and writes) and every flush/fence instructions.
-In addition, we will use LLVM's ThreadSanitizer to obtain happen-before edges between recorded instructions, and LLVM's DataFlow Sanitizer to obtain program dependency relations between execution events in runtime.
+In addition, we will use LLVM's ThreadSanitizer to obtain happens-before edges between recorded instructions, and LLVM's DataFlow Sanitizer to obtain program dependency relations between execution events in runtime.
 
 % TODO: rewrite
 
-\myparagraph{Happen-Before Analysis}
+\myparagraph{Happens-Before Analysis}
 LLVM's ThreadSanitizer \cite{tsan2009}, originally developed by Google, is a data race detection tool that instruments program execution and reports data races, using a vector clock analysis \cite{lamport1978}.
 In Lamport's original paper, vector clocks are updated when a process sends a message to another process. In the case of ThreadSanitizer, the messages are considered to be any event in one thread that is guarantied to happen before another event in another thread.
 Events like thread creation, join operations, lock acquisitions and releases, and use of atomic primitives like InterlockIncrement, InterlockXchg etc.
 
-We utilize ThreadSanitizer's precise instrumentation and vector clock updates in order to record happen-before edges between program events.
+We utilize ThreadSanitizer's precise instrumentation and vector clock updates in order to record happens-before edges between program events.
 
 % TODO: rewrite
 
@@ -140,30 +140,428 @@ LLVM's Data-Flow Sanitizer \cite{dfsan2020} is a tool used to detect the effects
 \section{Algorithm}
 \label{sec:algorithm}
 
-In the following section we will present the algorithm used to detect {\cprd}s.
-First, we will define \cprd formally and later present the algorithm to detect it.
+This section describes the algorithm used to detect {\cprd}s. We first formalize the definition of a \cprd and then detail the algorithmic steps for its detection.
 
-Events within the program trace are organized into three main categories: event nodes $\Nodes$, happens-before edges $\HBEdges$, and program dependency edges $\PDEdges$. Specifically, the subsets $\ReadNodes, \WriteNodes, \FlushNodes$ denote the \textbf{Read}, \textbf{Write}, and \textbf{Flush} nodes, highlighting the types of operations performed at each node.
-For every event node $\NodeV$, we assign $\var{\NodeV} \in \Vars$ to indicate the variable (or memory address) that is being accessed, modified, or flushed. Additionally, $\thread{\NodeV} \in \Threads$ identifies the thread in which the event at node $\NodeV$ occurs.
-Furthermore, each event in the trace is assigned a sequential ID, represented by $\idx{\NodeV}$. It's important to note that within each thread, this ID increments sequentially, reflecting the forward progression of program execution.
-We denote \HBGName as $\HBG = (\Nodes, \HBEdges)$. We say that an event node $\NodeE_1$ happen-before $\NodeE_2$ if there is a path in $\HBG$ from $\NodeE_1$ to $\NodeE_2$. Note that $\HBG$ is a directed acyclic graph (DAG) since no 2 events can happen-before each other.
-% TODO: should the following explanation be here or somewhere else?
-% TODO: The following is the explnation about the structure of the PDG and that each read has only one write... This explnation requires an understanding of the race
-We denote \PDGName as $\PDG = (\Nodes, \PDEdges)$. $\PDEdges$ contain only $\NodeWEx \to \NodeR$ edges, meaning that $\NodeWEx$ is program-dependent on node $\NodeR$.
+
+% ---------------------------------------------------------
+% Preliminaries
+% ---------------------------------------------------------
+\subsection{Preliminaries}
+The program trace categorizes events into three main types: event nodes $\Nodes$, happens-before edges $\HBEdges$, and program dependency edges $\PDEdges$. We denote the subsets of Read, Write, and Flush event nodes as $\ReadNodes$, $\WriteNodes$, and $\FlushNodes$, respectively. Each event node $\NodeV$ is associated with a variable $\var{\NodeV} \in \Vars$ indicating the memory address accessed, and a thread $\thread{\NodeV} \in \Threads$ indicating the executing thread. Each event node is also sequentially identified by $\idx{\NodeV}$ within its thread, reflecting the execution order.
+
+
+% ---------------------------------------------------------
+% Graphical Representation
+% ---------------------------------------------------------
+\subsection{Graphical Representation}
+% We represent the execution trace as two directed acyclic graphs:
+The execution trace is modeled using two directed acyclic graphs (DAGs):
+
+% ~~~~~~~~~~~~~~~~~~~~~~~
+% HBG
+% ~~~~~~~~~~~~~~~~~~~~~~~
+\myparagraph{\HBGName}
+
+% TODO: the first paragraph could go to the background section
+
+Lamport’s happens-before graph \cite{lamport1978} is a theoretical construct used to model the execution dynamics of concurrent programs. Within this graph, every executed instruction is represented as a node, and directed edges between these nodes create a partial-order that outlines the execution order between instructions.
+This abstraction is particularly useful for analyzing concurrent executions \cite{chess2008}, as it decouples the execution order from the actual timing of instructions. Consequently, different executions that may run at varying speeds but share the same happens-before graph are considered behaviorally equivalent, reflecting consistent execution behavior despite temporal differences.
+% Previous works have also modeled program execution in this way \cite{chess2008}.
+
+We abstract the program execution with a happens-before graph and denote it as $\HBG = (\Nodes, \HBEdges)$. A directed path from node $\NodeE_1$ to node $\NodeE_2$ implies that the event at $\NodeE_1$ happens-before the event at $\NodeE_2$, establishing a precedence relation.
+The graph structures the nodes to reflect the execution of the program threads. Nodes within the same thread are linked by intra-thread edges, illustrating sequential execution steps, while nodes across different threads are linked by inter-thread edges, demonstrating the happens-before relationship between them.
+
+
+% ~~~~~~~~~~~~~~~~~~~~~~~
+% PDG
+% ~~~~~~~~~~~~~~~~~~~~~~~
+
+% TODO: choose symbols
+\newcommand{\tempNodeOne}{\ensuremath{\NodeE_1}}
+\newcommand{\tempNodeTwo}{\ensuremath{\NodeE_2}}
+\renewcommand{\tempNodeOne}{\ensuremath{\NodeWEx}}
+\renewcommand{\tempNodeTwo}{\ensuremath{\NodeR}}
+
+\myparagraph{\PDGName} Defined as $\PDG = (\Nodes, \PDEdges)$. An edge from $\tempNodeOne$ to $\tempNodeTwo$ in $\PDEdges$ indicates that the execution of event $\tempNodeOne$ is program-dependent on the outcome of event $\tempNodeTwo$.
+Specifically, in our trace analysis, we restrict $\PDEdges$ to include only dependencies where a read event $\tempNodeTwo$ is followed by the first subsequent write event $\tempNodeOne$ within the same thread and on a different cache line. We will later explain the reasoning for this choice.
+% TODO: PDG: where to explain about the structure of the PDG and that each read has only one write... This explnation requires an understanding of the race (to understand why we did this)
 % TODO: explain that the \racerange for the earliest write is the largest...
+
+
+% TODO: add image of both graphs with threads etc.
+
+
+\subsection{Causality \& Persistence States}
+To assess program state at any point during execution, we will define two functions for each node $\NodeV$ in the execution.
+
+\myparagraph{Persisted-Before Vector Clock}
+To assess if a memory location $\VarX \in \Vars$ is persisted at the execution time of event node $\NodeV \in \Nodes$ we will use a vector clock that determines the last index in each thread where $\VarX$ was persisted and happens-before $\NodeV$.
+A persisted node is a node that happens-before a Flush event (on the same variable).
+
+% TODO: should we use the word epoch instead of index everywhere?
+
+% $\PBVC{\NodeV}{\Thread,\VarX}$: The last node's index in thread $\Thread$ concerning variable $\VarX$ that was persisted before node $\NodeV$.
+
+$$
+    \PBVC{\NodeV}{\Thread,\VarX} = \max \left( \left\{ \IndexI \middle| \ 
+    \begin{aligned}
+        & \exists \NodeU \in \ReadNodes \cup \WriteNodes \such \thread{\NodeU} = \Thread \land \var{\NodeU} = \VarX \\
+        & \exists \Path = (\NodeU, \ldots, \NodeV), \text{ a path of length } k \geq 1 \\
+        & \exists \NodeF \in \FlushNodes \such \var{\NodeF} = \VarX \land \Path(\IndexJ) = \NodeF, 1 < \IndexJ \leq k \\
+        & \idx{\NodeU} = \IndexI
+    \end{aligned}
+    \right\} \right)
+$$
+
+
+
+\myparagraph{Happens-Before Graph (\HBGName)}
+The \HBGName is denoted as $\HBG = (\Nodes, \HBEdges)$. In this graph, a directed path from node $\NodeE_1$ to node $\NodeE_2$ implies that the event at $\NodeE_1$ happens before that at $\NodeE_2$, establishing a temporal precedence relation. This graph links nodes within individual threads via intra-thread edges and connects nodes across different threads through inter-thread edges, reflecting the overall program order.
+
+\myparagraph{Program Dependency Graph (\PDGName)}
+The \PDGName is represented as $\PDG = (\Nodes, \PDEdges)$. An edge from node $\NodeWEx$ to node $\NodeR$ in $\PDEdges$ signifies that the execution of event $\NodeWEx$ is contingent upon the outcome of event $\NodeR$. For the purposes of our trace analysis, $\PDEdges$ includes only those dependencies where a read event $\NodeR$ is immediately followed by the first write event $\NodeWEx$ within the same thread but on a different cache line. This selection is specifically designed to highlight direct dependencies that are most susceptible to causing persistency races.
+
+\subsection{Causality \& Persistence States}
+To determine the state of the program at any given point during execution, particularly concerning data persistency, we define a vector clock function for each event node $\NodeV$:
+
+\myparagraph{Persisted-Before Vector Clock (\PBVCName)}
+The Persisted-Before Vector Clock (\PBVCName) for a node $\NodeV$ and a variable $\VarX$ is defined as the latest index in each thread at which $\VarX$ was confirmed to be persisted before $\NodeV$. This is formally expressed as:
+
+$$
+    \PBVC{\NodeV}{\Thread,\VarX} = \max \left( \left\{ \IndexI \middle| \ 
+    \begin{aligned}
+        & \exists \NodeU \in \ReadNodes \cup \WriteNodes \such \thread{\NodeU} = \Thread \land \var{\NodeU} = \VarX, \\
+        & \exists \Path = (\NodeU, \ldots, \NodeV) \text{ in } \HBG \text{ such that } \Path \text{ includes a flush node } \NodeF, \\
+        & \var{\NodeF} = \VarX \text{ and } \idx{\NodeU} = \IndexI
+    \end{aligned}
+    \right\} \right)
+$$
+
+This vector clock is pivotal in assessing whether changes to $\VarX$ are adequately persisted by the time subsequent operations are performed, thereby preventing persistency races.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+\myparagraph{Happens-Before State}
+\myparagraph{Happens-After State}
+
+
+
+To evaluate the persistence state of memory location $\VarX$ at any point during execution, for each node $\NodeV \in \Nodes$ we introduce the function $\PBVC{\NodeV}{\Thread,\VarX}$ that determines the index of the last node in thread $\Thread$ concerning variable $\VarX$ that was persisted prior to node $\NodeV$. This implies the node occurred before a flush event targeting the same cache line.
+
+
+In addition, for each event node we introduce the function $\HAVC{\NodeV}{\Thread}$ which identifies the index of the first node in thread $\Thread$ that happen-after node $\NodeV$.
+
+
+We will define 
+
+To assess the persistence status of a memory location $\VarX$ during execution, we define:
+We will define
+
+
+\subsection{\race Definition}
+
+A \race occurs when a write operation to persistent memory (PM) is influenced by a prior read operation from a non-persisted area of PM (on a different cache line). If the write operation becomes durable before the read operation, the PM state could be compromised if program recovery process won't fix the problem.
+
+\paragraph{Persistence Criteria} The memory location $\VarX$, involved in the read operation $\NodeR$, is considered \emph{persisted} at the time of a subsequent write event $\NodeWEx$ if one of the following is true:
+\begin{itemize}
+    \item There exists a flush event that happens before $\NodeWEx$ and after $\NodeR$, ensuring that the effects of $\NodeR$ are committed to PM before $\NodeWEx$ executes, or
+    \item After every write operation to $\VarX$ that does not happen-after $\NodeR$ (therefor it could influence the read), there is a flush event preceding $\NodeWEx$. This guarantees that all previous modifications of $\VarX$ persist before $\NodeWEx$.
+\end{itemize}
+
+\begin{definition}[\race]
+    \label{def:race}
+    A \textbf{\race} occurs between a read node $\NodeR \in \ReadNodes$ and a write node $\NodeW \in \WriteNodes$ when both nodes access overlapping memory locations, and there is no direct causal (happens-before) relationship from $\NodeR$ to $\NodeW$. For such a race to be identified, there must exist another write node $\NodeWEx \in \WriteNodes$ that is program-dependent on $\NodeR$, resides within the same thread but operates on a different cache line. Additionally, this relationship is only valid if no flush event $\NodeF$, which would guarantee the persistence of the data involved before $\NodeWEx$, occurs after $\NodeR$ or $\NodeW$ and before $\NodeWEx$.
+\end{definition}
+
+
+% \begin{definition}[\race]
+%     A \textbf{\race} between a read node $\NodeR \in \ReadNodes$ and a write node $\NodeW \in \WriteNodes$ is defined if all of the following conditions are met:
+%     \begin{enumerate}
+%         \item $\NodeR$ and $\NodeW$ operate on overlapping or the same memory locations.
+%         \item There is no happens-before relationship from $\NodeR$ to $\NodeW$; i.e., $\NodeW$ precedes $\NodeR$ or are concurrent.
+%         \item There exists a write node $\NodeWEx \in \WriteNodes$ such that:
+%             \begin{itemize}
+%                 \item $\NodeWEx$ is program-dependent on $\NodeR$,
+%                 \item $\NodeWEx$ and $\NodeR$ are executed within the same thread,
+%                 \item $\NodeWEx$ operates on a different cache line than that of $\NodeR$.
+%                 \item There is no flush event $\NodeF \in \FlushNodes$ that occurs between $\NodeR$ and $\NodeWEx$ which could persist the state of the memory location modified by $\NodeR$ or any overlapping write operation $\NodeW$.
+%             \end{itemize}
+%     \end{enumerate}
+% \end{definition}
+
+
+
+
+\section{STOP}
+\section{STOP}
+\section{STOP}
+\section{STOP}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+A \race emerges when a modification of persistent memory (PM) is influenced by a read operation from an area in PM that has not yet persisted (and is located on different cache lines).
+To detect such race, we assess the persistence status of the memory address $\VarX$ involved in the read operation at the time the corresponding PM modification is executed.
+
+A \race occurs when two operations on overlapping memory locations could lead to inconsistent or non-durable data states in persistent memory (PM). Specifically, a CPR involves a scenario where a read operation may influence subsequent write operations due to lack of intervening persistency guarantees. 
+
+
+\paragraph{Persistence Criteria} The memory location $\VarX$, involved in the read operation $\NodeR$, is considered \emph{persisted} at the time of a subsequent write event $\NodeWEx$ if one of the following is true:
+\begin{itemize}
+    \item There exists a flush event that happens before $\NodeWEx$ and after $\NodeR$, ensuring that the effects of $\NodeR$ are committed to PM before $\NodeWEx$ executes, or
+    \item After every write operation to $\VarX$ that does not happen-after $\NodeR$, there is a flush event preceding $\NodeWEx$. This guarantees that all previous modifications of $\VarX$ persist before $\NodeWEx$.
+\end{itemize}
+
+
+
+\subsection{TEMP}
+
+\subsection{Definition of Concurrent Persistency Race}
+
+A \textbf{Concurrent Persistency Race (CPR)} occurs when a write operation to persistent memory (PM) is potentially influenced by a preceding read operation from a region in PM that has not been persisted yet. This scenario typically involves interactions across different cache lines, which may compromise data consistency and durability.
+
+\paragraph{Operational Conditions} Consider a memory address $\VarX$ accessed by a read operation $\NodeR$. A \textbf{CPR} is said to emerge under the following conditions:
+\begin{itemize}
+    \item $\NodeR$ reads from $\VarX$ which resides in a non-persisted state within PM.
+    \item There exists a subsequent write operation $\NodeWEx$ to $\VarX$, occurring on a different cache line than the one accessed by $\NodeR$.
+    \item The persistency status of $\VarX$ is influenced by the read operation $\NodeR$ at the time when $\NodeWEx$ is executed, implying that changes made to $\VarX$ by $\NodeWEx$ could be inconsistent with earlier operations due to the lack of persistence.
+\end{itemize}
+
+To detect such races, we assess whether $\VarX$ was persisted after being read by $\NodeR$ and before being modified by $\NodeWEx$. Specifically, $\VarX$ is considered persisted at the moment of the write operation $\NodeWEx$ if:
+\begin{itemize}
+    \item A flush event targeted at $\VarX$ occurs after $\NodeR$ and before $\NodeWEx$, ensuring any data read by $\NodeR$ and any intermediate modifications are committed to PM prior to $\NodeWEx$.
+    \item For every write operation to $\VarX$ that does not sequentially follow the read operation $\NodeR$ within the same execution context, a corresponding flush event must precede $\NodeWEx$, confirming that all preceding changes to $\VarX$ are durable before $\NodeWEx$ is executed.
+\end{itemize}
+
+This definition encapsulates the key elements of persistency races involving non-volatile memory, highlighting the crucial role of appropriate synchronization and flush operations in maintaining data consistency across concurrent accesses.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+\subsection{Concurrent Persistency Race Definition}
+
+A \textbf{Concurrent Persistency Race (CPR)} occurs when a write operation to persistent memory (PM) is influenced by a prior read operation from a non-persisted area of PM. Specifically, this race condition arises when the read and write operations interact across different cache lines, potentially leading to inconsistencies if the read data is not yet durable.
+
+\paragraph{Persistence Criteria} The memory location $\VarX$, involved in the read operation $\NodeR$, is considered \emph{persisted} at the time of a subsequent write event $\NodeWEx$ if:
+\begin{itemize}
+    \item There exists a flush event that happens before $\NodeWEx$ and after $\NodeR$, ensuring that the effects of $\NodeR$ are committed to PM before $\NodeWEx$ executes, or
+    \item For every write operation to $\VarX$ that does not sequentially follow $\NodeR$ within the same thread, there is a flush event preceding $\NodeWEx$. This guarantees that all preceding modifications to $\VarX$ are persisted before $\NodeWEx$.
+\end{itemize}
+
+These conditions ensure that $\VarX$ is in a persisted state by the time $\NodeWEx$ occurs, having been flushed following any influencing operations.
+
+\begin{definition}[Concurrent Persistency Race]
+    A \textbf{Concurrent Persistency Race} between a read node $\NodeR \in \ReadNodes$ and a write node $\NodeW \in \WriteNodes$ is defined if all of the following conditions are met:
+    \begin{enumerate}
+        \item $\NodeR$ and $\NodeW$ operate on overlapping or the same memory locations.
+        \item There is no happens-before relationship from $\NodeR$ to $\NodeW$; i.e., $\NodeR$ and $\NodeW$ are concurrent.
+        \item There exists a write node $\NodeWEx \in \WriteNodes$ such that:
+            \begin{itemize}
+                \item $\NodeWEx$ is program-dependent on $\NodeR$,
+                \item $\NodeWEx$ and $\NodeR$ are executed within the same thread,
+                \item $\NodeWEx$ operates on a different cache line than that of $\NodeR$.
+            \end{itemize}
+        \item There is no flush event $\NodeF$ that occurs between $\NodeR$ and $\NodeWEx$ which could persist the state of the memory location modified by $\NodeR$ or any overlapping write operation $\NodeW$.
+    \end{enumerate}
+\end{definition}
+
+This definition encapsulates the essential elements of a persistency race in systems using non-volatile memory, highlighting the critical role of flush operations in maintaining data consistency across concurrent accesses.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+\subsection{Definition of Concurrent Persistency Race}
+
+A Concurrent Persistency Race (CPR) occurs when two operations on overlapping memory locations could lead to inconsistent or non-durable data states in persistent memory (PM). Specifically, a CPR involves a scenario where a read operation may influence subsequent write operations due to lack of intervening persistency guarantees. 
+
+\begin{definition}[Concurrent Persistency Race]
+    A \textbf{Concurrent Persistency Race} between a read node $\NodeR \in \ReadNodes$ and a write node $\NodeW \in \WriteNodes$ is said to occur if the following conditions are met:
+    \begin{enumerate}
+        \item Both nodes $\NodeR$ and $\NodeW$ operate on the same memory location or overlapping memory regions.
+        \item There is no direct happens-before relationship from $\NodeR$ to $\NodeW$, i.e., $\NodeR$ and $\NodeW$ are concurrent.
+        \item There exists a write node $\NodeWEx$ that:
+            \begin{itemize}
+                \item Is program-dependent on $\NodeR$,
+                \item Resides in the same thread as $\NodeR$,
+                \item Operates on a different cache line than $\NodeR$,
+            \end{itemize}
+        \item No flush operation $\NodeF$ happens-before $\NodeWEx$ that could persist the effects of any write operation overlapping with $\NodeR$ or $\NodeW$. This includes flush operations that:
+            \begin{itemize}
+                \item Happen after $\NodeR$ and before $\NodeWEx$,
+                \item Ensure the persistency of the data accessed by $\NodeW$ before the execution of $\NodeWEx$.
+            \end{itemize}
+    \end{enumerate}
+    These conditions collectively ensure that the write operation $\NodeW$ could be influenced by the read operation $\NodeR$ under a concurrent execution scenario, leading to a persistency race if not adequately managed by intervening flush operations.
+\end{definition}
+
+The implications of such races are critical in systems utilizing non-volatile memory technologies, where the durability and consistency of memory states are paramount. This definition forms the basis for the algorithmic detection of CPRs, as elaborated in the subsequent sections.
+
+
+
+
+
+
+
+
+
 
 A \race emerges when a modification of persistent memory (PM) is influenced by a read operation from an area in PM that has not yet persisted (and is located on different cache lines).
 To detect such race, we assess the persistence status of the memory address $\VarX$ involved in the read operation at the time the corresponding PM modification is executed. 
 
 $\VarX$ is considered persisted at the moment of the event node $\NodeWEx$ if it meets one of the following conditions: A Flush event precedes $\NodeWEx$ and occurs after the read event $\NodeR$ that influences it, or, for every write event to $\VarX$ not succeeding the read event $\NodeR$, there exists a Flush event that precedes $\NodeWEx$. This ensures that $\VarX$ is in a persisted state by the time $\NodeWEx$ takes place, having been flushed following the influencing read operation or write operations that might have affected the read.
-% We say that $\VarX$ is persisted at the time of the event node $\NodeWEx$ if a Flush event happen-before $\NodeWEx$ and happen-after the influencing read event $\NodeR$ or after all write events to $\VarX$ that don't happen-after the read event $\NodeR$, there is a flush event that happen-before the $\NodeWEx$ event.
+% We say that $\VarX$ is persisted at the time of the event node $\NodeWEx$ if a Flush event happens-before $\NodeWEx$ and happen-after the influencing read event $\NodeR$ or after all write events to $\VarX$ that don't happen-after the read event $\NodeR$, there is a flush event that happens-before the $\NodeWEx$ event.
 
 \begin{definition}
     \label{def:race}
-    We define a \race between a read node $\NodeR \in \ReadNodes$ and a write node $\NodeW \in \WriteNodes$ if both operate on overlapping memory locations, $\NodeR$ does not happen-before $\NodeW$, and $\exists \NodeWEx \in \WriteNodes$ such that $\NodeWEx$ is program-dependent on $\NodeR$ (in the same thread and operates on a different cache line), and there is no flush event $\NodeF$ that happen-before $\NodeWEx$ such that $\NodeF$ happen-after $\NodeR$ or happen-after $\NodeW$.
+    We define a \race between a read node $\NodeR \in \ReadNodes$ and a write node $\NodeW \in \WriteNodes$ if both operate on overlapping memory locations, $\NodeR$ does not happens-before $\NodeW$, and $\exists \NodeWEx \in \WriteNodes$ such that $\NodeWEx$ is program-dependent on $\NodeR$ (in the same thread and operates on a different cache line), and there is no flush event $\NodeF$ that happens-before $\NodeWEx$ such that $\NodeF$ happen-after $\NodeR$ or happen-after $\NodeW$.
 \end{definition}
 
-% In order to inquire about the persistency state of memory location $\VarX$ at any given point in the execution, we will define two functions for each event node $\NodeV \in \Nodes$: $\HBVC{\NodeV}{\Thread,\VarX}$, the last node's index in thread $\Thread$ of variable $\VarX$ that happen-before the node $\NodeV$, and $\PBVC{\NodeV}{\Thread,\VarX}$, the last node's index in thread $\Thread$ of variable $\VarX$ that was persisted before the node $\NodeV$, meaning that it  happen-before a flush event (on the same cache line).
+% In order to inquire about the persistency state of memory location $\VarX$ at any given point in the execution, we will define two functions for each event node $\NodeV \in \Nodes$: $\HBVC{\NodeV}{\Thread,\VarX}$, the last node's index in thread $\Thread$ of variable $\VarX$ that happens-before the node $\NodeV$, and $\PBVC{\NodeV}{\Thread,\VarX}$, the last node's index in thread $\Thread$ of variable $\VarX$ that was persisted before the node $\NodeV$, meaning that it  happens-before a flush event (on the same cache line).
 
 % To evaluate the persistence status of memory location $\VarX$ at any point during execution, we introduce two functions for each event node $\NodeV \in \Nodes$. The function $\HBVC{\NodeV}{\Thread,\VarX}$ identifies the index of the last node in thread $\Thread$ concerning variable $\VarX$ that precedes node $\NodeV$. The function $\PBVC{\NodeV}{\Thread,\VarX}$ determines the index of the last node in thread $\Thread$ concerning variable $\VarX$ that was persisted prior to node $\NodeV$. This implies the node occurred before a flush event targeting the same cache line.
 To evaluate the persistence status of memory location $\VarX$ at any point during execution, for each node we $\NodeV \in \Nodes$ introduce the function $\PBVC{\NodeV}{\Thread,\VarX}$ that determines the index of the last node in thread $\Thread$ concerning variable $\VarX$ that was persisted prior to node $\NodeV$. This implies the node occurred before a flush event targeting the same cache line.
@@ -340,7 +738,7 @@ In addition,
 \subsection{Correctness}
 \subsection{Complexity}
 
-Note that the maximum amount of parents/children is $\abs{\Threads}$ since we only allow one happen-before relation from each node to each thread.
+Note that the maximum amount of parents/children is $\abs{\Threads}$ since we only allow one happens-before relation from each node to each thread.
 We will also assume that practically, $\abs{\Threads} << \abs{\Nodes}$
 
 Part 1 - $\bigO{\abs{\Nodes}\cdot\abs{\Threads}^2} \approx \bigO{\abs{\Nodes}}$
