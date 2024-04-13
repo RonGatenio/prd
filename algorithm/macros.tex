@@ -102,6 +102,9 @@
 \newcommand{\WriteNodes}[1][]{\DefSet[#1]{W}}
 \newcommand{\FlushNodes}[1][]{\DefSet[#1]{F}}
 
+\newcommand{\IDs}{\DefSet{IDs}}
+\renewcommand{\IDs}{\N}
+
 % \newcommand{\Path}{\DefSet{P}}
 \newcommand{\Path}{\overset{\to}{\DefSet{p}}}
 
@@ -128,6 +131,10 @@
 \newcommand{\havc}[2]{\DefFunc{havc}{#1}{#2}}
 \newcommand{\hbvc}[2]{\DefFunc{hbvc}{#1}{#2}}
 \newcommand{\pbvc}[2]{\DefFunc{pbvc}{#1}{#2}}
+
+\newcommand{\HAVCDef}{\ensuremath{\Threads \mapsto \IDs}}
+\newcommand{\HBVCDef}{\ensuremath{\Threads \times \Vars \mapsto \IDs}}
+\newcommand{\PBVCDef}{\HBVCDef}
 
 
 % ---------------------------------------------------------

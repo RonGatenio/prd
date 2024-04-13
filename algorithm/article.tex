@@ -147,7 +147,7 @@ This section describes the algorithm used to detect {\cprd}s. We first formalize
 % Preliminaries
 % ---------------------------------------------------------
 \subsection{Preliminaries}
-The program trace categorizes events into three main types: event nodes $\Nodes$, happens-before edges $\HBEdges$, and program dependency edges $\PDEdges$. We denote the subsets of Read, Write, and Flush event nodes as $\ReadNodes$, $\WriteNodes$, and $\FlushNodes$, respectively. Each event node $\NodeV$ is associated with a variable $\var{\NodeV} \in \Vars$ indicating the memory address accessed, and a thread $\thread{\NodeV} \in \Threads$ indicating the executing thread. Each event node is also sequentially identified by $\idx{\NodeV}$ within its thread, reflecting the execution order.
+The program trace categorizes events into three main types: event nodes $\Nodes$, happens-before edges $\HBEdges$, and program dependency edges $\PDEdges$. We denote the subsets of Read, Write, and Flush event nodes as $\ReadNodes$, $\WriteNodes$, and $\FlushNodes$, respectively. Each event node $\NodeV$ is associated with a variable $\var{\NodeV} \in \Vars$ indicating the memory address accessed, and a thread $\thread{\NodeV} \in \Threads$ indicating the executing thread. Each event node is also sequentially identified by $\idx{\NodeV} \in \IDs$ within its thread, reflecting the execution order.
 
 
 % ---------------------------------------------------------
@@ -164,7 +164,7 @@ The execution trace is modeled using two directed acyclic graphs (DAGs):
 
 % TODO: the first paragraph could go to the background section
 
-Lamport’s happens-before graph \cite{lamport1978} is a theoretical construct used to model the execution dynamics of concurrent programs. Within this graph, every executed instruction is represented as a node, and directed edges between these nodes create a partial-order that outlines the execution order between instructions.
+Lamport’s happens-before graph (HBG) \cite{lamport1978} is a theoretical construct used to model the execution dynamics of concurrent programs. Within this graph, every executed instruction is represented as a node, and directed edges between these nodes create a partial-order that outlines the execution order between instructions.
 This abstraction is particularly useful for analyzing concurrent executions \cite{chess2008}, as it decouples the execution order from the actual timing of instructions. Consequently, different executions that may run at varying speeds but share the same happens-before graph are considered behaviorally equivalent, reflecting consistent execution behavior despite temporal differences.
 % Previous works have also modeled program execution in this way \cite{chess2008}.
 
@@ -175,6 +175,7 @@ The graph structures the nodes to reflect the execution of the program threads. 
 % ~~~~~~~~~~~~~~~~~~~~~~~
 % PDG
 % ~~~~~~~~~~~~~~~~~~~~~~~
+\myparagraph{\PDGName}
 
 % TODO: choose symbols
 \newcommand{\tempNodeOne}{\ensuremath{\NodeE_1}}
@@ -182,152 +183,53 @@ The graph structures the nodes to reflect the execution of the program threads. 
 \renewcommand{\tempNodeOne}{\ensuremath{\NodeWEx}}
 \renewcommand{\tempNodeTwo}{\ensuremath{\NodeR}}
 
-\myparagraph{\PDGName} Defined as $\PDG = (\Nodes, \PDEdges)$. An edge from $\tempNodeOne$ to $\tempNodeTwo$ in $\PDEdges$ indicates that the execution of event $\tempNodeOne$ is program-dependent on the outcome of event $\tempNodeTwo$.
-Specifically, in our trace analysis, we restrict $\PDEdges$ to include only dependencies where a read event $\tempNodeTwo$ is followed by the first subsequent write event $\tempNodeOne$ within the same thread and on a different cache line. We will later explain the reasoning for this choice.
-% TODO: PDG: where to explain about the structure of the PDG and that each read has only one write... This explnation requires an understanding of the race (to understand why we did this)
-% TODO: explain that the \racerange for the earliest write is the largest...
+% TODO: choose who to site. the definition here is from pd1992. \cite{pd1988} \cite{pd1990} \cite{pd1991} \cite{pd1992} \cite{pd1994book}
+The Dynamic Dependency Graph (DDG) \cite{pd1988} is a directed, acyclic graph that models the execution flow of a program as a partial order. In the DDG, each node corresponds to an executed instruction, and directed edges illustrate the dependencies that exist between these instructions.
+Dependencies in a DDG can be classified into several types \cite{pd1992}, primarily including data dependencies and control dependencies. A data dependency arises between two operations when the output of one operation (e.g., a value produced) is required as input for the other operation. Conversely, a control dependency exists when the execution path of one operation depends on the outcome of a conditional branch affecting another operation.
 
+We denote the DDG as $\PDG = (\Nodes, \PDEdges)$. Within this graph, an edge from $\tempNodeOne$ to $\tempNodeTwo$ indicates that the execution of $\tempNodeOne$ relies on the result of $\tempNodeTwo$.
+Our analysis particularly focuses on dependencies in dynamic executions where a read event $\tempNodeTwo$ precedes the first immediate write event $\tempNodeOne$ within the same thread but on a different cache line. The rationale behind this selective focus will be elaborated upon later.
+% Specifically, in our trace analysis, we restrict $\PDEdges$ to include only dependencies where a read event $\tempNodeTwo$ is followed by the first subsequent write event $\tempNodeOne$ within the same thread and on a different cache line. We will later explain the reasoning for this choice.
+
+
+% TODO: PDG: where to explain about the structure of the PDG and that each read has only one write... This explnation requires an understanding of the race (to understand why we did this)
+
+% TODO: explain that the \racerange for the earliest write is the largest...
 
 % TODO: add image of both graphs with threads etc.
 
 
-\subsection{Causality \& Persistence States}
-To assess program state at any point during execution, we will define two functions for each node $\NodeV$ in the execution.
+% ~~~~~~~~~~~~~~~~~~~~~~~
+% Vector Clocks
+% ~~~~~~~~~~~~~~~~~~~~~~~
+\subsection{State Vector Clocks}
+Vector clocks, building upon Lamport's timestamps \cite{lamport1978} and further developed in \cite{fidge1987vc} and \cite{mattern1988vc}, are a widely used mechanism for capturing causality among events in parallel and distributed systems. 
+This tool is used to determine the happens-before partial-order of the executed program events.
+
+We use vector clocks in many ways thought this work. Firstly, they are used by ThreadSanitizer \cite{tsan2009} to determine the happens-before relations in the program's execution. Secondly, use the same concept in our \HBGName analysis to determine different states of persistency and ordering of events in the program execution trace.
+
+In our analysis we define vector clocks for each event node in the execution.
+We use several types of vector clocks in order to keep track of different states during the execution trace. In general, each vector clock that we define is a $\Threads$ sized vector of event IDs (used like logical clocks) where each index $\Thread$ indicates a some known state from thread $\Thread$.
+
+\myparagraph{Happens-Before Vector Clock}
+The Happens-Before Vector Clock ($\HBVC{}{}$) is defined for each node $\NodeV \in \Nodes$ as the function $\HBVC{\NodeV}{\Thread,\VarX}: \HBVCDef$. This function determines the index of the latest event in thread $\Thread$ that precedes $\NodeV$ in $\HBG$ and affects the cache line associated with $\VarX$.
+An event $\NodeU$ is considered to \textit{happen-before} another event $\NodeV$ if $\idx{\NodeU} \leq \HBVC{\NodeV}{\thread{\NodeU},\var{\NodeU}}$, establishing a causal order between these events.
 
 \myparagraph{Persisted-Before Vector Clock}
-To assess if a memory location $\VarX \in \Vars$ is persisted at the execution time of event node $\NodeV \in \Nodes$ we will use a vector clock that determines the last index in each thread where $\VarX$ was persisted and happens-before $\NodeV$.
-A persisted node is a node that happens-before a Flush event (on the same variable).
+The Persisted-Before Vector Clock ($\PBVC{}{}$) is defined for each node $\NodeV \in \Nodes$ as the function $\PBVC{\NodeV}{\Thread,\VarX}: \PBVCDef$. This function determines the index of the latest event in thread $\Thread$ that precedes $\NodeV$ in $\HBG$, affects the cache line associated with $\VarX$, and ensures that $\VarX$ has been persisted.
+An event $\NodeU$ is considered \textit{persisted-before} another event $\NodeV$ if $\idx{\NodeU} \leq \PBVC{\NodeV}{\thread{\NodeU},\var{\NodeU}}$.
+Persistency here implies that there is a path in the $\HBG$ from $\NodeU$ to $\NodeV$ that contains a Flush event on the cache line associated with $\VarX$.
+
+\myparagraph{Happens-After Vector Clock}
+The Happens-After Vector Clock ($\HAVC{}{}$) is defined for each node $\NodeV \in \Nodes$ as the function $\HAVC{\NodeV}{\Thread}: \HAVCDef$. This function determines the index of the earliest event in thread $\Thread$ that happens-after $\NodeV$ in $\HBG$.
+An event $\NodeU$ is considered to \textit{happen-after} another event $\NodeV$ if $\HAVC{\NodeV}{\thread{\NodeU}} \leq \idx{\NodeU}$, establishing a causal order between these events.
 
 % TODO: should we use the word epoch instead of index everywhere?
 
-% $\PBVC{\NodeV}{\Thread,\VarX}$: The last node's index in thread $\Thread$ concerning variable $\VarX$ that was persisted before node $\NodeV$.
-
-$$
-    \PBVC{\NodeV}{\Thread,\VarX} = \max \left( \left\{ \IndexI \middle| \ 
-    \begin{aligned}
-        & \exists \NodeU \in \ReadNodes \cup \WriteNodes \such \thread{\NodeU} = \Thread \land \var{\NodeU} = \VarX \\
-        & \exists \Path = (\NodeU, \ldots, \NodeV), \text{ a path of length } k \geq 1 \\
-        & \exists \NodeF \in \FlushNodes \such \var{\NodeF} = \VarX \land \Path(\IndexJ) = \NodeF, 1 < \IndexJ \leq k \\
-        & \idx{\NodeU} = \IndexI
-    \end{aligned}
-    \right\} \right)
-$$
-
-
-
-\myparagraph{Happens-Before Graph (\HBGName)}
-The \HBGName is denoted as $\HBG = (\Nodes, \HBEdges)$. In this graph, a directed path from node $\NodeE_1$ to node $\NodeE_2$ implies that the event at $\NodeE_1$ happens before that at $\NodeE_2$, establishing a temporal precedence relation. This graph links nodes within individual threads via intra-thread edges and connects nodes across different threads through inter-thread edges, reflecting the overall program order.
-
-\myparagraph{Program Dependency Graph (\PDGName)}
-The \PDGName is represented as $\PDG = (\Nodes, \PDEdges)$. An edge from node $\NodeWEx$ to node $\NodeR$ in $\PDEdges$ signifies that the execution of event $\NodeWEx$ is contingent upon the outcome of event $\NodeR$. For the purposes of our trace analysis, $\PDEdges$ includes only those dependencies where a read event $\NodeR$ is immediately followed by the first write event $\NodeWEx$ within the same thread but on a different cache line. This selection is specifically designed to highlight direct dependencies that are most susceptible to causing persistency races.
-
-\subsection{Causality \& Persistence States}
-To determine the state of the program at any given point during execution, particularly concerning data persistency, we define a vector clock function for each event node $\NodeV$:
-
-\myparagraph{Persisted-Before Vector Clock (\PBVCName)}
-The Persisted-Before Vector Clock (\PBVCName) for a node $\NodeV$ and a variable $\VarX$ is defined as the latest index in each thread at which $\VarX$ was confirmed to be persisted before $\NodeV$. This is formally expressed as:
-
-$$
-    \PBVC{\NodeV}{\Thread,\VarX} = \max \left( \left\{ \IndexI \middle| \ 
-    \begin{aligned}
-        & \exists \NodeU \in \ReadNodes \cup \WriteNodes \such \thread{\NodeU} = \Thread \land \var{\NodeU} = \VarX, \\
-        & \exists \Path = (\NodeU, \ldots, \NodeV) \text{ in } \HBG \text{ such that } \Path \text{ includes a flush node } \NodeF, \\
-        & \var{\NodeF} = \VarX \text{ and } \idx{\NodeU} = \IndexI
-    \end{aligned}
-    \right\} \right)
-$$
-
-This vector clock is pivotal in assessing whether changes to $\VarX$ are adequately persisted by the time subsequent operations are performed, thereby preventing persistency races.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+\section{STOP}
+\section{STOP}
+\section{STOP}
+\section{STOP}
 
 
 
