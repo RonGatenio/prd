@@ -101,52 +101,70 @@ A \HBGName, denoted as $\HBG$, and a \PDGName \cite{pd1991} denoted as $\PDG$
 % Background and Preliminaries
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % \section{Preliminaries}
-\section{Background}
-% \section{Background and Preliminaries}
+% \section{Background}
+\section{Background and Preliminaries}
+\label{sec:preliminaries}
 
 \subsection{Persistent Memory Programming}
-% TODO: write
+% TODO: write a comprehensive introduction and explanation about persistent memory programming paradigms, technologies, and their applications in modern computing.
+
+% Persistent memory (PM) technologies represent a revolutionary step in memory solutions by combining the speed of DRAM with the permanence of traditional storage. As such, programming for persistent memory involves paradigms that significantly differ from those used with conventional memory systems. This section explores the key paradigms, technologies, and applications of persistent memory in modern computing.
+
+% \subsubsection{Overview of Persistent Memory Technologies}
+% Persistent memory refers to a class of non-volatile RAM (NVRAM) that retains data even when the power is turned off. Technologies such as Intel's Optane DC Persistent Memory, based on 3D XPoint technology, exemplify this, offering near-DRAM speeds while ensuring data persistence that was previously limited to slower disk-based storage. This capability bridges the gap between volatile memory and durable storage, enabling faster data retrieval and resilience in face of power outages.
+
+% \subsubsection{Programming Paradigms for Persistent Memory}
+% Programming for persistent memory can be approached through two primary paradigms: 
+
+% \paragraph{Memory-Mapped File-Based Access}
+% Using memory-mapped files is a traditional method where persistent memory is treated similarly to a block device, but it is mapped into the process's address space. This allows applications to use byte-level load and store instructions to access data, which can dramatically reduce the latency associated with I/O operations. Libraries like libpmem from the Persistent Memory Development Kit (PMDK) provide the necessary tools to ensure that memory stores are flushed to persistent memory correctly.
+
+% \paragraph{Direct Access (DAX)}
+% Direct access enables applications to access persistent memory as regular memory, without the need to serialize and deserialize data to and from a filesystem. This is facilitated through file systems like NOVA and PMFS, which are optimized for NVRAM technologies. DAX ensures that applications can leverage the full performance potential of persistent memory, providing a simpler and more efficient programming model.
+
+% \subsubsection{Applications in Modern Computing}
+% The integration of persistent memory into modern computing infrastructures is transformative, impacting several key areas:
+
+% \paragraph{Databases and Big Data}
+% Persistent memory is particularly advantageous for databases and big data frameworks, which demand rapid access to large volumes of data. By reducing the latency associated with data access, persistent memory technologies can significantly enhance the performance of these systems, enabling real-time analytics and faster transaction processing.
+
+% \paragraph{High-Performance Computing (HPC)}
+% In HPC environments, the ability to quickly write and retrieve large datasets is crucial. Persistent memory improves the efficiency of checkpoint/restart operations by accelerating data persistence processes, thereby reducing downtime and enhancing computational throughput.
+
+% \paragraph{Caching and In-Memory Data Grids}
+% Persistent memory can serve as an extended cache or as part of an in-memory data grid, providing low-latency data access while ensuring data is not lost in power failures. This is particularly useful in scenarios requiring high availability and resilience.
+
+% In conclusion, persistent memory programming paradigms and technologies are pivotal in harnessing the full capabilities of this innovative memory class. As applications continue to demand faster access to increasing volumes of data, persistent memory is set to play a critical role in the evolution of data centers, cloud platforms, and high-performance computing environments.
+
+
 
 \subsection{Program Instrumentation}
-Program instrumentation allows us to record runtime events that occur during program execution.
-Using LLVM's IR instrumentation %TODO: cite?
-we will record every PM access (reads and writes) and every flush/fence instructions.
-In addition, we will use LLVM's ThreadSanitizer to obtain happens-before edges between recorded instructions, and LLVM's DataFlow Sanitizer to obtain program dependency relations between execution events in runtime.
+Program instrumentation involves recording runtime events to analyze the behavior of a program during its execution. By leveraging LLVM's Intermediate Representation (IR) for instrumentation, we systematically track every access to persistent memory (PM), including reads, writes, and explicit memory synchronization commands such as flush and fence instructions. Additionally, we utilize LLVM's ThreadSanitizer \cite{tsan2009}, originally used for identifying potential data races, for capturing happens-before relations, and LLVM's DataFlowSanitizer \cite{dfsan2020} for identifying program dependency relations among execution events at runtime.
 
-% TODO: rewrite
 
 \myparagraph{Happens-Before Analysis}
-LLVM's ThreadSanitizer \cite{tsan2009}, originally developed by Google, is a data race detection tool that instruments program execution and reports data races, using a vector clock analysis \cite{lamport1978}.
-In Lamport's original paper, vector clocks are updated when a process sends a message to another process. In the case of ThreadSanitizer, the messages are considered to be any event in one thread that is guarantied to happen before another event in another thread.
-Events like thread creation, join operations, lock acquisitions and releases, and use of atomic primitives like InterlockIncrement, InterlockXchg etc.
+LLVM's ThreadSanitizer, originally developed by Google \cite{tsan2009} and now maintained by The Clang Team \cite{tsandoc}, is a tool that detects and reports data races through program instrumentation. ThreadSanitizer utilizes vector clocks to monitor thread interactions including thread creations, lock acquisitions, and atomic operations such as compare-and-swap, fetch-and-add, etc. This process effectively establishes a comprehensive happens-before partial-ordering of program execution. 
 
-We utilize ThreadSanitizer's precise instrumentation and vector clock updates in order to record happens-before edges between program events.
+We leverage the vector clock updates mechanism of ThreadSanitizer to record the happens-before relationships among concurrent program events.
 
-% TODO: rewrite
 
 \myparagraph{Dynamic Program Dependence Analysis}
-LLVM's Data-Flow Sanitizer \cite{dfsan2020} is a tool used to detect the effects of program events on one another
+LLVM's Data-Flow Sanitizer (DFSan) \cite{dfsan2020} is a tool used to detect the effects of program events on one another
 
-% TODO: complete
+% TODO: expand on how Data-Flow Sanitizer maps dependencies and its impact on understanding program behavior dynamically.
 
-\subsection{\race}
-
-% TODO: write
+LLVM's Data-Flow Sanitizer (DFSan) \cite{dfsan2020} serves as a dynamic analysis tool that traces the influence of specific program events on subsequent operations. This tool is instrumental in identifying dependencies that arise during execution, particularly those impacting data flow and control structures within the program.
 
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Algorithm
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\section{Algorithm}
-\label{sec:algorithm}
 
-This section describes the algorithm used to detect {\cprd}s. We first formalize the definition of a \cprd and then detail the algorithmic steps for its detection.
+as of the time this project was made, DFSAN only produces data-dependencies and not control dependencies.
+We will later see that PD analysis only removes false-positives from the results. Future work could expand on that and add control dependencies to find possible races that we might consider as false-positives
 
 
 % ---------------------------------------------------------
-% Preliminaries
+% Definitions - Program Trace Representation
 % ---------------------------------------------------------
-\subsection{Preliminaries}
+\subsection{Program Trace Representation}
 The program trace categorizes events into three main types: event nodes $\Nodes$, happens-before edges $\HBEdges$, and program dependency edges $\PDEdges$. We denote the subsets of Read, Write, and Flush event nodes as $\ReadNodes$, $\WriteNodes$, and $\FlushNodes$, respectively. Each event node $\NodeV$ is associated with a variable $\var{\NodeV} \in \Vars$ indicating the memory address accessed, and a thread $\thread{\NodeV} \in \Threads$ indicating the executing thread. Each event node is also sequentially identified by $\idx{\NodeV} \in \IDs$ within its thread, reflecting the execution order.
 
 
@@ -203,8 +221,10 @@ Our analysis particularly focuses on dependencies in dynamic executions where a 
 % Vector Clocks
 % ~~~~~~~~~~~~~~~~~~~~~~~
 \subsection{State Vector Clocks}
-Vector clocks, building upon Lamport's timestamps \cite{lamport1978} and further developed in \cite{fidge1987vc} and \cite{mattern1988vc}, are a widely used mechanism for capturing causality among events in parallel and distributed systems. 
-This tool is used to determine the happens-before partial-order of the executed program events.
+Vector clocks, based on Lamport's timestamps \cite{lamport1978} and further developed in \cite{fidge1987vc} and \cite{mattern1988vc}, are a widely used method to capture the causality between events in parallel and distributed systems, and to determine the happens-before partial-order between them. Intuitively, vector clocks represent the known state of execution across all program threads, from the view of a single event in the execution.
+% Vector clocks, building upon Lamport's timestamps \cite{lamport1978} and further developed in \cite{fidge1987vc} and \cite{mattern1988vc}, are a widely used mechanism for capturing causality among events in parallel and distributed systems. 
+% This tool is used to determine the happens-before partial-order of the executed program events. Intuitively, vector clocks represent the known state of execution across all program threads, from the view of a single event in the execution.
+
 
 We use vector clocks in many ways thought this work. Firstly, they are used by ThreadSanitizer \cite{tsan2009} to determine the happens-before relations in the program's execution. Secondly, use the same concept in our \HBGName analysis to determine different states of persistency and ordering of events in the program execution trace.
 
@@ -239,7 +259,9 @@ This scenario risks compromising the integrity of the PM state if the write oper
 
 \begin{definition} %[\race (\cpr)]
     \label{def:race}
-    A \cpr is defined to occur between a read node $\NodeR \in \ReadNodes$ and a write node $\NodeW \in \WriteNodes$ if both nodes access overlapping memory locations denoted as $\VarX$. Additionally, there exists another write node $\NodeWEx \in \WriteNodes$ that is program-dependent on $\NodeR$, operates on a different cache line, and satisfies the vector clock constraints $\PBVC{\NodeWEx}{\thread{\NodeW}, \VarX} < \idx{\NodeW} < \HAVC{\NodeR}{\thread{\NodeW}}$ and $\PBVC{\NodeWEx}{\thread{\NodeR}, \VarX} < \idx{\NodeR}$.
+    A \cpr is defined to occur between a read node $\NodeR \in \ReadNodes$ and a write node $\NodeW \in \WriteNodes$ if both nodes access overlapping memory locations denoted as $\VarX$. Additionally, there exists another write node $\NodeWEx \in \WriteNodes$ that is program-dependent on $\NodeR$, operates on a different cache line, and satisfies the
+    % vector clock % I don't want a new line in the middle of the constraint
+    constraints $\PBVC{\NodeWEx}{\thread{\NodeW}, \VarX} < \idx{\NodeW} < \HAVC{\NodeR}{\thread{\NodeW}}$ and $\PBVC{\NodeWEx}{\thread{\NodeR}, \VarX} < \idx{\NodeR}$.
 \end{definition}
 
 The first vector clock constraint ensures that $\NodeW$ does not persist before $\NodeWEx$ and that it does not execute after $\NodeR$. This condition implies that $\NodeW$ either occurs before $\NodeR$ or concurrently with it, thereby allowing $\NodeW$ to potentially influence the value read by $\NodeR$ in certain executions of the program.
@@ -254,19 +276,23 @@ The second vector clock constraint asserts that $\NodeR$ must not be persisted b
 %       2. if they are, we can only look at the first one.
 
 
-% ---------------------------------------------------------
-% Algorithm ???
-% ---------------------------------------------------------
-% TODO: rename!!!!!!!
-\subsection{Algorithm}
-The algorithm is comprised of three main stages: in \autoref{alg:havc} we construct the $\HAVC{}{}$ for each node, in \autoref{alg:pbvc} we construct $\PBVC{}{}$ for each node, and in \autoref{alg:cprd}, we identify {\cprd}s based on the two functions.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Algorithm
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Algorithm}
+\label{sec:algorithm}
+% This section describes the algorithm used to detect {\cprd}s.
+
+
+The algorithm is comprised of three main stages: in \ref{sec:havc} we construct the $\HAVC{}{}$ for each node, in \ref{sec:pbvc} we construct $\PBVC{}{}$ for each node, and in \ref{sec:cprd}, we identify {\cprd}s based on the two functions.
 
 
 % ---------------------------------------------------------
 % Algorithm - 1. HAVC
 % ---------------------------------------------------------
 
-\myparagraph{Happens-After Vector Clocks Builder}
+\subsection{Happens-After Vector Clocks Builder}
+\label{sec:havc}
 In \autoref{alg:havc} we iterate over all nodes in the $\HBG$ in post-order search (which insures that we traverse each node after visiting all of its children) and update $\havc{}{}$ accordingly.
 By the end of this algorithm, $\havc{\NodeV}{\Thread} = \HAVC{\NodeV}{\Thread}$ for all nodes $\NodeV \in \Nodes$ and all $\Thread \in \Threads$.
 
@@ -299,7 +325,8 @@ By the end of this algorithm, $\havc{\NodeV}{\Thread} = \HAVC{\NodeV}{\Thread}$ 
 % Algorithm - 2. PBVC
 % ---------------------------------------------------------
 
-\myparagraph{Persisted-Before Vector Clocks Builder}
+\subsection{Persisted-Before Vector Clocks Builder}
+\label{sec:pbvc}
 In \autoref{alg:pbvc} we iterate over all nodes in the $\HBG$ in a reversed post-order search (which insures that we traverse each node after visiting all of its parents).
 We define an auxilary function named $\HBVC{}{}$ that is calculated in $\hbvc{}{}$.
 The function $\HBVC{\NodeV}{\Thread,\VarX}$ identifies the index of the last node in thread $\Thread$ concerning variable $\VarX$ that precedes node $\NodeV$.
@@ -353,7 +380,8 @@ The function $\HBVC{\NodeV}{\Thread,\VarX}$ identifies the index of the last nod
 % Algorithm - 3. CPRD
 % ---------------------------------------------------------
 
-\myparagraph{Concurrent Persistence Race Detector}
+\subsection{Concurrent Persistence Race Detector}
+\label{sec:cprd}
 In \autoref{alg:cprd} we use the previously built $\HAVC{}{}$ and $\PBVC{}{}$ to find the {\racerange}s of each write event node.
 For each write node $\NodeWEx \in \WriteNodes$ we look at the dependent read node $\NodeR \in \ReadNodes$
 % TODO
