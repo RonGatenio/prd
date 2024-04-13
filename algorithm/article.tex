@@ -231,21 +231,30 @@ An event $\NodeU$ is considered to \textit{happen-after} another event $\NodeV$ 
 % Race
 % ~~~~~~~~~~~~~~~~~~~~~~~
 % \subsection{\race Definition}
-\subsection{\race}
+\subsection{\race (\cpr)}
 
-A \race occurs when a write operation to persistent memory (PM) is influenced by a prior read operation from a non-persisted area of PM (on a different cache line). If the write operation becomes durable before the read operation, the PM state could be compromised if program recovery process won't fix the problem.
+A \race occurs when a write operation to persistent memory (PM) is influenced by a prior read operation from a non-persisted area of PM located on a different cache line.
+This scenario risks compromising the integrity of the PM state if the write operation becomes durable before the read areas are persisted.
+% , and such discrepancies are not corrected during the program recovery process.
 
-We can say that there is a \race between $\NodeR \in \ReadNodes$ and $\NodeW \in \WriteNodes$ if both operate on overlapping memory locations ($\VarX$), and $\exists \NodeWEx \in \WriteNodes$ such that $\NodeWEx$ is program-dependent on $\NodeR$ and $\var{\NodeWEx} \neq \VarX$. And $\PBVC{\NodeWEx}{\thread{\NodeW}, \VarX} < \idx{\NodeW} < \HAVC{\NodeR}{\thread{\NodeW}}$ and $\PBVC{\NodeWEx}{\thread{\NodeR}, \VarX} < \idx{\NodeR}$.
+\begin{definition} %[\race (\cpr)]
+    \label{def:race}
+    A \cpr is defined to occur between a read node $\NodeR \in \ReadNodes$ and a write node $\NodeW \in \WriteNodes$ if both nodes access overlapping memory locations denoted as $\VarX$. Additionally, there exists another write node $\NodeWEx \in \WriteNodes$ that is program-dependent on $\NodeR$, operates on a different cache line, and satisfies the vector clock constraints $\PBVC{\NodeWEx}{\thread{\NodeW}, \VarX} < \idx{\NodeW} < \HAVC{\NodeR}{\thread{\NodeW}}$ and $\PBVC{\NodeWEx}{\thread{\NodeR}, \VarX} < \idx{\NodeR}$.
+\end{definition}
 
-$$
-\begin{aligned}
-    & \var{\NodeR} = \var{\NodeW} = \VarX \\
-    & \exists \NodeWEx \in \WriteNodes \such \var{\NodeR} \neq \var{\NodeWEx} \land \thread{\NodeR} = \thread{\NodeWEx} \\
-    & (\NodeWEx, \NodeR) \in \PDEdges \\
-    & \PBVC{\NodeWEx}{\thread{\NodeW}, \VarX} < \idx{\NodeW} < \HAVC{\NodeR}{\thread{\NodeW}} \\
-    & \PBVC{\NodeWEx}{\thread{\NodeR}, \VarX} < \idx{\NodeR}
-\end{aligned}
-$$
+The first vector clock constraint ensures that $\NodeW$ does not persist before $\NodeWEx$ and that it does not execute after $\NodeR$. This condition implies that $\NodeW$ either occurs before $\NodeR$ or concurrently with it, thereby allowing $\NodeW$ to potentially influence the value read by $\NodeR$ in certain executions of the program.
+
+The second vector clock constraint asserts that $\NodeR$ must not be persisted before $\NodeWEx$. If $\NodeR$ were persisted prior to $\NodeWEx$, then there would be no race; the memory location influencing $\NodeWEx$ would already be in a stable, persisted state, negating the possibility of a persistency race.
+
+% $$
+% \begin{aligned}
+%     & \var{\NodeR} = \var{\NodeW} = \VarX \\
+%     & \exists \NodeWEx \in \WriteNodes \such \var{\NodeR} \neq \var{\NodeWEx} \land \thread{\NodeR} = \thread{\NodeWEx} \\
+%     & (\NodeWEx, \NodeR) \in \PDEdges \\
+%     & \PBVC{\NodeWEx}{\thread{\NodeW}, \VarX} < \idx{\NodeW} < \HAVC{\NodeR}{\thread{\NodeW}} \\
+%     & \PBVC{\NodeWEx}{\thread{\NodeR}, \VarX} < \idx{\NodeR}
+% \end{aligned}
+% $$
 
 \section{STOP}
 \section{STOP}
