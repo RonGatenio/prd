@@ -246,37 +246,18 @@ The first vector clock constraint ensures that $\NodeW$ does not persist before 
 
 The second vector clock constraint asserts that $\NodeR$ must not be persisted before $\NodeWEx$. If $\NodeR$ were persisted prior to $\NodeWEx$, then there would be no race; the memory location influencing $\NodeWEx$ would already be in a stable, persisted state, negating the possibility of a persistency race.
 
-% $$
-% \begin{aligned}
-%     & \var{\NodeR} = \var{\NodeW} = \VarX \\
-%     & \exists \NodeWEx \in \WriteNodes \such \var{\NodeR} \neq \var{\NodeWEx} \land \thread{\NodeR} = \thread{\NodeWEx} \\
-%     & (\NodeWEx, \NodeR) \in \PDEdges \\
-%     & \PBVC{\NodeWEx}{\thread{\NodeW}, \VarX} < \idx{\NodeW} < \HAVC{\NodeR}{\thread{\NodeW}} \\
-%     & \PBVC{\NodeWEx}{\thread{\NodeR}, \VarX} < \idx{\NodeR}
-% \end{aligned}
-% $$
-
-\section{STOP}
-\section{STOP}
-\section{STOP}
-\section{STOP}
-
-
-Using these functions, we will redefine \cprd as follows.
-\begin{definition}
-    \label{def:race2}
-    We define a \race between a read node $\NodeR \in \ReadNodes$ and a write node $\NodeW \in \WriteNodes$ if both operate on overlapping memory locations, and $\exists \NodeWEx \in \WriteNodes$ such that $\NodeWEx$ is program-dependent on $\NodeR$ (in the same thread and operates on a different cache line), and 
-    $$\PBVC{\NodeWEx}{\thread{\NodeW}, \var{\NodeW}} < \idx{\NodeW} < \HAVC{\NodeR}{\thread{\NodeW}}$$
-    and
-    $$\PBVC{\NodeWEx}{\thread{\NodeWEx}, \var{\NodeR}} < \idx{\NodeR}$$
-\end{definition}
-
 % TODO: show interval image
-Essentially, if the \readnode isn't persisted, we define an interval in each thread between the persistency point of $\VarX$ and the point that happen-after the read (meaning it has no affect on the read value). We call this interval \racerange, and it is defined for each write node and for each thread.
-% TODO: not explained great
+
+% TODO: missing info:
+%       1. r and w' are on the same thread in our analysis
+%           1.1. why don't we care about others???????????
+%       2. if they are, we can only look at the first one.
 
 
-
+% ---------------------------------------------------------
+% Algorithm ???
+% ---------------------------------------------------------
+% TODO: rename!!!!!!!
 \subsection{Algorithm}
 The algorithm is comprised of three main stages: in \autoref{alg:havc} we construct the $\HAVC{}{}$ for each node, in \autoref{alg:pbvc} we construct $\PBVC{}{}$ for each node, and in \autoref{alg:cprd}, we identify {\cprd}s based on the two functions.
 
