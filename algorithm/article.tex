@@ -211,17 +211,17 @@ We use vector clocks in many ways thought this work. Firstly, they are used by T
 In our analysis we define vector clocks for each event node in the execution.
 We use several types of vector clocks in order to keep track of different states during the execution trace. In general, each vector clock that we define is a $\Threads$ sized vector of event IDs (used like logical clocks) where each index $\Thread$ indicates a some known state from thread $\Thread$.
 
-\myparagraph{Happens-Before Vector Clock}
-The Happens-Before Vector Clock ($\HBVC{}{}$) is defined for each node $\NodeV \in \Nodes$ as the function $\HBVC{\NodeV}{\Thread,\VarX}: \HBVCDef$. This function determines the index of the latest event in thread $\Thread$ that precedes $\NodeV$ in $\HBG$ and affects the cache line associated with $\VarX$.
+\myparagraph{Happens-Before Vector Clock (HBVC)}
+Defined for each node $\NodeV \in \Nodes$ as the function $\HBVC{\NodeV}{\Thread,\VarX}: \HBVCDef$. This function determines the index of the latest event in thread $\Thread$ that precedes $\NodeV$ in $\HBG$ and affects the cache line associated with $\VarX$.
 An event $\NodeU$ is considered to \textit{happen-before} another event $\NodeV$ if $\idx{\NodeU} \leq \HBVC{\NodeV}{\thread{\NodeU},\var{\NodeU}}$, establishing a causal order between these events.
 
-\myparagraph{Persisted-Before Vector Clock}
-The Persisted-Before Vector Clock ($\PBVC{}{}$) is defined for each node $\NodeV \in \Nodes$ as the function $\PBVC{\NodeV}{\Thread,\VarX}: \PBVCDef$. This function determines the index of the latest event in thread $\Thread$ that precedes $\NodeV$ in $\HBG$, affects the cache line associated with $\VarX$, and ensures that $\VarX$ has been persisted.
+\myparagraph{Persisted-Before Vector Clock (PBVC)}
+Defined for each node $\NodeV \in \Nodes$ as the function $\PBVC{\NodeV}{\Thread,\VarX}: \PBVCDef$. This function determines the index of the latest event in thread $\Thread$ that precedes $\NodeV$ in $\HBG$, affects the cache line associated with $\VarX$, and ensures that $\VarX$ has been persisted.
 An event $\NodeU$ is considered \textit{persisted-before} another event $\NodeV$ if $\idx{\NodeU} \leq \PBVC{\NodeV}{\thread{\NodeU},\var{\NodeU}}$.
 Persistency here implies that there is a path in the $\HBG$ from $\NodeU$ to $\NodeV$ that contains a Flush event on the cache line associated with $\VarX$.
 
-\myparagraph{Happens-After Vector Clock}
-The Happens-After Vector Clock ($\HAVC{}{}$) is defined for each node $\NodeV \in \Nodes$ as the function $\HAVC{\NodeV}{\Thread}: \HAVCDef$. This function determines the index of the earliest event in thread $\Thread$ that happens-after $\NodeV$ in $\HBG$.
+\myparagraph{Happens-After Vector Clock (HAVC)}
+Defined for each node $\NodeV \in \Nodes$ as the function $\HAVC{\NodeV}{\Thread}: \HAVCDef$. This function determines the index of the earliest event in thread $\Thread$ that happens-after $\NodeV$ in $\HBG$.
 An event $\NodeU$ is considered to \textit{happen-after} another event $\NodeV$ if $\HAVC{\NodeV}{\thread{\NodeU}} \leq \idx{\NodeU}$, establishing a causal order between these events.
 
 % TODO: should we use the word epoch instead of index everywhere?
