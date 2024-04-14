@@ -1,18 +1,14 @@
-from collections import defaultdict
-from typing import Dict, Set
+from typing import Collection, Dict, Set
 from .types import ThreadId, Cacheline
 from . import utils
 
 
 class DirtyCachelinesVector:
-    def __init__(self, tid: ThreadId):
+    def __init__(self, tid: ThreadId, tids: Collection[ThreadId]):
         self._tid = tid
         
         # A vector of dirty cachelines that we must update our inter-children with
-        self._vector: Dict[ThreadId, Set[Cacheline]] = defaultdict(set)
-        
-        # The dirty cachlines so far - used to update a new unknown thread that might come later
-        self._resereved_thread_vector: Set[Cacheline] = set()
+        self._vector: Dict[ThreadId, Set[Cacheline]] = {t: set() for t in tids if t != tid}
         
         # Instead of updating the vector on every new cacheline that we see,
         # just update this temp buffer and dump it where needed when we update some child
@@ -22,17 +18,22 @@ class DirtyCachelinesVector:
     def tid(self) -> ThreadId:
         return self._tid
     
-    def is_dirty(self, tid: ThreadId) -> bool:
+    @property
+    def vector(self) -> Dict[ThreadId, Set[Cacheline]]:
+        self._clear_pending()
+        return self._vector
+    
+    def _clear_pending(self):
         if self._pending_dirty_cachelines:
-            return True
-        
-        if self._vector[tid]:
-            return True
-        
-        return False
+            # Dump the pending dirty cachelines
+            for tid, dirty_cachelines in self._vector.items():
+                dirty_cachelines.update(self._pending_dirty_cachelines)
+            
+            # Clear the pending buffer
+            self._pending_dirty_cachelines.clear()
     
     def get_dirty_cachelines(self, tid: ThreadId):
-        return self._pending_dirty_cachelines | self._vector[tid]
+        return self.vector[tid]
     
     def set_cacheline_dirty(self, address: int, size: int = 1):
         """
@@ -47,26 +48,19 @@ class DirtyCachelinesVector:
         
         # Assertions before update
         assert self.tid != child.tid, "Expecting to update an inter-child but got an intra-child"
-        assert child.tid not in child._vector, "Expected tid to not be in the child node's vector"
+        assert child.tid not in child._vector, "Expected child's tid to not be in the child node's vector"
         assert self.tid not in self._vector, "Expected tid to not be in my vector"
         
-        # Dump the pending dirty cachelines
-        self._resereved_thread_vector.update(self._pending_dirty_cachelines)
-        for tid, dirty_cachelines in self._vector.items():
-            dirty_cachelines.update(self._pending_dirty_cachelines)
-        
-        # Clear the pending buffer
-        self._pending_dirty_cachelines.clear()
-
         # Update the child
-        for tid, dirty_cachelines in child._vector.items():
+        for tid, child_dirty_cachelines in child.vector.items():
             assert tid != child.tid, "Child is not expected to have a cell for itself"
 
-            if tid != self.tid:
-                child._vector[tid].update(self._vector[child.tid])
-        
-        # Adding a cell with my tid lazily - child doesn't need to update me with the knowledge that I just gave it
-        child._vector[tid].update(set())
+            if tid == self.tid:
+                continue
+            
+            child_dirty_cachelines.update(self.vector[tid])
+            
+        self._vector[child.tid].clear()
                 
         # Assertions after an update
         assert not self._pending_dirty_cachelines, "Pending dirty cachelines are not expected"
