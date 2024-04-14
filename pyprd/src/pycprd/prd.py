@@ -3,6 +3,7 @@ from dataclasses import dataclass, field
 from typing import Dict, Generator, List, Set, Tuple
 import logging
 from .nodes import AbstractNode, NodeType, ReadNode, WriteNode, FlushNode, EpochNode
+from .types import ThreadId, Cacheline
 from .trace_event_info import TraceEventInfo
 from .vector_clock import PersistencyVectorClock, ReversedVectorClock
 from .hbg import HBG
@@ -11,13 +12,6 @@ from . import utils
 
 
 logger = logging.getLogger(__name__)
-
-
-###########################################################
-# Types
-###########################################################
-ThreadId    = int
-Cacheline   = int
 
 
 @dataclass(frozen=True)
