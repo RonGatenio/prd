@@ -102,7 +102,7 @@ def main():
     args = parse_args()
     
     if args.destination_path:
-        copy_to(container, args.source_paths, args.output)
+        copy_to(container, args.source_paths, args.destination_path)
     else:
         copy_from(container, args.source_paths)
 
