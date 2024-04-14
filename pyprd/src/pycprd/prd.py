@@ -6,6 +6,7 @@ from .nodes import AbstractNode, NodeType, ReadNode, WriteNode, FlushNode, Epoch
 from .types import ThreadId, Cacheline
 from .trace_event_info import TraceEventInfo
 from .vector_clock import PersistencyVectorClock, ReversedVectorClock
+from .dirty_vector import DirtyCachelinesVector
 from .hbg import HBG
 from .pdg import PDG
 from . import utils
@@ -388,13 +389,11 @@ class PersistencyRaceDetector:
                             my_pvc: PersistencyVectorClock = pvc_per_thread[n.tid][cacheline]
                             child_pvc: PersistencyVectorClock = pvc_per_epoch_node[child][cacheline]
                             child_pvc.merge(my_pvc)
-                            # dirty_cachelines_per_epoch_node[child].add(cacheline)
 
                         # clean dirty
                         dirty_cachelines_vector[n.tid][child.tid].clear()
 
                     # Merge my state with thread state and delete me
-                    # for cacheline in dirty_cachelines_per_epoch_node
                     for cacheline in pvc_per_epoch_node[n]:
                         # only dirty cachelines
                         _pvc: PersistencyVectorClock = pvc_per_epoch_node[n][cacheline]
@@ -402,8 +401,72 @@ class PersistencyRaceDetector:
                         pvc.merge(_pvc)
                         dirty_cachelines[n.tid].add(cacheline)
                     del pvc_per_epoch_node[n]
+                    
+    def _do_persisted_before_vector_clocks_analysis_fast(self, vc_per_read_node: Dict[ReadNode, ReversedVectorClock]):
+        pvc_per_thread:          Dict[ThreadId, Dict[Cacheline, PersistencyVectorClock]]  = utils.DefaultDictByKey(lambda tid: defaultdict(lambda: PersistencyVectorClock(tid)))
+        pvc_per_epoch_node:      Dict[EpochNode, Dict[Cacheline, PersistencyVectorClock]] = utils.DefaultDictByKey(lambda n: defaultdict(lambda: PersistencyVectorClock(n.tid)))
+        dirty_cachelines:        Dict[ThreadId, DirtyCachelinesVector]  = utils.DefaultDictByKey(lambda tid: DirtyCachelinesVector(tid, self._hbg.tids))
+        dirty_cachelines_per_epoch:        Dict[EpochNode, DirtyCachelinesVector]  = utils.DefaultDictByKey(lambda n: DirtyCachelinesVector(n.tid, self._hbg.tids))
 
-    def run(self, validate=False):
+        for n in self._hbg.reverse_postorder():
+            n: AbstractNode
+
+            match n.itype:
+                case NodeType.WRITE:
+                    n: WriteNode
+                    pvc: PersistencyVectorClock = pvc_per_thread[n.tid][n.get_cacheline_address()]
+                    pvc.add_epoch(self._hbg.get_node_location(n).tindex)
+                    dirty_cachelines[n.tid].set_cacheline_dirty(n.address, n.size)
+
+                    # Find bugs
+                    self._find_bugs(n, pvc_per_thread, vc_per_read_node)
+
+                case NodeType.READ:
+                    n: ReadNode
+                    pvc: PersistencyVectorClock = pvc_per_thread[n.tid][n.get_cacheline_address()]
+                    pvc.add_epoch(self._hbg.get_node_location(n).tindex)
+                    dirty_cachelines[n.tid].set_cacheline_dirty(n.address, n.size)
+
+                case NodeType.FLUSH:
+                    if self._ignore_flush_nodes:
+                        continue
+
+                    n: FlushNode
+                    pvc: PersistencyVectorClock = pvc_per_thread[n.tid][n.get_cacheline_address()]
+                    pvc.flush()
+                    dirty_cachelines[n.tid].set_cacheline_dirty(n.address, n.size)
+
+                case NodeType.EPOCH:
+                    if self._ignore_inter_thread_edges:
+                        continue
+
+                    n: EpochNode
+                    
+                    # Merge current epoch nodes dirty cachelines knowledge to the threads dirty cachelines vector, and delete node's vector
+                    dirty_cachelines[n.tid].merge(dirty_cachelines_per_epoch[n])
+                    del dirty_cachelines_per_epoch[n]
+
+                    # Merge current epoch nodes state with thread state and delete it
+                    for cacheline in pvc_per_epoch_node[n]:
+                        # only dirty cachelines
+                        _pvc: PersistencyVectorClock = pvc_per_epoch_node[n][cacheline]
+                        pvc: PersistencyVectorClock  = pvc_per_thread[n.tid][cacheline]
+                        pvc.merge(_pvc)
+                    del pvc_per_epoch_node[n]
+
+                    # Tell inter children the current state
+                    for child in self._hbg.get_inter_children(n):
+                        child: EpochNode
+
+                        for cacheline in dirty_cachelines[n.tid].get_dirty_cachelines(child.tid):
+                            my_pvc: PersistencyVectorClock = pvc_per_thread[n.tid][cacheline]
+                            child_pvc: PersistencyVectorClock = pvc_per_epoch_node[child][cacheline]
+                            child_pvc.merge(my_pvc)
+
+                        # update child's dirty vector
+                        dirty_cachelines[n.tid].update_child(dirty_cachelines_per_epoch[child])
+
+    def run(self, validate=False, use_faster_version=True):
         self._races.clear()
 
         with utils.timeit() as t:
@@ -411,15 +474,18 @@ class PersistencyRaceDetector:
         self._time_first_stage = t.total
 
         with utils.timeit() as t:
-            races = list(self._do_persisted_before_vector_clocks_analysis(vc_per_read_node))
+            if use_faster_version:
+                self._do_persisted_before_vector_clocks_analysis_fast(vc_per_read_node)
+            else:
+                self._do_persisted_before_vector_clocks_analysis(vc_per_read_node)
         self._time_second_stage = t.total
 
         if validate:
-            for race in races:
+            for race in self.races:
                 if not self.is_bug(race):
                     raise Exception(f'Not a race!\n{race}')
 
-        return races
+        return self.races
 
     def is_bug(self, race: PersistencyRace):
         assert race.read_node.itype == NodeType.READ
