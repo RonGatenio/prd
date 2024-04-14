@@ -18,7 +18,9 @@ def get_cacheline_interval(address: int, size: int, cacheline_size=DEFAULT_CACHE
 
 
 def get_cacheline_addresses(address: int, size: int, cacheline_size=DEFAULT_CACHELINE_SIZE) -> int:
-    return list(range(*get_cacheline_interval(address, size), cacheline_size))
+    l = list(range(*get_cacheline_interval(address, size), cacheline_size))
+    assert len(l) == 1, f"got more than 1 cacheline ({len(l)})"
+    return l
 
 
 @contextmanager
