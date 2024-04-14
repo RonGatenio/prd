@@ -5,16 +5,20 @@ from contextlib import contextmanager
 from .config import DEFAULT_CACHELINE_SIZE
 
 
-def get_cacheline_address(address, cacheline_size=DEFAULT_CACHELINE_SIZE) -> int:
+def get_cacheline_address(address: int, cacheline_size=DEFAULT_CACHELINE_SIZE) -> int:
     mask = ((1 << 64) - 1) * cacheline_size
     return address & mask
 
 
-def get_cacheline_interval(address, size, cacheline_size=DEFAULT_CACHELINE_SIZE) -> tuple[int, int]:
+def get_cacheline_interval(address: int, size: int, cacheline_size=DEFAULT_CACHELINE_SIZE) -> tuple[int, int]:
     mask = ((1 << 64) - 1) * cacheline_size
     start = address & mask
     end = (address + size + cacheline_size - 1) & mask
     return start, end
+
+
+def get_cacheline_addresses(address: int, size: int, cacheline_size=DEFAULT_CACHELINE_SIZE) -> int:
+    return list(range(*get_cacheline_interval(address, size), cacheline_size))
 
 
 @contextmanager
