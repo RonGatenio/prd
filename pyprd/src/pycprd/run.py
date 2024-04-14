@@ -11,7 +11,8 @@ def run(hbg, pdg,
         ignore_persisted_before_index=False,
         ignore_happens_after_index=False,
         ignore_read_node_persistency=False,
-        show_only_first_bug_in_thread=False):
+        show_only_first_bug_in_thread=False,
+        use_fast=True):
     prd = PersistencyRaceDetector(hbg, pdg,
                                   ignore_inter_thread_edges     = ignore_inter_thread_edges,
                                   ignore_flush_nodes            = ignore_flush_nodes,
@@ -19,7 +20,7 @@ def run(hbg, pdg,
                                   ignore_happens_after_index    = ignore_happens_after_index,
                                   ignore_read_node_persistency  = ignore_read_node_persistency,
                                   show_only_first_bug_in_thread = show_only_first_bug_in_thread)
-    prd.run()
+    prd.run(use_faster_version=use_fast)
     print(prd.stats())
     return prd
 
@@ -28,6 +29,8 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("trace")
     parser.add_argument("--mock-pdg", action='store_true', default=False)
+    parser.add_argument("--fast", action='store_true', default=False)
+    parser.add_argument("--stats", action='store_true', default=False)
 
     args = parser.parse_args()
 
@@ -52,7 +55,8 @@ def main():
         ignore_persisted_before_index=False,
         ignore_happens_after_index=False,
         ignore_read_node_persistency=False,
-        show_only_first_bug_in_thread=False)
+        show_only_first_bug_in_thread=False,
+        use_fast=args.fast)
 
     # run(hbg, pdg,
     #     ignore_inter_thread_edges=False,
@@ -85,6 +89,9 @@ def main():
     #     ignore_happens_after_index=True,
     #     ignore_read_node_persistency=True,
     #     show_only_first_bug_in_thread=False)
+    
+    if args.stats:
+        return
 
     print('')
     
@@ -98,4 +105,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    with timeit('main'):
+        main()
