@@ -15,7 +15,7 @@
 
 \begin{document}
 
-\title{Concurrent Persistency Race Bug Detector}
+\title{\myrace Detection}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Authors
@@ -48,9 +48,10 @@
 The introduction of new NVM technologies with byte addressable access and DRAM performance has increased interest in developing crash-consistent software.
 This type of software introduces a new type of inconsistency bugs between the volatile CPU cache and the persistent NVM state.
 
-This research introduces CPRD, a concurrent NVM bug detector that analyzes the program trace using a graph search algorithm.
+This research introduces \SignRaceDetector, a concurrent NVM bug detector that analyzes the program trace using a graph search algorithm.
 
 \end{abstract}
+
 
 \maketitle % should come after the abstract
 \pagestyle{plain} % should come right after \maketitle
@@ -72,7 +73,7 @@ Nonvolatile memory (NVM) technologies, such as Intel’s Optane DC Persistent Me
 
 To ensure consistency of NVM state, developers need to explicitly evict cache lines to the NVM. This can be done with explicit flush (e.g., CLWB) and fence (e.g., SFENCE) instructions \cite{intel2020abi}. Due to the need to ensure correct cache line evictions, even experienced programmers may introduce inconsistency bugs, if they are not experienced with PM programming practices. This introduces a need for special bug detectors that could help developers find such complicated bugs. Previous bug detectors, aimed at detecting data inconsistencies, won’t necessarily be able to find NVM related bugs. This type of programming model that uses byte addressable persistent memory did not exist before. 
 
-In this work, we focus on a specific type of bug that can be introduced in concurrent NVM programs. Previously coined as \pmracerace \cite{pmrace2022}, a bug that occurs when an NVM location affects data written to another NVM location before being persisted. Such bug can cause an inconsistent NVM state after a crash if the affected written address got persisted before the read address. In the following, we refer to this bug as \textbf{\race}.
+In this work, we focus on a specific type of bug that can be introduced in concurrent NVM programs. Previously coined as \NamePMRaceRace \cite{pmrace2022}, a bug that occurs when an NVM location affects data written to another NVM location before being persisted. Such bug can cause an inconsistent NVM state after a crash if the affected written address got persisted before the read address. In the following, we refer to this bug as \textbf{\race}.
 
 Previous work \cite{pmrace2022} attempted to detect the bug using a smart fuzzing technique to explore the inter-thread interleaving of the program.
 We attempt to solve the interleaving exploration using a vector clock analysis that detects happens-before relations between program events \cite{lamport1978}.
@@ -82,7 +83,7 @@ For this, we will use LLVM's DataFlowSanitizer \cite{dfsan2020}.
 
 Using both the happens-before analysis and the data-flow analysis we can construct 2 graphs that represent the relations between all execution events.
 A \HBGName, denoted as $\HBG$, and a \PDGName \cite{pd1991} denoted as $\PDG$
-\myrace detector will use the 2 graphs to traverse the program execution trace and report all discovered bugs using the algorithm presented later in \autoref{sec:algorithm}.
+\NameRaceDetector will use the 2 graphs to traverse the program execution trace and report all discovered bugs using the algorithm presented later in \autoref{sec:algorithm}.
 
 
 % ChatGPT:
@@ -143,22 +144,38 @@ Program instrumentation involves recording runtime events to analyze the behavio
 
 
 \myparagraph{Happens-Before Analysis}
-LLVM's ThreadSanitizer, originally developed by Google \cite{tsan2009} and now maintained by The Clang Team \cite{tsandoc}, is a tool that detects and reports data races through program instrumentation. ThreadSanitizer utilizes vector clocks to monitor thread interactions including thread creations, lock acquisitions, and atomic operations such as compare-and-swap, fetch-and-add, etc. This process effectively establishes a comprehensive happens-before partial-ordering of program execution. 
+LLVM's ThreadSanitizer \linebreak (TSan), originally developed by Google \cite{tsan2009} and now maintained by The Clang Team \cite{tsandoc}, is a tool that detects and reports data races through program instrumentation. TSan utilizes vector clocks to monitor thread interactions including thread creations, lock acquisitions, and atomic operations such as compare-and-swap, fetch-and-add, etc. This process effectively establishes a comprehensive happens-before partial-ordering of program execution. 
 
-We leverage the vector clock updates mechanism of ThreadSanitizer to record the happens-before relationships among concurrent program events.
+We leverage the vector clock updates mechanism of TSan to record the happens-before relationships among concurrent program events.
 
 
 \myparagraph{Dynamic Program Dependence Analysis}
-LLVM's Data-Flow Sanitizer (DFSan) \cite{dfsan2020} is a tool used to detect the effects of program events on one another
+% LLVM's Data-Flow Sanitizer (DFSan) \cite{dfsan2020} is a tool used to detect the effects of program events on one another
 
 % TODO: expand on how Data-Flow Sanitizer maps dependencies and its impact on understanding program behavior dynamically.
 
-LLVM's Data-Flow Sanitizer (DFSan) \cite{dfsan2020} serves as a dynamic analysis tool that traces the influence of specific program events on subsequent operations. This tool is instrumental in identifying dependencies that arise during execution, particularly those impacting data flow and control structures within the program.
+% LLVM's DataFlowSanitizer \cite{dfsan2020} serves as a dynamic analysis tool that traces the influence of specific program events on subsequent operations. This tool is instrumental in identifying dependencies that arise during execution, particularly those impacting data flow and control structures within the program.
 
 
+% LLVM's DataFlowSanitizer (DFSan) \cite{dfsan2020} is a dynamic data flow analysis that is able to tag memory locations and trace their flow throughout the program execution.
 
-as of the time this project was made, DFSAN only produces data-dependencies and not control dependencies.
-We will later see that PD analysis only removes false-positives from the results. Future work could expand on that and add control dependencies to find possible races that we might consider as false-positives
+% We utilize DFSan's memory tagging mechanism to tag read operations and find all tagged reads that have affected a write operation down the line within each thread.
+
+
+% As of today, DFSAN only produces data-dependencies and not control-dependencies.
+% We will later see that PD analysis only removes false-positives from the results. Future work could expand on that and add control dependencies to find possible races that we might consider as false-positives.
+
+
+LLVM's \linebreak DataFlowSanitizer (DFSan) \cite{dfsan2020} is a dynamic data flow analysis tool capable of tagging memory locations and tracing their flow throughout the execution of the program.
+
+We employ DFSan's memory tagging mechanism to label read operations and subsequently track all such tagged reads that influence write operations later in the program within each thread.
+
+Currently, DFSan is limited to producing data-dependency analyses and does not account for control-dependencies. In our discussions, we will observe that while program dependency (PD) analysis helps eliminate false positives from these results, there is potential for future enhancements. Expanding our analysis to include control dependencies could allow for the identification of additional race conditions currently overlooked as false positives.
+
+
+% Note that since we are not trying to find causality between events using DFSan, we ignore cases when a dependency is inter-thread. 
+
+% TODO: explain why only within each thread....
 
 
 % ---------------------------------------------------------
@@ -205,7 +222,7 @@ The graph structures the nodes to reflect the execution of the program threads. 
 The Dynamic Dependency Graph (DDG) \cite{pd1988} is a directed, acyclic graph that models the execution flow of a program as a partial order. In the DDG, each node corresponds to an executed instruction, and directed edges illustrate the dependencies that exist between these instructions.
 Dependencies in a DDG can be classified into several types \cite{pd1992}, primarily including data dependencies and control dependencies. A data dependency arises between two operations when the output of one operation (e.g., a value produced) is required as input for the other operation. Conversely, a control dependency exists when the execution path of one operation depends on the outcome of a conditional branch affecting another operation.
 
-We denote the DDG as $\PDG = (\Nodes, \PDEdges)$. Within this graph, an edge from $\tempNodeOne$ to $\tempNodeTwo$ indicates that the execution of $\tempNodeOne$ relies on the result of $\tempNodeTwo$.
+We denote the DDG by $\PDG = (\Nodes, \PDEdges)$. Within this graph, an edge from $\tempNodeOne$ to $\tempNodeTwo$ indicates that the execution of $\tempNodeOne$ relies on the result of $\tempNodeTwo$.
 Our analysis particularly focuses on dependencies in dynamic executions where a read event $\tempNodeTwo$ precedes the first immediate write event $\tempNodeOne$ within the same thread but on a different cache line. The rationale behind this selective focus will be elaborated upon later.
 % Specifically, in our trace analysis, we restrict $\PDEdges$ to include only dependencies where a read event $\tempNodeTwo$ is followed by the first subsequent write event $\tempNodeOne$ within the same thread and on a different cache line. We will later explain the reasoning for this choice.
 
@@ -231,18 +248,34 @@ We use vector clocks in many ways thought this work. Firstly, they are used by T
 In our analysis we define vector clocks for each event node in the execution.
 We use several types of vector clocks in order to keep track of different states during the execution trace. In general, each vector clock that we define is a $\Threads$ sized vector of event IDs (used like logical clocks) where each index $\Thread$ indicates a some known state from thread $\Thread$.
 
-\myparagraph{Happens-Before Vector Clock (HBVC)}
-Defined for each node $\NodeV \in \Nodes$ as the function $\HBVC{\NodeV}{\Thread,\VarX}: \HBVCDef$. This function determines the index of the latest event in thread $\Thread$ that precedes $\NodeV$ in $\HBG$ and affects the cache line associated with $\VarX$.
+\myparagraph{\NameHAVC (\SignHAVC)}
+Defined for each node $\NodeV \in \Nodes$ as the following function:
+$$\HAVC{\NodeV}{\Thread}: \HAVCDef$$
+This function determines the index of the earliest event in thread $\Thread$ that happens-after $\NodeV$ in $\HBG$.
+An event $\NodeU$ is considered to \textit{happen-after} another event $\NodeV$ if $\HAVC{\NodeV}{\thread{\NodeU}} \leq \idx{\NodeU}$, establishing a causal order between these events.
+
+% $$
+%     \HAVC{\NodeV}{\Thread} = \min \left( \left\{ \IndexI \middle| \ 
+%     \begin{aligned}
+%         & \exists \NodeU \in \Nodes \such \thread{\NodeU} = \Thread \\
+%         & \exists \Path = (\NodeV, \ldots, \NodeU), \text{ path of length } k \geq 1 \\
+%         & \idx{\NodeU} = \IndexI
+%     \end{aligned}
+%     \right\} \right)
+% $$
+
+\myparagraph{\NameHBVC (\SignHBVC)}
+Defined for each node $\NodeV \in \Nodes$ as the following function:
+$$\HBVC{\NodeV}{\Thread,\VarX}: \HBVCDef$$
+This function determines the index of the latest event in thread $\Thread$ that precedes $\NodeV$ in $\HBG$ and affects the cache line associated with $\VarX$.
 An event $\NodeU$ is considered to \textit{happen-before} another event $\NodeV$ if $\idx{\NodeU} \leq \HBVC{\NodeV}{\thread{\NodeU},\var{\NodeU}}$, establishing a causal order between these events.
 
-\myparagraph{Persisted-Before Vector Clock (PBVC)}
-Defined for each node $\NodeV \in \Nodes$ as the function $\PBVC{\NodeV}{\Thread,\VarX}: \PBVCDef$. This function determines the index of the latest event in thread $\Thread$ that precedes $\NodeV$ in $\HBG$, affects the cache line associated with $\VarX$, and ensures that $\VarX$ has been persisted.
+\myparagraph{\NamePBVC (\SignPBVC)}
+Defined for each node $\NodeV \in \Nodes$ as the following function:
+$$\PBVC{\NodeV}{\Thread,\VarX}: \PBVCDef$$
+This function determines the index of the latest event in thread $\Thread$ that precedes $\NodeV$ in $\HBG$, affects the cache line associated with $\VarX$, and ensures that $\VarX$ has been persisted.
 An event $\NodeU$ is considered \textit{persisted-before} another event $\NodeV$ if $\idx{\NodeU} \leq \PBVC{\NodeV}{\thread{\NodeU},\var{\NodeU}}$.
 Persistency here implies that there is a path in the $\HBG$ from $\NodeU$ to $\NodeV$ that contains a Flush event on the cache line associated with $\VarX$.
-
-\myparagraph{Happens-After Vector Clock (HAVC)}
-Defined for each node $\NodeV \in \Nodes$ as the function $\HAVC{\NodeV}{\Thread}: \HAVCDef$. This function determines the index of the earliest event in thread $\Thread$ that happens-after $\NodeV$ in $\HBG$.
-An event $\NodeU$ is considered to \textit{happen-after} another event $\NodeV$ if $\HAVC{\NodeV}{\thread{\NodeU}} \leq \idx{\NodeU}$, establishing a causal order between these events.
 
 % TODO: should we use the word epoch instead of index everywhere?
 
@@ -251,22 +284,49 @@ An event $\NodeU$ is considered to \textit{happen-after} another event $\NodeV$ 
 % Race
 % ~~~~~~~~~~~~~~~~~~~~~~~
 % \subsection{\race Definition}
-\subsection{\race (\cpr)}
+\subsection{\NameRace}
 
-A \race occurs when a write operation to persistent memory (PM) is influenced by a prior read operation from a non-persisted area of PM located on a different cache line.
+A \NameRace occurs when a write operation to persistent memory (PM) is influenced by a prior read operation from a non-persisted area of PM located on a different cache line.
 This scenario risks compromising the integrity of the PM state if the write operation becomes durable before the read areas are persisted.
 % , and such discrepancies are not corrected during the program recovery process.
 
-\begin{definition} %[\race (\cpr)]
+\begin{definition}[\NameRace]
     \label{def:race}
-    A \cpr is defined to occur between a read node $\NodeR \in \ReadNodes$ and a write node $\NodeW \in \WriteNodes$ if both nodes access overlapping memory locations denoted as $\VarX$. Additionally, there exists another write node $\NodeWEx \in \WriteNodes$ that is program-dependent on $\NodeR$, operates on a different cache line, and satisfies the
-    % vector clock % I don't want a new line in the middle of the constraint
-    constraints $\PBVC{\NodeWEx}{\thread{\NodeW}, \VarX} < \idx{\NodeW} < \HAVC{\NodeR}{\thread{\NodeW}}$ and $\PBVC{\NodeWEx}{\thread{\NodeR}, \VarX} < \idx{\NodeR}$.
+    % Option 1
+    % A \NameRace $( \NodeR, \NodeW, \NodeWEx ) \in \ReadNodes \times \WriteNodes \times \WriteNodes$ occurs if all the following are satisfied:
+    % $$
+    % \begin{aligned}
+    %     & \var{\NodeR} = \var{\NodeW} \neq \var{\NodeWEx} \\
+    %     & \thread{\NodeR} = \thread{\NodeWEx} \\
+    %     & \NodeWEx \text{ is program-dependent on } \NodeR \\
+    %     & \PBVC{\NodeWEx}{\thread{\NodeR}, \VarX} < \idx{\NodeR} \\
+    %     & \PBVC{\NodeWEx}{\thread{\NodeW}, \VarX} < \idx{\NodeW} < \HAVC{\NodeR}{\thread{\NodeW}}
+    % \end{aligned}
+    % $$
+    
+    % Option 2
+    % A \NameRace is defined to occur between a read node $\NodeR \in \ReadNodes$ and a write node $\NodeW \in \WriteNodes$ if both nodes access overlapping memory locations denoted as $\VarX$. Additionally, there exists another write node $\NodeWEx \in \WriteNodes$ that is program-dependent on $\NodeR$, operates on a different cache line, and satisfies the
+    % % vector clock % I don't want a new line in the middle of the constraint
+    % constraints $$\PBVC{\NodeWEx}{\thread{\NodeR}, \VarX} < \idx{\NodeR}$$ and $$\PBVC{\NodeWEx}{\thread{\NodeW}, \VarX} < \idx{\NodeW} < \HAVC{\NodeR}{\thread{\NodeW}}$$.
+
+    % Option 3
+    % A \NameRace is defined to occur between a read node $\NodeR \in \ReadNodes$ a write node $\NodeW \in \WriteNodes$ and a program-dependent $\NodeWEx \in \WriteNodes$ such that $(\NodeWEx, \NodeR) \in \PDEdges$, if both $\NodeR$ and $\NodeW$ access overlapping memory locations denoted as $\VarX$, and $\NodeWEx$ operates on a different cache line, and the following constrains are satisfied:
+    % $$\PBVC{\NodeWEx}{\thread{\NodeR}, \VarX} < \idx{\NodeR}$$
+    % $$\PBVC{\NodeWEx}{\thread{\NodeW}, \VarX} < \idx{\NodeW} < \HAVC{\NodeR}{\thread{\NodeW}}$$
+
+    % Option 4
+    A \NameRace is identified between a read node $\NodeR \in \ReadNodes$, a write node $\NodeW \in \WriteNodes$, and a program-dependent write node $\NodeWEx \in \WriteNodes$ where $(\NodeWEx, \NodeR) \in \PDEdges$.
+    
+    For this race to occur, both $\NodeR$ and $\NodeW$ must access the same memory location denoted as $\VarX$, while $\NodeWEx$ must operate on a different cache line.
+    Additionally, the following two constraints are satisfied:
+    $$\PBVC{\NodeWEx}{\thread{\NodeR}, \VarX} < \idx{\NodeR},$$
+    $$\PBVC{\NodeWEx}{\thread{\NodeW}, \VarX} < \idx{\NodeW} < \HAVC{\NodeR}{\thread{\NodeW}}.$$
+
 \end{definition}
 
-The first vector clock constraint ensures that $\NodeW$ does not persist before $\NodeWEx$ and that it does not execute after $\NodeR$. This condition implies that $\NodeW$ either occurs before $\NodeR$ or concurrently with it, thereby allowing $\NodeW$ to potentially influence the value read by $\NodeR$ in certain executions of the program.
+The first vector clock constraint asserts that $\NodeR$ must not be persisted before $\NodeWEx$. If $\NodeR$ persisted before $\NodeWEx$, then there would be no race; the memory location that influences $\NodeWEx$ would already be in a stable persisted state, negating the possibility of a \NameRace.
 
-The second vector clock constraint asserts that $\NodeR$ must not be persisted before $\NodeWEx$. If $\NodeR$ were persisted prior to $\NodeWEx$, then there would be no race; the memory location influencing $\NodeWEx$ would already be in a stable, persisted state, negating the possibility of a persistency race.
+The second vector clock constraint ensures that $\NodeW$ does not persist before $\NodeWEx$ and that it does not execute after $\NodeR$. This condition implies that $\NodeW$ occurs before $\NodeR$ or concurrently with it, allowing $\NodeW$ to potentially influence the value read by $\NodeR$ in certain executions of the program.
 
 % TODO: show interval image
 
@@ -281,23 +341,27 @@ The second vector clock constraint asserts that $\NodeR$ must not be persisted b
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Algorithm}
 \label{sec:algorithm}
-% This section describes the algorithm used to detect {\cprd}s.
+This section presents the algorithm designed to detect {\NameRace}s. The algorithm is comprised of three main stages: Initially, as detailed in \ref{sec:havc}, we construct the \NameHAVC ($\HAVC{}{}$) for each node. Subsequently, in \ref{sec:pbvc}, we develop the \NamePBVC ($\PBVC{}{}$) for each node. Lastly, in \ref{sec:cprd}, we employ these vector clocks to systematically identify {\NameRace}s throughout the program events.
 
+After presenting the algorithm we will show some optimizations, correctness, and runtime complexity.
 
-The algorithm is comprised of three main stages: in \ref{sec:havc} we construct the $\HAVC{}{}$ for each node, in \ref{sec:pbvc} we construct $\PBVC{}{}$ for each node, and in \ref{sec:cprd}, we identify {\cprd}s based on the two functions.
+% This section describes the algorithm used to detect {\NameRace}s. The algorithm is comprised of three main stages: in \ref{sec:havc} we construct the $\HAVC{}{}$ for each node, in \ref{sec:pbvc} we construct $\PBVC{}{}$ for each node, and in \ref{sec:cprd}, we identify {\NameRace}s based on the two functions.
 
 
 % ---------------------------------------------------------
 % Algorithm - 1. HAVC
 % ---------------------------------------------------------
 
-\subsection{Happens-After Vector Clocks Builder}
+\subsection{{\NameHAVC}s Builder}
 \label{sec:havc}
-In \autoref{alg:havc} we iterate over all nodes in the $\HBG$ in post-order search (which insures that we traverse each node after visiting all of its children) and update $\havc{}{}$ accordingly.
-By the end of this algorithm, $\havc{\NodeV}{\Thread} = \HAVC{\NodeV}{\Thread}$ for all nodes $\NodeV \in \Nodes$ and all $\Thread \in \Threads$.
+In \autoref{alg:havc}, we perform a post-order traversal of all nodes in the \HBGName ($\HBG$). This traversal order ensures that each node $\NodeV$ is processed only after all nodes that happen-after it—its descendants—are processed.
+
+During this traversal, the vector clock of each node, $\havc{\NodeV}{}$, is updated to the component-wise minimum of its descendants'
+% children's?
+vector clocks. This update process ensures that the vector clock $\havc{\NodeV}{}$ precisely reflects the \NameHAVC $\HAVC{\NodeV}{}$ for $\NodeV$ by the time its processing is complete, capturing the earliest interaction times dictated by the causal relationships within the $\HBG$.
 
 \begin{algorithm}
-    \caption{Happens-After Vector Clocks Builder}
+    \caption{{\NameHAVC}s Builder}
     \label{alg:havc}
     \Fn{\FHAVC{$\HBG$}}{
         \BlankLine
@@ -307,10 +371,10 @@ By the end of this algorithm, $\havc{\NodeV}{\Thread} = \HAVC{\NodeV}{\Thread}$ 
             \label{alg:havc:mainloop}
             $\havc{\NodeV}{\thread{\NodeV}} \gets \idx{\NodeV}$ \label{alg:havc:initialize} \;
             \BlankLine
-            \ForEach{parent node $\NodeParent$ such that $(\NodeParent, \NodeV) \in \HBEdges$}{
-                \label{alg:havc:parentloop}
+            \ForEach{child node $\NodeChild \such (\NodeV, \NodeChild) \in \HBEdges$}{
+                \label{alg:havc:childloop}
                 \ForEach{$\Thread \in \Threads$}{
-                    $\havc{\NodeParent}{\Thread} \gets \min \left( \havc{\NodeParent}{\Thread}, \havc{\NodeV}{\thread{\NodeV}} \right)$ \label{alg:havc:update} \;
+                    $\havc{\NodeV}{\Thread} \gets \Min{\havc{\NodeV}{\Thread}}{\havc{\NodeChild}{\Thread}}$ \label{alg:havc:update} \;
                 }
             }
         }
@@ -324,15 +388,16 @@ By the end of this algorithm, $\havc{\NodeV}{\Thread} = \HAVC{\NodeV}{\Thread}$ 
 % ---------------------------------------------------------
 % Algorithm - 2. PBVC
 % ---------------------------------------------------------
-
-\subsection{Persisted-Before Vector Clocks Builder}
+\subsection{{\NamePBVC}s Builder}
 \label{sec:pbvc}
-In \autoref{alg:pbvc} we iterate over all nodes in the $\HBG$ in a reversed post-order search (which insures that we traverse each node after visiting all of its parents).
-We define an auxilary function named $\HBVC{}{}$ that is calculated in $\hbvc{}{}$.
-The function $\HBVC{\NodeV}{\Thread,\VarX}$ identifies the index of the last node in thread $\Thread$ concerning variable $\VarX$ that precedes node $\NodeV$.
+In \autoref{alg:pbvc}, we perform a reversed post-order traversal of all nodes in the \HBGName ($\HBG$). This traversal order ensures that each node $\NodeV$ is processed only after all nodes that happen-before it—its ancestors—have been visited.
+
+During the traversal, we update two vector clocks for each node $\NodeV$: the \NameHBVC ($\hbvc{\NodeV}{}$) and the \NamePBVC ($\pbvc{\NodeV}{}$). Each vector clock is updated to the component-wise maximum of the vector clocks of its ancestors to ensure it captures the most comprehensive interaction history. Specifically, if $\NodeV$ is a flush node, $\pbvc{\NodeV}{}$ is updated to match $\hbvc{\NodeV}{}$, signaling that all interactions up to this flush are now considered persisted.
+
+We maintain a separate vector clock for each variable to accurately track and reflect the effects of flush events on corresponding variables (practically, on the relevant cache lines).
 
 \begin{algorithm}
-    \caption{Persisted-Before Vector Clocks Builder}
+    \caption{{\NamePBVC}s Builder}
     \label{alg:pbvc}
     \Fn{\FPBVC{$\HBG$}}{
         \BlankLine
@@ -340,32 +405,28 @@ The function $\HBVC{\NodeV}{\Thread,\VarX}$ identifies the index of the last nod
         Initialize $\pbvc{\NodeV}{\Thread, \VarX} \gets -\infty$ \hfill $\forall \NodeV \in \Nodes, \Thread \in \Threads, \VarX \in \Vars$ \;
         \BlankLine
         \ForEach{node $\NodeV$ in $\HBG$ in reversed post-order}{
+            $\hbvc{\NodeV}{\thread{\NodeV},\var{\NodeV}} \gets \idx{\NodeV}$\;
         
-            % RW
             \BlankLine
-            \Comment*[l]{Handle Read and Write nodes}
-            \If{$\NodeV \in \ReadNodes \cup \WriteNodes$}{
-                $\hbvc{\NodeV}{\thread{\NodeV},\var{\NodeV}} \gets \idx{\NodeV}$\;
-            }
-        
-            % F
-            \BlankLine
-            \Comment*[l]{Handle Flush nodes}
-            \If{$\NodeV \in \FlushNodes$}{
+            
+            % Take from parents
+            % \Comment*[l]{Learn from parent nodes}
+            \ForEach{parent node $\NodeParent$ \such $(\NodeParent, \NodeV) \in \HBEdges$}{
                 \ForEach{$\Thread \in \Threads$}{
-                    $\pbvc{\NodeV}{\Thread,\var{\NodeV}} \gets \hbvc{\NodeV}{\Thread,\var{\NodeV}}$\;
+                    \ForEach{$\VarY \in {\Vars}$}{
+                        $\hbvc{\NodeV}{\Thread,\VarY} \gets \max \left( \hbvc{\NodeV}{\Thread,\VarY}, \hbvc{\NodeParent}{\Thread,\VarY} \right)$\;
+                        $\pbvc{\NodeV}{\Thread,\VarY} \gets \max \left( \pbvc{\NodeV}{\Thread,\VarY}, \pbvc{\NodeParent}{\Thread,\VarY} \right)$\;
+                    }
                 }
             }
         
-            % Pass to children
             \BlankLine
-            \Comment*[l]{Handle children nodes}
-            \ForEach{child node $\NodeChild$ such that $(\NodeV, \NodeChild) \in \HBEdges$}{
+            
+            % F
+            % \Comment*[l]{Handle Flush nodes}
+            \If{$\NodeV \in \FlushNodes$}{
                 \ForEach{$\Thread \in \Threads$}{
-                    \ForEach{$\VarY \in {\Vars}$}{
-                        $\hbvc{\NodeChild}{\Thread,\VarY} \gets \max \left( \hbvc{\NodeChild}{\Thread,\VarY}, \hbvc{\NodeV}{\Thread,\VarY} \right)$\;
-                        $\pbvc{\NodeChild}{\Thread,\VarY} \gets \max \left( \pbvc{\NodeChild}{\Thread,\VarY}, \pbvc{\NodeV}{\Thread,\VarY} \right)$\;
-                    }
+                    $\pbvc{\NodeV}{\Thread,\var{\NodeV}} \gets \hbvc{\NodeV}{\Thread,\var{\NodeV}}$\;
                 }
             }
         }
@@ -380,14 +441,12 @@ The function $\HBVC{\NodeV}{\Thread,\VarX}$ identifies the index of the last nod
 % Algorithm - 3. CPRD
 % ---------------------------------------------------------
 
-\subsection{Concurrent Persistence Race Detector}
+\subsection{\NameRaceDetector}
 \label{sec:cprd}
-In \autoref{alg:cprd} we use the previously built $\HAVC{}{}$ and $\PBVC{}{}$ to find the {\racerange}s of each write event node.
-For each write node $\NodeWEx \in \WriteNodes$ we look at the dependent read node $\NodeR \in \ReadNodes$
-% TODO
+In \autoref{alg:cprd}, we utilize the previously constructed {\NameHAVC}s (\SignHAVC) and {\NamePBVC}s (\SignPBVC) to detect {\NameRace}s as defined in \autoref{def:race}. We examine each program-dependency edge from the \PDGName ($\PDG$), targeting scenarios where the read operation $\NodeR$ is not yet persisted. For each valid dependency, our goal is to identify write nodes $\NodeW$ that access the same memory location as $\NodeR$ and fall within the critical time window defined by $\NodeR$'s persistency and its subsequent interactions.
 
 \begin{algorithm}
-    \caption{Concurrent Persistence Race Detector}
+    \caption{\NameRaceDetector}
     \label{alg:cprd}
     % \newcommand{\DependentNodeVar}{\NodeV}
     \newcommand{\DependentNodeVar}{\NodeWEx}
@@ -395,32 +454,52 @@ For each write node $\NodeWEx \in \WriteNodes$ we look at the dependent read nod
         $\havc{}{} \gets \FHAVC{\HBG}$\;
         $\pbvc{}{} \gets \FPBVC{\HBG}$\;
         $\races \gets \EmptySet$\;
+        
         \BlankLine
-        \ForEach{write node $\DependentNodeVar \in \WriteNodes$ in $\HBG$}{
-            \ForEach{read node $\NodeR \in \ReadNodes$ such that $\PD{\DependentNodeVar}{\NodeR}$ in $\PDG$}{
+        
+        \ForEach{program-dependency $(\DependentNodeVar, \NodeR) \in \PDEdges$}{
+
+        % \ForEach{write node $\DependentNodeVar \in \WriteNodes$ in $\HBG$}{
+            % \ForEach{read node $\NodeR \in \ReadNodes \such (\DependentNodeVar, \NodeR) \in \PDEdges$}{
                 % TODO: explain that t wasn't changed or something
-                \Assert{$\thread{\NodeR} = \thread{\DependentNodeVar}$} \; % \Comment*[r]{The 2 nodes are on the same thread}
+                % \Assert{$\thread{\NodeR} = \thread{\DependentNodeVar}$} \; % \Comment*[r]{The 2 nodes are on the same thread}
                 
-                \BlankLine
-                \Comment*[l]{If the dependent node and the read node are of the same variable, there is not bug}
-                \If{$\var{\DependentNodeVar} = \var{\NodeR}$}{
-                    \Continue\;
-                }
+                % \BlankLine
                 
+                % \Comment*[l]{If the dependent node and the read node are of the same variable, there is not bug}
+                % \If{$\var{\DependentNodeVar} = \var{\NodeR}$}{
+                %     \Continue\;
+                % }
+
+                \Assert{$\thread{\NodeR} = \thread{\DependentNodeVar}$} \;
+                \Assert{$\var{\NodeR} \neq \var{\DependentNodeVar}$} \;
+
                 \BlankLine
-                \Comment*[l]{If the read node is persisted, there is not bug}
-                \If{$\idx{\NodeR} \leq \pbvc{\DependentNodeVar}{\thread{\DependentNodeVar},\var{\NodeR}}$}{
+                
+                \Comment*[l]{No bug if $\NodeR$ is persisted}
+                \If{$\idx{\NodeR} \leq \pbvc{\DependentNodeVar}{\thread{\NodeR},\var{\NodeR}}$}{
                     \Continue\;
                 }
 
                 \BlankLine
-                \ForEach{write node $\NodeW \in \WriteNodes$ such that $\var{\NodeW} = \var{\NodeR}$}{
+                
+                \ForEach{ $\NodeW \in \WriteNodes \such \var{\NodeW} = \var{\NodeR}$}{
+                
                     \BlankLine
-                    \If{$\pbvc{\DependentNodeVar}{\thread{\NodeW},\var{\NodeW}} < \idx{\NodeW} < \havc{\NodeR}{\thread{\NodeW}}$}{
-                        $\races \gets \races \cup {(\NodeR, \NodeW)}$\;
+
+                    % TODO: choose one...
+                    % \If{$\pbvc{\DependentNodeVar}{\thread{\NodeW},\var{\NodeW}} < \idx{\NodeW} < \havc{\NodeR}{\thread{\NodeW}}$}{
+                    \If{$\pbvc{\DependentNodeVar}{\thread{\NodeW},\var{\NodeW}} < \idx{\NodeW}$ and $\idx{\NodeW} < \havc{\NodeR}{\thread{\NodeW}}$}{
+                    
+                        \BlankLine
+                        
+                        $\races \gets \races \cup \{(\NodeR, \NodeW, \DependentNodeVar)\}$\;
+                        
+                        \BlankLine
+                        
                     }
                 }
-            }
+            % }
         
         }
         \BlankLine

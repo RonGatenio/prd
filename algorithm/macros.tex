@@ -14,7 +14,6 @@
 \usepackage{amsthm, thmtools}
 
 
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Macros
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -23,24 +22,41 @@
 % Names
 % ---------------------------------------------------------
 
-\newcommand{\cprd}{CPRD\xspace}
-\newcommand{\myrace}{Concurrent Persistency Race\xspace}
-\newcommand{\pmracerace}{PM Inter-thread Inconsistency\xspace}
-\newcommand{\race}{\myrace}
+% \newcommand{\cpr}{CPR\xspace}
+% \newcommand{\cprd}{CPRD\xspace}
+% \newcommand{\myrace}{Persistency Race\xspace}
+% \newcommand{\pmracerace}{PM Inter-thread Inconsistency\xspace}
+\newcommand{\NamePMRaceRace}{PM Inter-thread Inconsistency\xspace}
+% \newcommand{\race}{\myrace}
 % \renewcommand{\race}{PM Inter-thread Inconsistency\xspace}
 
-\newcommand{\racerange}{\myrace Range}
-\newcommand{\racedetector}{\myrace Detector}
+\newcommand{\NameRace}{Persistency Race\xspace}
+\newcommand{\SignRace}{PR\xspace}
 
-\newcommand{\nodename}[1]{\textbf{\MakeUppercase{#1}} event node\xspace}
-\renewcommand{\nodename}[1]{#1 event node\xspace}
-\newcommand{\readnode}{\nodename{read}}
-\newcommand{\writenode}{\nodename{write}}
-\newcommand{\flushnode}{\nodename{flush}}
+\newcommand{\NameRaceDetector}{\NameRace Detector\xspace}
+\newcommand{\SignRaceDetector}{PRD\xspace}
 
-\newcommand{\happenbefore}{happen-before\xspace}
+\newcommand{\NameHAVC}{Happens-After Vector Clock\xspace}
+\newcommand{\SignHAVC}{HAVC\xspace}
+\newcommand{\NameHBVC}{Happens-Before Vector Clock\xspace}
+\newcommand{\SignHBVC}{HBVC\xspace}
+\newcommand{\NamePBVC}{Persisted-Before Vector Clock\xspace}
+\newcommand{\SignPBVC}{PBVC\xspace}
+
+
+
+% \newcommand{\racerange}{\myrace Range}
+% \newcommand{\racedetector}{\myrace Detector}
+
+% \newcommand{\nodename}[1]{\textbf{\MakeUppercase{#1}} event node\xspace}
+% \renewcommand{\nodename}[1]{#1 event node\xspace}
+% \newcommand{\readnode}{\nodename{read}}
+% \newcommand{\writenode}{\nodename{write}}
+% \newcommand{\flushnode}{\nodename{flush}}
+
+% \newcommand{\happenbefore}{happen-before\xspace}
 % \newcommand{\happenbeforeedge}{\happenbefore edge\xspace}
-\newcommand{\programdependent}{program-dependent\xspace}
+% \newcommand{\programdependent}{program-dependent\xspace}
 
 
 % ---------------------------------------------------------
@@ -68,6 +84,7 @@
 % ---------------------------------------------------------
 
 \newcommand{\such}{\ensuremath{.\;}}
+\renewcommand{\such}{\ensuremath{\ s.t.\ }}
 
 
 % ---------------------------------------------------------
@@ -78,6 +95,9 @@
 % \newcommand{\EmptySet}{\DefSet{\emptyset}}
 \newcommand{\EmptySet}{\DefSet{\varnothing}}
 \newcommand{\bigO}[1]{\ensuremath{\mathcal{O}\left(#1\right)}}
+
+\newcommand{\Min}[2]{\ensuremath{\min\left(#1, #2\right)}}
+\newcommand{\Max}[2]{\ensuremath{\max\left(#1, #2\right)}}
 
 
 % ---------------------------------------------------------
@@ -103,7 +123,7 @@
 \newcommand{\FlushNodes}[1][]{\DefSet[#1]{F}}
 
 \newcommand{\IDs}{\DefSet{IDs}}
-\renewcommand{\IDs}{\N}
+% \renewcommand{\IDs}{\N}
 
 % \newcommand{\Path}{\DefSet{P}}
 \newcommand{\Path}{\overset{\to}{\DefSet{p}}}
