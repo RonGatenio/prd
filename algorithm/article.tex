@@ -73,7 +73,7 @@ Nonvolatile memory (NVM) technologies, such as Intel’s Optane DC Persistent Me
 
 To ensure consistency of NVM state, developers need to explicitly evict cache lines to the NVM. This can be done with explicit flush (e.g., CLWB) and fence (e.g., SFENCE) instructions \cite{intel2020abi}. Due to the need to ensure correct cache line evictions, even experienced programmers may introduce inconsistency bugs, if they are not experienced with PM programming practices. This introduces a need for special bug detectors that could help developers find such complicated bugs. Previous bug detectors, aimed at detecting data inconsistencies, won’t necessarily be able to find NVM related bugs. This type of programming model that uses byte addressable persistent memory did not exist before. 
 
-In this work, we focus on a specific type of bug that can be introduced in concurrent NVM programs. Previously coined as \NamePMRaceRace \cite{pmrace2022}, a bug that occurs when an NVM location affects data written to another NVM location before being persisted. Such bug can cause an inconsistent NVM state after a crash if the affected written address got persisted before the read address. In the following, we refer to this bug as \textbf{\race}.
+In this work, we focus on a specific type of bug that can be introduced in concurrent NVM programs. Previously coined as \NamePMRaceRace \cite{pmrace2022}, a bug that occurs when an NVM location affects data written to another NVM location before being persisted. Such bug can cause an inconsistent NVM state after a crash if the affected written address got persisted before the read address. In the following, we refer to this bug as \textbf{\NameRace}.
 
 Previous work \cite{pmrace2022} attempted to detect the bug using a smart fuzzing technique to explore the inter-thread interleaving of the program.
 We attempt to solve the interleaving exploration using a vector clock analysis that detects happens-before relations between program events \cite{lamport1978}.
@@ -97,14 +97,17 @@ A \HBGName, denoted as $\HBG$, and a \PDGName \cite{pd1991} denoted as $\PDG$
 % TODO: write about other sections
 % TODO: conclude the intro
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Preliminaries
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Preliminaries}
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Background and Preliminaries
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% \section{Preliminaries}
-% \section{Background}
-\section{Background and Preliminaries}
-\label{sec:preliminaries}
+% % \myparagraph{PM}
+% \myparagraph{PMRace}
+% % \myparagraph{LLVM Instrumentation}
+% \myparagraph{Happens-Before}
+% \myparagraph{Program-Dependence}
+
 
 \subsection{Persistent Memory Programming}
 % TODO: write a comprehensive introduction and explanation about persistent memory programming paradigms, technologies, and their applications in modern computing.
@@ -138,51 +141,82 @@ A \HBGName, denoted as $\HBG$, and a \PDGName \cite{pd1991} denoted as $\PDG$
 % In conclusion, persistent memory programming paradigms and technologies are pivotal in harnessing the full capabilities of this innovative memory class. As applications continue to demand faster access to increasing volumes of data, persistent memory is set to play a critical role in the evolution of data centers, cloud platforms, and high-performance computing environments.
 
 
-
 \subsection{Program Instrumentation}
+% TODO: explain LLVM...
+% TODO: This explains what we are doing as well... should this be somewhere else?
 Program instrumentation involves recording runtime events to analyze the behavior of a program during its execution. By leveraging LLVM's Intermediate Representation (IR) for instrumentation, we systematically track every access to persistent memory (PM), including reads, writes, and explicit memory synchronization commands such as flush and fence instructions. Additionally, we utilize LLVM's ThreadSanitizer \cite{tsan2009}, originally used for identifying potential data races, for capturing happens-before relations, and LLVM's DataFlowSanitizer \cite{dfsan2020} for identifying program dependency relations among execution events at runtime.
 
 
-\myparagraph{Happens-Before Analysis}
-LLVM's ThreadSanitizer \linebreak (TSan), originally developed by Google \cite{tsan2009} and now maintained by The Clang Team \cite{tsandoc}, is a tool that detects and reports data races through program instrumentation. TSan utilizes vector clocks to monitor thread interactions including thread creations, lock acquisitions, and atomic operations such as compare-and-swap, fetch-and-add, etc. This process effectively establishes a comprehensive happens-before partial-ordering of program execution. 
+\subsection{Happens-Before}
+The happens-before relation that determines a causal relation between event in a program execution. Originally formulated by Leslie Lamport \cite{lamport1978}.
+
+\myparagraph{\HBGName}
+Lamport’s happens-before graph (HBG) \cite{lamport1978} is a theoretical construct used to model the execution dynamics of concurrent programs. Within this graph, every executed instruction is represented as a node, and directed edges between these nodes create a partial-order that outlines the execution order between instructions.
+This abstraction is particularly useful for analyzing concurrent executions \cite{chess2008}, as it decouples the execution order from the actual timing of instructions. Consequently, different executions that may run at varying speeds but share the same happens-before graph are considered behaviorally equivalent, reflecting consistent execution behavior despite temporal differences.
+
+\myparagraph{Vector Clocks}
+Vector clocks, based on Lamport's timestamps \cite{lamport1978} and further developed in \cite{fidge1987vc} and \cite{mattern1988vc}, are a widely used method to capture the causality between events in parallel and distributed systems, and to determine the happens-before partial-order between them. Intuitively, vector clocks represent the known state of execution across all program threads, from the view of a single event in the execution.
+% Vector clocks, building upon Lamport's timestamps \cite{lamport1978} and further developed in \cite{fidge1987vc} and \cite{mattern1988vc}, are a widely used mechanism for capturing causality among events in parallel and distributed systems. 
+% This tool is used to determine the happens-before partial-order of the executed program events. Intuitively, vector clocks represent the known state of execution across all program threads, from the view of a single event in the execution.
+
+\myparagraph{ThreadSanitizer (TSan)}
+LLVM's TSan \cite{tsandoc}, originally developed by Google \cite{tsan2009} and now maintained by The Clang Team, is a tool that detects and reports data races through program instrumentation. TSan utilizes vector clocks to monitor thread interactions including thread creations, lock acquisitions, and atomic operations such as compare-and-swap, fetch-and-add, etc. This process effectively establishes a comprehensive happens-before partial-ordering of program execution. 
 
 We leverage the vector clock updates mechanism of TSan to record the happens-before relationships among concurrent program events.
 
 
-\myparagraph{Dynamic Program Dependence Analysis}
-% LLVM's Data-Flow Sanitizer (DFSan) \cite{dfsan2020} is a tool used to detect the effects of program events on one another
+\subsection{Program Dependence Analysis}
+Program dependency is a relation between two instructions or statements, $S1$ and $S2$. This relation exists if the outcome of $S1$ directly influences the outcome of $S2$, necessitating that $S1$ be executed before $S2$ to ensure correct program behavior.
+% There are two main types of program-dependencies:
+
+\myparagraph{\PDGName}
+% TODO: choose who to site. the definition here is from pd1992. \cite{pd1988} \cite{pd1990} \cite{pd1991} \cite{pd1992} \cite{pd1994book}
+The \PDGName ($\PDG$) \cite{pd1988} is a directed, acyclic graph that models the execution flow of a program as a partial order. In the $\PDG$, each node corresponds to an executed instruction, and directed edges illustrate the dependencies that exist between these instructions.
+Dependencies in a $\PDG$ can be classified into several types \cite{pd1992}, primarily including data dependencies and control dependencies. A data dependency arises between two operations when the output of one operation (e.g., a value produced) is required as input for the other operation. Conversely, a control dependency exists when the execution path of one operation depends on the outcome of a conditional branch affecting another operation.
+
+
+\myparagraph{DataFlowSanitizer (DFSan)}
 
 % TODO: expand on how Data-Flow Sanitizer maps dependencies and its impact on understanding program behavior dynamically.
 
-% LLVM's DataFlowSanitizer \cite{dfsan2020} serves as a dynamic analysis tool that traces the influence of specific program events on subsequent operations. This tool is instrumental in identifying dependencies that arise during execution, particularly those impacting data flow and control structures within the program.
-
-
-% LLVM's DataFlowSanitizer (DFSan) \cite{dfsan2020} is a dynamic data flow analysis that is able to tag memory locations and trace their flow throughout the program execution.
-
-% We utilize DFSan's memory tagging mechanism to tag read operations and find all tagged reads that have affected a write operation down the line within each thread.
-
-
-% As of today, DFSAN only produces data-dependencies and not control-dependencies.
-% We will later see that PD analysis only removes false-positives from the results. Future work could expand on that and add control dependencies to find possible races that we might consider as false-positives.
-
-
-LLVM's \linebreak DataFlowSanitizer (DFSan) \cite{dfsan2020} is a dynamic data flow analysis tool capable of tagging memory locations and tracing their flow throughout the execution of the program.
+LLVM's DFSan \cite{dfsan2020} is a dynamic data flow analysis tool capable of tagging memory locations and tracing their flow throughout the execution of the program.
 
 We employ DFSan's memory tagging mechanism to label read operations and subsequently track all such tagged reads that influence write operations later in the program within each thread.
 
 Currently, DFSan is limited to producing data-dependency analyses and does not account for control-dependencies. In our discussions, we will observe that while program dependency (PD) analysis helps eliminate false positives from these results, there is potential for future enhancements. Expanding our analysis to include control dependencies could allow for the identification of additional race conditions currently overlooked as false positives.
-
 
 % Note that since we are not trying to find causality between events using DFSan, we ignore cases when a dependency is inter-thread. 
 
 % TODO: explain why only within each thread....
 
 
+\subsection{PMRace / \NamePMRaceRace}
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Data Structures and Definitions
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% \section{Background}
+% \section{Background and Preliminaries}
+\section{Data Structures and Definitions}
+
 % ---------------------------------------------------------
 % Definitions - Program Trace Representation
 % ---------------------------------------------------------
-\subsection{Program Trace Representation}
+% \subsection{Program Trace Representation}
 The program trace categorizes events into three main types: event nodes $\Nodes$, happens-before edges $\HBEdges$, and program dependency edges $\PDEdges$. We denote the subsets of Read, Write, and Flush event nodes as $\ReadNodes$, $\WriteNodes$, and $\FlushNodes$, respectively. Each event node $\NodeV$ is associated with a variable $\var{\NodeV} \in \Vars$ indicating the memory address accessed, and a thread $\thread{\NodeV} \in \Threads$ indicating the executing thread. Each event node is also sequentially identified by $\idx{\NodeV} \in \IDs$ within its thread, reflecting the execution order.
+
+
+
+
+
+
+
+
+
+
+
 
 
 % ---------------------------------------------------------
@@ -196,15 +230,15 @@ The execution trace is modeled using two directed acyclic graphs (DAGs):
 % HBG
 % ~~~~~~~~~~~~~~~~~~~~~~~
 \myparagraph{\HBGName}
-
-% TODO: the first paragraph could go to the background section
-
-Lamport’s happens-before graph (HBG) \cite{lamport1978} is a theoretical construct used to model the execution dynamics of concurrent programs. Within this graph, every executed instruction is represented as a node, and directed edges between these nodes create a partial-order that outlines the execution order between instructions.
-This abstraction is particularly useful for analyzing concurrent executions \cite{chess2008}, as it decouples the execution order from the actual timing of instructions. Consequently, different executions that may run at varying speeds but share the same happens-before graph are considered behaviorally equivalent, reflecting consistent execution behavior despite temporal differences.
-% Previous works have also modeled program execution in this way \cite{chess2008}.
-
-We abstract the program execution with a happens-before graph and denote it as $\HBG = (\Nodes, \HBEdges)$. A directed path from node $\NodeE_1$ to node $\NodeE_2$ implies that the event at $\NodeE_1$ happens-before the event at $\NodeE_2$, establishing a precedence relation.
+We abstract the program execution with a \HBGName and denote it as $\HBG = (\Nodes, \HBEdges)$. A directed path from node $\NodeE_1$ to node $\NodeE_2$ implies that the event at $\NodeE_1$ happens-before the event at $\NodeE_2$, establishing a precedence relation.
 The graph structures the nodes to reflect the execution of the program threads. Nodes within the same thread are linked by intra-thread edges, illustrating sequential execution steps, while nodes across different threads are linked by inter-thread edges, demonstrating the happens-before relationship between them.
+
+% TODO: HBG constrains:
+%       - deg_out(v) <= T, deg_in(v) <= T
+%       PDG constrains:
+%       - deg_in(r) <= 1
+%       - only first w that var(w) != var(r) and in the same thread
+%           - explain the same thread thing and in general why only the first
 
 
 % ~~~~~~~~~~~~~~~~~~~~~~~
@@ -218,11 +252,8 @@ The graph structures the nodes to reflect the execution of the program threads. 
 \renewcommand{\tempNodeOne}{\ensuremath{\NodeWEx}}
 \renewcommand{\tempNodeTwo}{\ensuremath{\NodeR}}
 
-% TODO: choose who to site. the definition here is from pd1992. \cite{pd1988} \cite{pd1990} \cite{pd1991} \cite{pd1992} \cite{pd1994book}
-The Dynamic Dependency Graph (DDG) \cite{pd1988} is a directed, acyclic graph that models the execution flow of a program as a partial order. In the DDG, each node corresponds to an executed instruction, and directed edges illustrate the dependencies that exist between these instructions.
-Dependencies in a DDG can be classified into several types \cite{pd1992}, primarily including data dependencies and control dependencies. A data dependency arises between two operations when the output of one operation (e.g., a value produced) is required as input for the other operation. Conversely, a control dependency exists when the execution path of one operation depends on the outcome of a conditional branch affecting another operation.
-
-We denote the DDG by $\PDG = (\Nodes, \PDEdges)$. Within this graph, an edge from $\tempNodeOne$ to $\tempNodeTwo$ indicates that the execution of $\tempNodeOne$ relies on the result of $\tempNodeTwo$.
+% TODO: Using the trace from DFSan...
+We abstract the program-dependence analysis with a \PDGName and denote it as $\PDG = (\Nodes, \PDEdges)$. Within this graph, an edge from $\tempNodeOne$ to $\tempNodeTwo$ indicates that the execution of $\tempNodeOne$ relies on the result of $\tempNodeTwo$.
 Our analysis particularly focuses on dependencies in dynamic executions where a read event $\tempNodeTwo$ precedes the first immediate write event $\tempNodeOne$ within the same thread but on a different cache line. The rationale behind this selective focus will be elaborated upon later.
 % Specifically, in our trace analysis, we restrict $\PDEdges$ to include only dependencies where a read event $\tempNodeTwo$ is followed by the first subsequent write event $\tempNodeOne$ within the same thread and on a different cache line. We will later explain the reasoning for this choice.
 
@@ -237,13 +268,9 @@ Our analysis particularly focuses on dependencies in dynamic executions where a 
 % ~~~~~~~~~~~~~~~~~~~~~~~
 % Vector Clocks
 % ~~~~~~~~~~~~~~~~~~~~~~~
-\subsection{State Vector Clocks}
-Vector clocks, based on Lamport's timestamps \cite{lamport1978} and further developed in \cite{fidge1987vc} and \cite{mattern1988vc}, are a widely used method to capture the causality between events in parallel and distributed systems, and to determine the happens-before partial-order between them. Intuitively, vector clocks represent the known state of execution across all program threads, from the view of a single event in the execution.
-% Vector clocks, building upon Lamport's timestamps \cite{lamport1978} and further developed in \cite{fidge1987vc} and \cite{mattern1988vc}, are a widely used mechanism for capturing causality among events in parallel and distributed systems. 
-% This tool is used to determine the happens-before partial-order of the executed program events. Intuitively, vector clocks represent the known state of execution across all program threads, from the view of a single event in the execution.
+\subsection{Causal State Vector Clocks}
 
-
-We use vector clocks in many ways thought this work. Firstly, they are used by ThreadSanitizer \cite{tsan2009} to determine the happens-before relations in the program's execution. Secondly, use the same concept in our \HBGName analysis to determine different states of persistency and ordering of events in the program execution trace.
+The vector clocks concept is used in many ways thought this work. Firstly, they are used by ThreadSanitizer \cite{tsan2009} to determine the happens-before relations in the program's execution. Secondly, use the same concept in our \HBGName analysis to determine different states of persistency and ordering of events in the program execution trace.
 
 In our analysis we define vector clocks for each event node in the execution.
 We use several types of vector clocks in order to keep track of different states during the execution trace. In general, each vector clock that we define is a $\Threads$ sized vector of event IDs (used like logical clocks) where each index $\Thread$ indicates a some known state from thread $\Thread$.
@@ -509,12 +536,27 @@ In \autoref{alg:cprd}, we utilize the previously constructed {\NameHAVC}s (\Sign
 
 
 % ---------------------------------------------------------
-% Algorithm - Improvments
+% Algorithm - Optimization
 % ---------------------------------------------------------
 
-\subsection{Algorithm Improvements}
+\subsection{Algorithm Optimizations}
+In this section we will discuss optimizations to the algorithm that helped the implementation and performance.
 
-In practice, we combine the 2 last algorithm to one iteration over all the nodes. This is acceptable since when reaching a node $\NodeV$ we already know $\HAVC{\NodeV}{}$ and $\PBVC{\NodeV}{}$.
+\myparagraph{Reducing Steps}
+In practice, we combine the two last algorithm to one iteration over all the nodes. This is acceptable since when reaching a node $\NodeV$ we already know $\HAVC{\NodeV}{}$ and $\PBVC{\NodeV}{}$.
+
+\myparagraph{Reducing Memory Usage}
+In \autoref{alg:pbvc}, instead of storing a $\hbvc{\NodeV}{\Thread, \VarX} and  \pbvc{\NodeV}{\Thread, \VarX}\forall \NodeV \in \Nodes, \Thread \in \Threads, \VarX \in \Vars$, we only store one for each thread and 
+propegate 
+
+\myparagraph{Dirty Variables Vector Clock (DVVC)}
+In \autoref{alg:pbvc} we have to iterate over all variables $\VarY \in \Vars$ since we must update all vector clocks.
+This introduces a performance problem since $\abs{\Vars} \approx \abs{\Nodes}$ which can become really big.
+To resolve this, we wanted to update the vector clocks relating only to the variables that there really is a need to update us about.
+
+\myparagraph{Cache Lines Linked Lists}
+the daisy chains
+
 
 In addition, 
 
@@ -536,7 +578,7 @@ In \autoref{alg:cprd} we effectively iterate over all edges in $\PDEdges$. So,
 $\bigO{\abs{\PDEdges}\cdot\abs{\WriteNodes}} \approx \bigO{\abs{\Nodes}^2}$
 
 
-In practice, we store linked lists in each thread between event nodes that affect the same cache line. This allows us to quickly iterate over the possible violating write nodes in the \racerange.
+In practice, we store linked lists in each thread between event nodes that affect the same cache line. This allows us to quickly iterate over the possible violating write nodes in the racerange.
 
 The most important optimization is that of dirty cache lines bookkeeping.
 We maintain in each thread a set of all cache lines that were operated by the event nodes (written to, read from or flushed)
