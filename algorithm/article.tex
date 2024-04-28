@@ -15,7 +15,7 @@
 
 \begin{document}
 
-\title{\myrace Detection}
+\title{\NameRace Detection}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Authors
@@ -45,10 +45,14 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \begin{abstract}
 
-The introduction of new NVM technologies with byte addressable access and DRAM performance has increased interest in developing crash-consistent software.
-This type of software introduces a new type of inconsistency bugs between the volatile CPU cache and the persistent NVM state.
+% The introduction of new Nonvolatile Memory (NVM) technologies with byte-addressable access and DRAM performance has increased the interest in developing crash-consistent software. However, these features introduce complex challenges in ensuring data consistency, especially under concurrent access scenarios.
 
-This research introduces \SignRaceDetector, a concurrent NVM bug detector that analyzes the program trace using a graph search algorithm.
+Nonvolatile Memory (NVM) technologies like Intel’s Optane offer new avenues for building high-performance and crash-consistent applications by combining byte-addressable DRAM-like characteristics with non-volatility. However, these features introduce complex challenges in ensuring data consistency, especially under concurrent access scenarios.
+
+This paper introduces \SignRaceDetector, a specialized tool designed to detect {\NameRace}s—specific type of concurrency bugs in PM environments that can lead to critical inconsistencies following system failures.
+\SignRaceDetector utilizes graph-theoretical analysis along with happens-before and program-dependence analysis to map causal relationships and dependencies among program operations. By leveraging these analyses, \SignRaceDetector efficiently generalizes across multiple thread interleavings to detect potential races within a single program execution, significantly enhancing the speed and efficiency of race detection.
+
+% TODO: write about the evaluation results
 
 \end{abstract}
 
@@ -62,45 +66,25 @@ This research introduces \SignRaceDetector, a concurrent NVM bug detector that a
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Introduction}
 
-\iffalse
-TODO:
-Background
-This paper presents CPRD, ...
-The sections are ...
-\fi
+Nonvolatile Memory (NVM) technologies such as Intel’s Optane DC Persistent Memory \cite{intel2019optane} integrate the persistence of traditional storage with the performance characteristics of DRAM. This unique combination facilitates direct, byte-addressable access to persistent data, unlocking the potential for crash-consistent applications that previously would have incurred significant storage overhead. However, despite these advantages, the integration of NVM into existing computing paradigms introduces new complexities, particularly in ensuring data consistency across volatile and persistent memory layers.
 
-Nonvolatile memory (NVM) technologies, such as Intel’s Optane DC Persistent Memory \cite{intel2019optane}, offer both persistence similar to disks with performance close to that of DRAM. NVM storage is accessed, like DRAM, with load and store instructions. This provides new opportunities to design crash-consistent software without high storage overhead. However, designing and implementing such programs is difficult. NVM data on a volatile cache may not persist after a crash, and it may also evict cache lines in an arbitrary order, which may differ from the program’s store order.
+In the realm of NVM, data residing on volatile CPU caches does not automatically persist upon power failures, and cache lines may be evicted in a sequence that diverges from the program’s actual store order. This inconsistency poses a challenge: to guarantee data persistence, developers must manually manage cache line eviction using explicit flush (e.g., CLWB) and fence (e.g., SFENCE) instructions \cite{intel2020abi}. Unfortunately, even experienced developers can introduce bugs into their programs if they are not thoroughly acquainted with these persistent memory (PM) programming models, necessitating bug detection tools specifically engineered for NVM-related inconsistencies.
 
-To ensure consistency of NVM state, developers need to explicitly evict cache lines to the NVM. This can be done with explicit flush (e.g., CLWB) and fence (e.g., SFENCE) instructions \cite{intel2020abi}. Due to the need to ensure correct cache line evictions, even experienced programmers may introduce inconsistency bugs, if they are not experienced with PM programming practices. This introduces a need for special bug detectors that could help developers find such complicated bugs. Previous bug detectors, aimed at detecting data inconsistencies, won’t necessarily be able to find NVM related bugs. This type of programming model that uses byte addressable persistent memory did not exist before. 
+This work targets a specific concurrency-related bug prevalent in NVM programs, originally identified as \NamePMRaceRace by Chen, Zhangyu, et al. \cite{pmrace2022}. This bug occur when one thread commits durable side effects, such as writes to persistent memory (PM), based on non-persisted data written by another thread.
+Such scenarios can cause inconsistent NVM states post-crash, especially if the system crashes before the read location is persisted. Throughout this paper, we refer to this bug as \NameRace.
+% This bug occurs when a read from a non-persisted NVM location influences a subsequent write to another NVM location, which is then persisted before the initial read location. This sequence can lead to an inconsistent state post-crash if the system fails before the read location is persisted. Throughout this work, we refer to such bug as \NameRace.
 
-In this work, we focus on a specific type of bug that can be introduced in concurrent NVM programs. Previously coined as \NamePMRaceRace \cite{pmrace2022}, a bug that occurs when an NVM location affects data written to another NVM location before being persisted. Such bug can cause an inconsistent NVM state after a crash if the affected written address got persisted before the read address. In the following, we refer to this bug as \textbf{\NameRace}.
+To address this issue, we introduce \NameRaceDetector (\SignRaceDetector), a tool that leverages graph-theoretical constructs to detect \NameRace conditions effectively. \SignRaceDetector integrates program instrumentation techniques to perform happens-before and program-dependence analyses, thereby mapping causal relationships and dependencies between program operations. Using a \HBGName ($\HBG$) and a \PDGName ($\PDG$) \SignRaceDetector traverses the execution trace of the program to identify potential inconsistencies.
 
-Previous work \cite{pmrace2022} attempted to detect the bug using a smart fuzzing technique to explore the inter-thread interleaving of the program.
-We attempt to solve the interleaving exploration using a vector clock analysis that detects happens-before relations between program events \cite{lamport1978}.
-To do this, we use LLVM's ThreadSanitizer \cite{tsan2009}.
-In addition, we want to detect all write events to persistent memory that are affected by a read event from persistent memory. We will use data-flow analysis to determine whether a read event affects a write event later in the execution.
-For this, we will use LLVM's DataFlowSanitizer \cite{dfsan2020}.
+The remainder of this paper is organized as follows: \autoref{sec:preliminaries} discusses the theoretical foundations and the necessary background, \autoref{sec:algorithm} describes the detailed algorithm developed for \NameRace detection, \autoref{sec:implementation} covers the implementation details, and \autoref{sec:evaluation} evaluates the approach against established benchmarks. Finally, \autoref{sec:conclusions} concludes the paper with a summary of findings and potential areas for future research.
+% TODO: more sections
 
-Using both the happens-before analysis and the data-flow analysis we can construct 2 graphs that represent the relations between all execution events.
-A \HBGName, denoted as $\HBG$, and a \PDGName \cite{pd1991} denoted as $\PDG$
-\NameRaceDetector will use the 2 graphs to traverse the program execution trace and report all discovered bugs using the algorithm presented later in \autoref{sec:algorithm}.
-
-
-% ChatGPT:
-% Concurrent Persistency Race Detector (CPRD) is a novel tool designed to identify and analyze concurrent persistency races in applications leveraging persistent memory, such as Intel's Optane DC Persistent Memory. With the advent of non-volatile memory technologies, ensuring the correctness of persistent data structures in the face of concurrent accesses and system failures has become paramount. CPRD addresses this challenge by instrumenting the target application, generating a detailed execution trace that includes memory access, synchronization events, and flush operations to persistent memory. By constructing and analyzing a Happens-Before graph (HBG) from the execution trace, CPRD effectively identifies potential data races that could lead to inconsistencies in persistent memory, thus aiding developers in the design of robust and error-free persistent memory applications.
-
-% ChatGPT:
-% This document presents an algorithm designed to identify and mitigate Concurrent Persistence Races (CPR) in multithreaded applications. At its core, the algorithm instruments a given program to trace execution, thereby generating a detailed log of memory accesses, synchronization events, and flush operations. Utilizing this trace, we construct a Happens-Before Graph (HBG) and a Program Dependency Graph (PDG), fundamental structures for understanding the temporal and dependency relations between different program events.
-% Our approach innovates on existing methods by offering a more precise detection of potential persistence races, leveraging advanced vector clock techniques to account for the nuanced interplay of read, write, and flush events across threads. The ultimate goal is to offer developers a tool for preemptively identifying race conditions that could lead to inconsistent or erroneous program states in persistent memory environments. This document details the algorithm's theoretical foundation, practical implementation, and expected outcomes, aiming to provide a comprehensive framework for enhancing program reliability and performance in concurrent systems.
-
-
-% TODO: write about other sections
-% TODO: conclude the intro
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Preliminaries
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Preliminaries}
+\label{sec:preliminaries}
 
 % % \myparagraph{PM}
 % \myparagraph{PMRace}
@@ -110,48 +94,28 @@ A \HBGName, denoted as $\HBG$, and a \PDGName \cite{pd1991} denoted as $\PDG$
 
 
 \subsection{Persistent Memory Programming}
-% TODO: write a comprehensive introduction and explanation about persistent memory programming paradigms, technologies, and their applications in modern computing.
+% TODO: rewrite
+% \todo{introduction and explanation about persistent memory programming paradigms, technologies, and their applications}
+Persistent Memory (PM) represents a significant advance in memory technology by combining the durability of storage devices with the speed and byte-addressability of traditional RAM. This unique characteristic allows applications to directly access and manipulate data in memory using byte-level load and store instructions, circumventing the page cache and offering performance akin to DRAM.
 
-% Persistent memory (PM) technologies represent a revolutionary step in memory solutions by combining the speed of DRAM with the permanence of traditional storage. As such, programming for persistent memory involves paradigms that significantly differ from those used with conventional memory systems. This section explores the key paradigms, technologies, and applications of persistent memory in modern computing.
+However, the intrinsic non-volatility of PM, such as that found in technologies like 3D XPoint, introduces additional complexities in programming, especially concerning crash consistency. Data in PM persists through power outages, presenting challenges in ensuring data consistency if a system crashes. Unlike PM, CPU caches are volatile and do not automatically preserve data upon power failure. This discrepancy necessitates managing the order of data persistence, which hinges on how cache lines are evicted—either through automatic system processes or explicit flush operations.
 
-% \subsubsection{Overview of Persistent Memory Technologies}
-% Persistent memory refers to a class of non-volatile RAM (NVRAM) that retains data even when the power is turned off. Technologies such as Intel's Optane DC Persistent Memory, based on 3D XPoint technology, exemplify this, offering near-DRAM speeds while ensuring data persistence that was previously limited to slower disk-based storage. This capability bridges the gap between volatile memory and durable storage, enabling faster data retrieval and resilience in face of power outages.
+Programming for PM must carefully manage these aspects to maintain data integrity and system consistency after crashes. Developers can use high-level programming constructs like logging or copy-on-write (CoW) mechanisms to enforce crash consistency, but these methods often come with significant performance overheads. As a lower-level alternative, specific instructions such as CLWB (Cache Line Write Back) and SFENCE (Store Fence) in the x86 instruction set, or DC CVAP (Clean Cache Line to Point of Persistence) and DSB (Data Synchronization Barrier) in ARM, provide direct control over cache line flushing and memory ordering. These tools help ensure that writes are properly ordered and visible before subsequent operations.
 
-% \subsubsection{Programming Paradigms for Persistent Memory}
-% Programming for persistent memory can be approached through two primary paradigms: 
+Furthermore, non-temporal store instructions offer another method by directly writing data to PM, bypassing the volatile CPU caches. While this approach avoids caching overheads, it eliminates the benefits of fast data retrieval for frequently accessed ("hot") data, making it less suitable for such use cases.
 
-% \paragraph{Memory-Mapped File-Based Access}
-% Using memory-mapped files is a traditional method where persistent memory is treated similarly to a block device, but it is mapped into the process's address space. This allows applications to use byte-level load and store instructions to access data, which can dramatically reduce the latency associated with I/O operations. Libraries like libpmem from the Persistent Memory Development Kit (PMDK) provide the necessary tools to ensure that memory stores are flushed to persistent memory correctly.
-
-% \paragraph{Direct Access (DAX)}
-% Direct access enables applications to access persistent memory as regular memory, without the need to serialize and deserialize data to and from a filesystem. This is facilitated through file systems like NOVA and PMFS, which are optimized for NVRAM technologies. DAX ensures that applications can leverage the full performance potential of persistent memory, providing a simpler and more efficient programming model.
-
-% \subsubsection{Applications in Modern Computing}
-% The integration of persistent memory into modern computing infrastructures is transformative, impacting several key areas:
-
-% \paragraph{Databases and Big Data}
-% Persistent memory is particularly advantageous for databases and big data frameworks, which demand rapid access to large volumes of data. By reducing the latency associated with data access, persistent memory technologies can significantly enhance the performance of these systems, enabling real-time analytics and faster transaction processing.
-
-% \paragraph{High-Performance Computing (HPC)}
-% In HPC environments, the ability to quickly write and retrieve large datasets is crucial. Persistent memory improves the efficiency of checkpoint/restart operations by accelerating data persistence processes, thereby reducing downtime and enhancing computational throughput.
-
-% \paragraph{Caching and In-Memory Data Grids}
-% Persistent memory can serve as an extended cache or as part of an in-memory data grid, providing low-latency data access while ensuring data is not lost in power failures. This is particularly useful in scenarios requiring high availability and resilience.
-
-% In conclusion, persistent memory programming paradigms and technologies are pivotal in harnessing the full capabilities of this innovative memory class. As applications continue to demand faster access to increasing volumes of data, persistent memory is set to play a critical role in the evolution of data centers, cloud platforms, and high-performance computing environments.
+Overall, effective PM programming requires a deep understanding of both the underlying hardware features and the software techniques necessary to exploit this technology fully while ensuring robust crash consistency.
 
 
 \subsection{Program Instrumentation}
-% TODO: explain LLVM...
-% TODO: This explains what we are doing as well... should this be somewhere else?
-Program instrumentation involves recording runtime events to analyze the behavior of a program during its execution. By leveraging LLVM's Intermediate Representation (IR) for instrumentation, we systematically track every access to persistent memory (PM), including reads, writes, and explicit memory synchronization commands such as flush and fence instructions. Additionally, we utilize LLVM's ThreadSanitizer \cite{tsan2009}, originally used for identifying potential data races, for capturing happens-before relations, and LLVM's DataFlowSanitizer \cite{dfsan2020} for identifying program dependency relations among execution events at runtime.
-
+Program instrumentation involves recording runtime events to analyze the behavior of a program during its execution. By leveraging LLVM's \cite{llvm2004} instrumentation capabilities, we systematically track every access to persistent memory (PM), including reads, writes, and explicit memory synchronization commands such as flush and fence instructions.
 
 \subsection{Happens-Before}
 The happens-before relation that determines a causal relation between event in a program execution. Originally formulated by Leslie Lamport \cite{lamport1978}.
 
 \myparagraph{\HBGName}
 Lamport’s happens-before graph (HBG) \cite{lamport1978} is a theoretical construct used to model the execution dynamics of concurrent programs. Within this graph, every executed instruction is represented as a node, and directed edges between these nodes create a partial-order that outlines the execution order between instructions.
+
 This abstraction is particularly useful for analyzing concurrent executions \cite{chess2008}, as it decouples the execution order from the actual timing of instructions. Consequently, different executions that may run at varying speeds but share the same happens-before graph are considered behaviorally equivalent, reflecting consistent execution behavior despite temporal differences.
 
 \myparagraph{Vector Clocks}
@@ -177,8 +141,6 @@ Dependencies in a $\PDG$ can be classified into several types \cite{pd1992}, pri
 
 \myparagraph{DataFlowSanitizer (DFSan)}
 
-% TODO: expand on how Data-Flow Sanitizer maps dependencies and its impact on understanding program behavior dynamically.
-
 LLVM's DFSan \cite{dfsan2020} is a dynamic data flow analysis tool capable of tagging memory locations and tracing their flow throughout the execution of the program.
 
 We employ DFSan's memory tagging mechanism to label read operations and subsequently track all such tagged reads that influence write operations later in the program within each thread.
@@ -189,8 +151,29 @@ Currently, DFSan is limited to producing data-dependency analyses and does not a
 
 % TODO: explain why only within each thread....
 
+\subsection{\NameRace}
+% \subsection{PMRace / \NamePMRaceRace}
+% \subsection{\NamePMRaceRace}
+% TODO: choose title
+\todo{choose title: \NameRace or \NamePMRaceRace}
+Chen, Zhangyu, et al. \cite{pmrace2022} introduced \textbf{PMRace}, the first
+PM-specific concurrency bug detection tool.
 
-\subsection{PMRace / \NamePMRaceRace}
+\todo{explain the \NamePMRaceRace and how they detect it?}
+
+\todo{is this needed? we have this in the introduction}
+
+% TODO: write more about it. What should we write in the previous work section about it?
+
+% In this work, we focus on a specific type of bug that can be introduced in concurrent NVM programs. Previously coined as \NamePMRaceRace \cite{pmrace2022}, a bug that occurs when an NVM location affects data written to another NVM location before being persisted. Such bug can cause an inconsistent NVM state after a crash if the affected written address got persisted before the read address. In the following, we refer to this bug as \textbf{\NameRace}.
+
+% Previous work by Chen, Zhangyu, et al. \cite{pmrace2022} attempted to detect the bug using a smart fuzzing technique to explore the inter-thread interleaving of the program.
+% We attempt to solve the interleaving exploration using a vector clock analysis that detects happens-before relations between program events.
+
+% In this study, we investigate a particular type of bug prevalent in concurrent non-volatile memory (NVM) programs. This bug, previously identified as \NamePMRaceRace \cite{pmrace2022}, occurs when a location in NVM influences data written to another location before the first is persisted. Such bugs can lead to inconsistent states in NVM following a system crash, particularly if the written address is persisted before the address being read. Throughout this document, we will refer to this bug as \textbf{\NameRace}.
+
+% The seminal work by Chen, Zhangyu, et al. \cite{pmrace2022} approached the detection of this bug using a sophisticated fuzzing technique aimed at examining the inter-thread interleavings of a program. In contrast, our method leverages vector clock analysis to accurately identify happens-before relationships among program events, thereby providing a systematic approach to exploring interleavings that might lead to \NameRace.
+
 
 
 
@@ -232,9 +215,12 @@ The execution trace is modeled using two directed acyclic graphs (DAGs):
 \myparagraph{\HBGName}
 We abstract the program execution with a \HBGName and denote it as $\HBG = (\Nodes, \HBEdges)$. A directed path from node $\NodeE_1$ to node $\NodeE_2$ implies that the event at $\NodeE_1$ happens-before the event at $\NodeE_2$, establishing a precedence relation.
 The graph structures the nodes to reflect the execution of the program threads. Nodes within the same thread are linked by intra-thread edges, illustrating sequential execution steps, while nodes across different threads are linked by inter-thread edges, demonstrating the happens-before relationship between them.
+Each node in our $\HBG$ has a maximum of $\abs{\Threads}$ incoming and outgoing edges, since we permit only one happens-before relation from each thread to any given node.
+
+\todo{Add image of HBG}
 
 % TODO: HBG constrains:
-%       - deg_out(v) <= T, deg_in(v) <= T
+%       V - deg_out(v) <= T, deg_in(v) <= T
 %       PDG constrains:
 %       - deg_in(r) <= 1
 %       - only first w that var(w) != var(r) and in the same thread
@@ -252,23 +238,29 @@ The graph structures the nodes to reflect the execution of the program threads. 
 \renewcommand{\tempNodeOne}{\ensuremath{\NodeWEx}}
 \renewcommand{\tempNodeTwo}{\ensuremath{\NodeR}}
 
-% TODO: Using the trace from DFSan...
-We abstract the program-dependence analysis with a \PDGName and denote it as $\PDG = (\Nodes, \PDEdges)$. Within this graph, an edge from $\tempNodeOne$ to $\tempNodeTwo$ indicates that the execution of $\tempNodeOne$ relies on the result of $\tempNodeTwo$.
-Our analysis particularly focuses on dependencies in dynamic executions where a read event $\tempNodeTwo$ precedes the first immediate write event $\tempNodeOne$ within the same thread but on a different cache line. The rationale behind this selective focus will be elaborated upon later.
-% Specifically, in our trace analysis, we restrict $\PDEdges$ to include only dependencies where a read event $\tempNodeTwo$ is followed by the first subsequent write event $\tempNodeOne$ within the same thread and on a different cache line. We will later explain the reasoning for this choice.
+We abstract the program-dependence analysis with a \PDGName and denote it as $\PDG = (\Nodes, \PDEdges)$. Within this graph, an edge from $\tempNodeOne$ to $\tempNodeTwo$ indicates that the execution of $\tempNodeOne$ depends on the result of $\tempNodeTwo$.
+Our analysis specifically targets dependencies in dynamic executions where a read event $\tempNodeTwo$ precedes the first immediate dependent write event $\tempNodeOne$ within the same thread but on a different cache line.
 
+The rationale behind this specification is that a \NameRace occurs only if the dependent write event modifies a different cache line than the read event.We focus on the first immediate dependent write following a read because if a subsequent dependent write event was influenced by the non-persisted read data, then the same data must have influenced the first immediate dependent write event. Therefore, the \NameRace would have already been established there.
 
-% TODO: PDG: where to explain about the structure of the PDG and that each read has only one write... This explnation requires an understanding of the race (to understand why we did this)
+This specification ensures that $\abs{\PDEdges} \leq \abs{\ReadNodes}$, simplifying the analysis and reducing complexity.
+% This specification ensures that the number of edges in $\PDG$, denoted as $\abs{\PDEdges}$, does not exceed the number of read nodes, $\abs{\ReadNodes}$, simplifying the analysis and reducing complexity.
+% This specification ensures that the number of edges in $\PDG$ does not exceed the number of read nodes, meaning $\abs{\PDEdges} \leq \abs{\ReadNodes}$, simplifying the analysis and reducing complexity.
+% This approach ensures that the number of dependency edges in $\PDG$ is at most equal to the number of read nodes, expressed as $\abs{\PDEdges} \leq \abs{\ReadNodes}$. This constraint simplifies the analysis and reduces the computational complexity, making the overall process more efficient.
 
-% TODO: explain that the \racerange for the earliest write is the largest...
+% TODO: 
+% \todo{should we acknowlage the fact that we don't detect inter-thread program dependencies? If so, how? After all, a dependency could be hidden within a volatile memory location and used again in another thread. If we traced everything, ofcourse the "first" dependency would be in the same thread.}
+
 
 % TODO: add image of both graphs with threads etc.
+\todo{Add image of PDG or of bothe graphs together}
 
 
 % ~~~~~~~~~~~~~~~~~~~~~~~
 % Vector Clocks
 % ~~~~~~~~~~~~~~~~~~~~~~~
 \subsection{Causal State Vector Clocks}
+\label{sec:vc}
 
 The vector clocks concept is used in many ways thought this work. Firstly, they are used by ThreadSanitizer \cite{tsan2009} to determine the happens-before relations in the program's execution. Secondly, use the same concept in our \HBGName analysis to determine different states of persistency and ordering of events in the program execution trace.
 
@@ -305,6 +297,7 @@ An event $\NodeU$ is considered \textit{persisted-before} another event $\NodeV$
 Persistency here implies that there is a path in the $\HBG$ from $\NodeU$ to $\NodeV$ that contains a Flush event on the cache line associated with $\VarX$.
 
 % TODO: should we use the word epoch instead of index everywhere?
+% \todo{Should we replace "index" with "epoch" or "timestamp"?}
 
 
 % ~~~~~~~~~~~~~~~~~~~~~~~
@@ -316,6 +309,7 @@ Persistency here implies that there is a path in the $\HBG$ from $\NodeU$ to $\N
 A \NameRace occurs when a write operation to persistent memory (PM) is influenced by a prior read operation from a non-persisted area of PM located on a different cache line.
 This scenario risks compromising the integrity of the PM state if the write operation becomes durable before the read areas are persisted.
 % , and such discrepancies are not corrected during the program recovery process.
+Below, we formalize the definition of \NameRace based on our causal state vector clocks introduced in \autoref{sec:vc}.
 
 \begin{definition}[\NameRace]
     \label{def:race}
@@ -356,11 +350,17 @@ The first vector clock constraint asserts that $\NodeR$ must not be persisted be
 The second vector clock constraint ensures that $\NodeW$ does not persist before $\NodeWEx$ and that it does not execute after $\NodeR$. This condition implies that $\NodeW$ occurs before $\NodeR$ or concurrently with it, allowing $\NodeW$ to potentially influence the value read by $\NodeR$ in certain executions of the program.
 
 % TODO: show interval image
+\todo{Image of the range defined by the vector clocks}
 
 % TODO: missing info:
 %       1. r and w' are on the same thread in our analysis
 %           1.1. why don't we care about others???????????
 %       2. if they are, we can only look at the first one.
+% \todo{We need to explain that r and w' are on the same thread in our analysis and explain why.
+
+% this allows us to look only on the first program dependent write.
+
+% But why can we just ignore inter-dynamic-program-dependency?}
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -387,12 +387,18 @@ During this traversal, the vector clock of each node, $\havc{\NodeV}{}$, is upda
 % children's?
 vector clocks. This update process ensures that the vector clock $\havc{\NodeV}{}$ precisely reflects the \NameHAVC $\HAVC{\NodeV}{}$ for $\NodeV$ by the time its processing is complete, capturing the earliest interaction times dictated by the causal relationships within the $\HBG$.
 
+% TODO: Should we add this?
+\IfShowRuntimeComplexity
+The runtime complexity of \autoref{alg:havc} is $\bigO{\abs{\Nodes}\abs{\Threads}^2}$.
+In practice, the number of threads ($\abs{\Threads}$) in the execution will be much smaller than the number of event nodes $\abs{\Nodes}$, so we can say that the runtime complexity is closer to $\bigO{\abs{\Nodes}}$.
+\fi
+
 \begin{algorithm}
     \caption{{\NameHAVC}s Builder}
     \label{alg:havc}
     \Fn{\FHAVC{$\HBG$}}{
         \BlankLine
-        Initialize $\havc{\NodeV}{\Thread} \gets +\infty$ \hfill $\forall \NodeV \in \Nodes, \Thread \in \Threads$ \;
+        Initialize $\havc{\NodeV}{\Thread} \gets +\infty$ \hfill $\forall \NodeV \in \Nodes, \Thread \in \Threads$
         \BlankLine
         \ForEach{node $\NodeV$ in $\HBG$ in post-order}{
             \label{alg:havc:mainloop}
@@ -423,16 +429,25 @@ During the traversal, we update two vector clocks for each node $\NodeV$: the \N
 
 We maintain a separate vector clock for each variable to accurately track and reflect the effects of flush events on corresponding variables (practically, on the relevant cache lines).
 
+\IfShowRuntimeComplexity
+The runtime complexity of \autoref{alg:pbvc} is $\bigO{\abs{\Nodes}\abs{\Vars}\abs{\Threads}^2}$. And since $\abs{T} << \abs{\Nodes}$ and $\abs{\Vars} < \abs{\Nodes}$, we can say that the runtime complexity is closer to $\bigO{\abs{\Nodes}^2}$.
+\fi
+
 \begin{algorithm}
     \caption{{\NamePBVC}s Builder}
     \label{alg:pbvc}
     \Fn{\FPBVC{$\HBG$}}{
+        
         \BlankLine
-        Initialize $\hbvc{\NodeV}{\Thread, \VarX} \gets -\infty$ \hfill $\forall \NodeV \in \Nodes, \Thread \in \Threads, \VarX \in \Vars$ \;
-        Initialize $\pbvc{\NodeV}{\Thread, \VarX} \gets -\infty$ \hfill $\forall \NodeV \in \Nodes, \Thread \in \Threads, \VarX \in \Vars$ \;
+        
+        $\hbvc{\NodeV}{\Thread, \VarX} \gets -\infty$ \hfill $\forall \NodeV \in \Nodes, \Thread \in \Threads, \VarX \in \Vars$
+        
+        $\pbvc{\NodeV}{\Thread, \VarX} \gets -\infty$ \hfill $\forall \NodeV \in \Nodes, \Thread \in \Threads, \VarX \in \Vars$
+        
         \BlankLine
+        
         \ForEach{node $\NodeV$ in $\HBG$ in reversed post-order}{
-            $\hbvc{\NodeV}{\thread{\NodeV},\var{\NodeV}} \gets \idx{\NodeV}$\;
+            $\hbvc{\NodeV}{\thread{\NodeV},\var{\NodeV}} \gets \idx{\NodeV}$
         
             \BlankLine
             
@@ -441,8 +456,9 @@ We maintain a separate vector clock for each variable to accurately track and re
             \ForEach{parent node $\NodeParent$ \such $(\NodeParent, \NodeV) \in \HBEdges$}{
                 \ForEach{$\Thread \in \Threads$}{
                     \ForEach{$\VarY \in {\Vars}$}{
-                        $\hbvc{\NodeV}{\Thread,\VarY} \gets \max \left( \hbvc{\NodeV}{\Thread,\VarY}, \hbvc{\NodeParent}{\Thread,\VarY} \right)$\;
-                        $\pbvc{\NodeV}{\Thread,\VarY} \gets \max \left( \pbvc{\NodeV}{\Thread,\VarY}, \pbvc{\NodeParent}{\Thread,\VarY} \right)$\;
+                        $\hbvc{\NodeV}{\Thread,\VarY} \gets \max \left( \hbvc{\NodeV}{\Thread,\VarY}, \hbvc{\NodeParent}{\Thread,\VarY} \right)$
+                        
+                        $\pbvc{\NodeV}{\Thread,\VarY} \gets \max \left( \pbvc{\NodeV}{\Thread,\VarY}, \pbvc{\NodeParent}{\Thread,\VarY} \right)$
                     }
                 }
             }
@@ -453,13 +469,13 @@ We maintain a separate vector clock for each variable to accurately track and re
             % \Comment*[l]{Handle Flush nodes}
             \If{$\NodeV \in \FlushNodes$}{
                 \ForEach{$\Thread \in \Threads$}{
-                    $\pbvc{\NodeV}{\Thread,\var{\NodeV}} \gets \hbvc{\NodeV}{\Thread,\var{\NodeV}}$\;
+                    $\pbvc{\NodeV}{\Thread,\var{\NodeV}} \gets \hbvc{\NodeV}{\Thread,\var{\NodeV}}$
                 }
             }
         }
         \BlankLine
         % \KwRet $\pbvc{\NodeV}{} \hfill \forall \NodeV \in \Nodes$\;
-        \KwRet $\pbvc{}{}$\;
+        \KwRet $\pbvc{}{}$
     }
 \end{algorithm}
 
@@ -470,7 +486,16 @@ We maintain a separate vector clock for each variable to accurately track and re
 
 \subsection{\NameRaceDetector}
 \label{sec:cprd}
-In \autoref{alg:cprd}, we utilize the previously constructed {\NameHAVC}s (\SignHAVC) and {\NamePBVC}s (\SignPBVC) to detect {\NameRace}s as defined in \autoref{def:race}. We examine each program-dependency edge from the \PDGName ($\PDG$), targeting scenarios where the read operation $\NodeR$ is not yet persisted. For each valid dependency, our goal is to identify write nodes $\NodeW$ that access the same memory location as $\NodeR$ and fall within the critical time window defined by $\NodeR$'s persistency and its subsequent interactions.
+In \autoref{alg:cprd}, we utilize the previously constructed {\SignHAVC}s and {\SignPBVC}s to detect {\NameRace}s as defined in \autoref{def:race}. We examine each program-dependency edge from the \PDGName ($\PDG$), targeting scenarios where the read operation $\NodeR$ is not yet persisted.
+Our objective is to pinpoint all write nodes $\NodeW$ that not only access the same memory location as $\NodeR$ but also are executed within the critical time window—spanning from the latest persistency point of the memory location to the immediate point where an event happens-after $\NodeR$.
+% For each valid dependency, our goal is to identify write nodes $\NodeW$ that access the same memory location as $\NodeR$ and fall within the critical time window defined by the memory location's persistency time and the time of the first event that happens-after $\NodeR$.
+
+\todo{Add reference to an image showing the "time window"}
+
+\IfShowRuntimeComplexity
+The runtime complexity of \autoref{alg:cprd} is $\bigO{\abs{\PDEdges}\abs{\WriteNodes}}$. And since $\abs{\PDEdges} \leq \abs{\ReadNodes}$, we can say that the runtime complexity is closer to $\bigO{\abs{\Nodes}^2}$.
+\fi
+
 
 \begin{algorithm}
     \caption{\NameRaceDetector}
@@ -538,157 +563,212 @@ In \autoref{alg:cprd}, we utilize the previously constructed {\NameHAVC}s (\Sign
 % ---------------------------------------------------------
 % Algorithm - Optimization
 % ---------------------------------------------------------
+\subsection{Algorithmic Optimizations}
 
-\subsection{Algorithm Optimizations}
-In this section we will discuss optimizations to the algorithm that helped the implementation and performance.
+This section discusses several key optimizations implemented to enhance both the performance and efficiency of the algorithm.
 
-\myparagraph{Reducing Steps}
-In practice, we combine the two last algorithm to one iteration over all the nodes. This is acceptable since when reaching a node $\NodeV$ we already know $\HAVC{\NodeV}{}$ and $\PBVC{\NodeV}{}$.
+\myparagraph{Intra-Thread Cache Line Linked Lists}
+We implement linked lists within each thread for event nodes that affect the same cache line. This allows for rapid iteration over potential write nodes within the critical window defined by $\PBVC{}{}$ and $\HAVC{}{}$, significantly reducing the runtime complexity of \autoref{alg:cprd}.
+% towards $\bigO{\abs{\races}}$
 
-\myparagraph{Reducing Memory Usage}
-In \autoref{alg:pbvc}, instead of storing a $\hbvc{\NodeV}{\Thread, \VarX} and  \pbvc{\NodeV}{\Thread, \VarX}\forall \NodeV \in \Nodes, \Thread \in \Threads, \VarX \in \Vars$, we only store one for each thread and 
-propegate 
+% \myparagraph{Integrated Node Processing}
+\myparagraph{Iterations Coalescing}
+Instead of separately executing the two final algorithms, we consolidate their operations into a single pass over all nodes. Once a node $\NodeV$ is processed we can immediately determine $\HAVC{\NodeV}{}$ and $\PBVC{\NodeV}{}$ and therefor look for the bugs defined by their range. This integration reduces memory overhead by eliminating the need to store $\pbvc{}{}$ for each node.
+% We consolidate the operations of the final two algorithms into a single traversal over all nodes. This integration allows for immediate access to $\HAVC{\NodeV}{}$ and $\PBVC{\NodeV}{}$ upon processing each node $\NodeV$, thus eliminating the need to store $\pbvc{}{}$ for each node separately. This approach not only reduces memory overhead but also simplifies the computational workflow.
 
+
+\myparagraph{Per-Thread Vector Clock Management}
+Instead of maintaining separate vector clocks $\hbvc{\NodeV}{\Thread, \VarX}$ and $\pbvc{\NodeV}{\Thread, \VarX}$ for every node across all variables and threads, we manage vector clocks on a per-thread basis. We propagate updates through partial vector clocks linked to each node, reducing memory usage and enhancing processing speed by avoiding redundant duplication of vector clocks within threads.
+% Rather than maintaining a $\hbvc{\NodeV}{\Thread, \VarX}$ and $\pbvc{\NodeV}{\Thread, \VarX}$ for every node across all variables and threads, we maintain thread-specific vector clocks and propagate updates via partial vector clocks associated with each node. This adjustment not only conserves memory but also enhances processing speed by minimizing redundant vector clocks duplication between nodes of the same thread.
+
+% \myparagraph{Dirty Variables Vector Clock (DVVC) Strategy}
 \myparagraph{Dirty Variables Vector Clock (DVVC)}
-In \autoref{alg:pbvc} we have to iterate over all variables $\VarY \in \Vars$ since we must update all vector clocks.
-This introduces a performance problem since $\abs{\Vars} \approx \abs{\Nodes}$ which can become really big.
-To resolve this, we wanted to update the vector clocks relating only to the variables that there really is a need to update us about.
-
-\myparagraph{Cache Lines Linked Lists}
-the daisy chains
+To tackle the performance degradation associated with propagation of vector clocks for all variables, we employ a mechanism we call DVVC. This strategy focuses updates only on variables that necessitate changes, utilizing a flagging system to manage updates across threads. When a variable $\VarX$ in one thread is updated, a DVVC flags this event, ensuring that other threads are notified only as necessary. This method significantly reduces the runtime of the algorithm.
 
 
-In addition, 
+\iffalse
+\begin{algorithm}
+    \caption{\NameRaceDetector - Optimized}
+    \label{alg:cprdopt}
+    \Fn{\FCPRDOpt{$\HBG$, $\PDG$}}{
+        $\havc{}{} \gets \FHAVC{\HBG}$
+        
+        $\races \gets \EmptySet$
+        
+        \BlankLine
 
-\subsection{Correctness}
-\subsection{Complexity}
-
-Note that the maximum amount of parents/children is $\abs{\Threads}$ since we only allow one happens-before relation from each node to each thread.
-We will also assume that practically, $\abs{\Threads} << \abs{\Nodes}$
-
-Part 1 - $\bigO{\abs{\Nodes}\cdot\abs{\Threads}^2} \approx \bigO{\abs{\Nodes}}$
-
-Part 2 - $\bigO{\abs{\Nodes}\cdot\left(\abs{\Threads} + \abs{\Threads}^2\cdot\abs{\Vars} \right)} \approx \bigO{\abs{\Nodes}\cdot\abs{\Vars}} \approx \bigO{\abs{\Nodes}^2}$
-
-Part 3
-
-Since each read node has only one possible edge or less (since we keep only the edge to the first write in that thread), $\abs{\PDEdges} \leq \abs{\ReadNodes}$.
-
-In \autoref{alg:cprd} we effectively iterate over all edges in $\PDEdges$. So, 
-$\bigO{\abs{\PDEdges}\cdot\abs{\WriteNodes}} \approx \bigO{\abs{\Nodes}^2}$
+        % -------------------------------
+        % Stage 1 - Initialize
+        % -------------------------------
+        
+        $\hbvcThread{\ThreadOther}{\Thread, \VarX} \gets -\infty$ \hfill $\forall \Thread, \ThreadOther \in \Threads, \VarX \in \Vars$
+        
+        $\pbvcThread{\ThreadOther}{\Thread, \VarX} \gets -\infty$ \hfill $\forall \Thread, \ThreadOther \in \Threads, \VarX \in \Vars$
+        
+        $\dvvcThread{\ThreadOther}{\Thread} \gets \EmptySet$ \hfill $\forall \Thread, \ThreadOther \in \Threads$
 
 
-In practice, we store linked lists in each thread between event nodes that affect the same cache line. This allows us to quickly iterate over the possible violating write nodes in the racerange.
+        $\hbvcPartial{\NodeV}{\Thread, \VarX} \gets -\infty$ \hfill $\forall \NodeV \in \Nodes, \Thread \in \Threads, \VarX \in \Vars$
+        
+        $\pbvcPartial{\NodeV}{\Thread, \VarX} \gets -\infty$ \hfill $\forall \NodeV \in \Nodes, \Thread \in \Threads, \VarX \in \Vars$
+        
+        $\dvvcPartial{\NodeV}{\Thread} \gets \EmptySet$ \hfill $\forall \NodeV \in \Nodes, \Thread \in \Threads$
 
-The most important optimization is that of dirty cache lines bookkeeping.
-We maintain in each thread a set of all cache lines that were operated by the event nodes (written to, read from or flushed)
-Empirically this reduces the amount of vector updates, since we only update vectors that there is high chance that were updated since the last merge....
-% TODO: this needs more explnation, also, place in the optimization/imporovments subsection. Can we show some complexity calculation here?
+        ${dirty}_{\NodeV} \gets \EmptySet$ \hfill $\forall \NodeV \in \Nodes$
+        
+        \BlankLine
+
+        \ForEach{node $\NodeV$ in $\HBG$ in reversed post-order}{
+            % -------------------------------
+            % Stage 2 - thread-VC updates based on node
+            % -------------------------------
+
+            \Comment*[l]{Update thread VCs}
+            \BlankLine
+        
+            $\hbvcThread{\thread{\NodeV}}{\thread{\NodeV},\var{\NodeV}} \gets \idx{\NodeV}$
+
+            \BlankLine
+        
+            \If{$\NodeV \in \FlushNodes$}{
+                \ForEach{$\Thread \in \Threads$}{
+                    $\pbvcThread{\thread{\NodeV}}{\Thread,\var{\NodeV}} \gets \hbvc{\NodeV}{\Thread,\var{\NodeV}}$
+                }
+            }
+        
+            \BlankLine
+            
+            % $\dvvcThread{\thread{\NodeV}}{\Thread} \gets \dvvcThread{\thread{\NodeV}}{\Thread} \cup \left\{ \var{\NodeV} \right\}$\;
+            % $\dvvcThread{\thread{\NodeV}}{\Thread} \bigcup = \left\{ \var{\NodeV} \right\}$ \hfill $\forall \Thread \in \Threads, \Thread \neq \thread{\NodeV}$
+            \ForEach{$\Thread \in \Threads \such \Thread \neq \thread{\NodeV}$}{
+                $\dvvcThread{\thread{\NodeV}}{\Thread} \bigcup = \left\{ \var{\NodeV} \right\}$
+            }
+
+            \BlankLine
+
+            % -------------------------------
+            % Stage 3 - merge sub-VC to thread-VC
+            % -------------------------------
+
+            \Comment*[l]{Merge local VCs to thread VCs}
+            \BlankLine
+
+            % \ForEach{$\Thread \in \Threads$ and $\VarX \in {dirty}_{\NodeV}$}{
+            % \ForEach{$\Thread \in \Threads \such \Thread \neq \thread{\NodeV}$}{
+            \ForEach{$\Thread \in \Threads$}{
+                \ForEach{$\VarX \in {dirty}_{\NodeV}$}{
+                    $\hbvcThread{\thread{\NodeV}}{\Thread, \VarX} \gets \Max{\hbvcThread{\thread{\NodeV}}{\Thread, \VarX}}{\hbvcPartial{\NodeV}{\Thread, \VarX}}$
+
+                    $\pbvcThread{\thread{\NodeV}}{\Thread, \VarX} \gets \Max{\pbvcThread{\thread{\NodeV}}{\Thread, \VarX}}{\pbvcPartial{\NodeV}{\Thread, \VarX}}$
+                }
+
+                $\dvvcThread{\thread{\NodeV}}{\Thread} \bigcup = \dvvcPartial{\NodeV}{\Thread}$
+            }
+            
+            \BlankLine
+
+            % -------------------------------
+            % Stage 4 - find bugs
+            % -------------------------------
+
+            
+            
+            % -------------------------------
+            % Stage 5 - propagate to children
+            % -------------------------------
+
+            \Comment*[l]{Propagate to children}
+            \BlankLine
+
+            \ForEach{child node $\NodeChild \such (\NodeV, \NodeChild) \in \HBEdges$}{
+                \ForEach{$\VarX \in \dvvcThread{\thread{\NodeV}}{\thread{\NodeChild}}$}{
+                    \ForEach{$\Thread \in \Threads$}{
+                        $\hbvcPartial{\NodeChild}{\Thread, \VarX} \gets \Max{\hbvcPartial{\NodeChild}{\Thread, \VarX}}{\hbvcThread{\thread{\NodeV}}{\Thread, \VarX}}$
+                        
+                        $\pbvcPartial{\NodeChild}{\Thread, \VarX} \gets \Max{\pbvcPartial{\NodeChild}{\Thread, \VarX}}{\pbvcThread{\thread{\NodeV}}{\Thread, \VarX}}$
+
+                        % ${dirty}_{\NodeChild} \bigcup = $
+                    }
+                }
+
+                $\dvvcThread{\thread{\NodeV}}{\thread{\NodeChild}} \gets \EmptySet$
+            }
+
+            
+        }
+        \BlankLine
+        % \KwRet $\pbvc{\NodeV}{} \hfill \forall \NodeV \in \Nodes$\;
+        \KwRet $\pbvc{}{}$
+    }
+\end{algorithm}
+\fi
+
+% \subsection{Correctness}
+% \todo{This subsection is still in early stages}
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Implementation
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Implementation}
+\label{sec:implementation}
 
 % TODO: add image of full system
+\todo{Image of the full system like in the research proposal}
 
 \subsection{Program Instrumentation}
-TODO: TSAN
-TODO: DFSAN
+\todo{TSan and DFSan ? I already explained this. Why do we need this section?}
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Evaluation
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Evaluation}
+\label{sec:evaluation}
+
+\subsection{Experimental Setup}
+\subsection{Results}
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Related Work}
+% Related Work
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Related Work}
-TODO: intro
+The evolution of Persistent Memory (PM) technologies has catalyzed the development of numerous tools designed to detect and mitigate consistency issues in concurrent PM programs. This surge in tool creation reflects the complex challenges posed by PM's unique characteristics, such as byte-addressability and durability, which complicate traditional programming models especially in multi-threaded environments.
 
-\textbf{Persistent Memory Bugs Detectors:}
-Like PMRACE \cite{pmrace2022}, which focuses on finding concurrent bugs. 
-Others like Yashme \cite{yashme2022}, Witcher \cite{witcher2021}, PMDebugger \cite{pmdebugger2021}, XFDetector \cite{xfdetector2020}, PMTest \cite{pmtest2019}
+Among the notable contributions is PMRace, introduced by Chen, Zhangyu, et al. \cite{pmrace2022}, which marks a significant advancement in bug detection for concurrent NVM programs. Unlike earlier approaches that did not extensively address concurrency, PMRace employs a fuzzing-based technique to uncover inter-thread inconsistencies and synchronization issues. The tool identifies and tests PM alias pairs—pairs of read/write operations to the same PM address—to simulate delays that might expose potential inconsistencies.
 
+Witcher, introduced by Fu, Xinwei, et al. \cite{witcher2021}, further explores the state space of NVM, utilizing an LLVM pass to trace program execution and detect violations of NVM state. This tool emphasizes crash consistency by testing the persistence order of operations through crash simulations, aiming for scalability and precision without the need for manual source code annotations.
 
+Another important tool is XFDetector \cite{xfdetector2020}, which focuses on detecting 'Cross-Failure Bugs'—bugs that manifest due to discrepancies between pre-failure and post-failure states. These include both cross-failure races, where a post-failure operation relies on unpersisted data, and semantic bugs, where operations post-recovery misuse data that, while persisted, is deemed invalid by program semantics.
 
+PMTest \cite{pmtest2019} provides a more granular approach by offering low-level checkers like isPersist and isOrderedBefore, which allow developers to assert specific program invariants and directly check the persistence states of memory locations, thus aiding in the identification of inconsistency bugs.
 
-
-
-
-
-
-
-
-
-
-
-
-The concept of operating systems for coffee machines is not entirely novel. Previous attempts have focused on various aspects of coffee preparation and automation. Here, we provide a brief overview of these endeavors and highlight how ESPLOS improves upon them.
-
-
-
-\textbf{PMRace} \cite{pmrace2022} – a NVM bug detector designed for concurrent NVM programs.
-Until recently, most works didn’t focus on NVM bugs in concurrent programs, mostly due to the complex search space that thread scheduling introduces.
-In ASPLOS 2022, Chen, Zhangyu, et al. introduced PMRace, that focuses on bug detection in concurrent NVM programs. 
-PMRace is a fuzzing-based bug detector that is aimed at detecting 2 types of PM bugs:
-\begin{itemize}
-    \item PM inter-thread inconsistencies – a program execution in which one thread makes durable side effects based on non-persisted data written by another thread. This is the definition of our concurrent persistency race.
-    \item PM synchronization inconsistencies - an inconsistency between a persistent synchronization variable (e.g., a lock, a mutex, etc.) and the non-persistent thread state.
-\end{itemize}
-PMRace detects PM inter-thread inconsistencies by finding all pairs of read/write operations to the same PM addresses (named PM alias pairs). It later simulates a delay after the write operation that allows the read operation to continue and to hopefully introduce the inconsistency bug.
-
-PMRace tries to maximize its coverage of PM alias pairs to detect more bugs. To find the inconsistencies, PMRace detects program dependency relations and sees if an NVM location, that is dependent on the PM alias pair’s data, is modified with un-persisted data.
-
-\paragraph{Witcher} \cite{witcher2021} – a crash consistency bug detector for NVM software that focuses on exploring the NVM state space.
-Witcher uses an LLVM pass to trace the program's execution and to detect possible violations of NVM state. It finds likely invariants on the program’s persistence order and tests its correctness by simulating a crash. Later it checks the equivalence of the NVM state with and without the simulated crash and finds NVM violations if the states are different.
-Witcher is designed to be scalable (doesn’t suffer from test space explosion), automatic (doesn’t require manual source code annotations), and precise (doesn’t produce false positives).
-Witcher doesn’t focus on exploring thread interleaving, and therefore isn’t suited to find difficult concurrency NVM bugs. They leave this for future work.
-
-\paragraph{VSV-D} (Vector Space Verification – Durability) \cite{vsvd2021} – a dynamic analysis tool that checks durable linearizability at runtime.
-Requires user annotations – granularity of operations is defined by the user.
-Mostly verifies that all required NVM data is guaranteed to be flushed.
-
-\paragraph{XFDetector} (Cross-Failure Detector) \cite{xfdetector2020}
-Detects NVM bugs between the pre-failure and post-failure stages, named Cross-Failure Bugs.
-These bugs can be categorized into 2 classes:
-\begin{itemize}
-    \item Cross-failure races – a post-failure operation that relies on data that wasn’t persisted in the pre-failure stage.
-    \item Cross-failure semantic bugs – a post-failure operation that reads data that might be persistent but is considered invalid by program semantics.
-\end{itemize}
-
-\paragraph{PMTest} \cite{pmtest2019}
-Supplies 2 low-level program checkers:
-\begin{itemize}
-\item isPersist – checks if an NVM memory location is persisted.
-\item isOrderedBefore – checks if an NVM memory location is persisted before another location.
-\end{itemize}
-
-Using these checkers, the user can assert program invariants and detect inconsistency bugs.
-
-\textbf{Recipe} \cite{recipe2019} an approach for converting concurrent DRAM data structures into crash consistent data structures for persistent memory.
-
-The common conversion step is to insert a cache line flush and memory fence instructions after each store. 
-This approach can produce a bug where data that is modified in one thread can be read by another thread before being persisted. This data can later be used to update other NVM locations that might get persisted before the original data persists. If a crash occurs before the original data persists but after the dependent data persists in another thread, an inconsistency bug will occur. The NVM state after the crash is no longer consistent.
-
-In this work we call such bug a Concurrent Persistency Race, and this is the bug that we hope to detect with our bug detector.
-
+These tools collectively highlight the diverse strategies employed to tackle the intricate issues of PM programming, from dynamic analysis to program instrumentation and beyond.
+% However, each comes with limitations in either scope or applicability, particularly in handling the intricate interplays of multi-threaded operations in PM environments. Our work with \SignRaceDetector builds on these foundations, aiming to provide a comprehensive solution that addresses the gaps left by existing tools in detecting and resolving \NameRace conditions effectively.
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Conclusions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Conclusions}
-\lipsum[1][1-3]
+\label{sec:conclusions}
+\todo{Write conclusions}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Appendix
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\appendix
+
+\section{Artifact Appendix}
+\subsection{Abstract}
+\subsection{Installation}
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Bibliography
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\balance
 \bibliographystyle{unsrt}
 \bibliography{references}
 

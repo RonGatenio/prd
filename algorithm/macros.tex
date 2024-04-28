@@ -6,7 +6,9 @@
 % \usepackage{amssymb}
 \usepackage{sansmath}
 \usepackage{commath}
+% \usepackage[ruled,linesnumbered,vlined]{algorithm2e}
 \usepackage[ruled,linesnumbered]{algorithm2e}
+% \usepackage{multicol}
 \usepackage{float}
 \usepackage{calc}
 \usepackage{xifthen}
@@ -77,7 +79,11 @@
         \ifthenelse{\isempty{#2}}{}{_{#2}}
         \ifthenelse{\isempty{#3}}{}{({#3})}
     }}
-
+\newcommand{\DefFuncUpper}[3]{\ensuremath{
+        \FontSet{#1}
+        \ifthenelse{\isempty{#2}}{}{^{#2}}
+        \ifthenelse{\isempty{#3}}{}{({#3})}
+    }}
 
 % ---------------------------------------------------------
 % Formal Notation
@@ -148,9 +154,24 @@
 \newcommand{\HBVC}[2]{\DefFunc{HBVC}{#1}{#2}}
 \newcommand{\PBVC}[2]{\DefFunc{PBVC}{#1}{#2}}
 
-\newcommand{\havc}[2]{\DefFunc{havc}{#1}{#2}}
-\newcommand{\hbvc}[2]{\DefFunc{hbvc}{#1}{#2}}
-\newcommand{\pbvc}[2]{\DefFunc{pbvc}{#1}{#2}}
+\newcommand{\havcName}{havc}
+\newcommand{\hbvcName}{hbvc}
+\newcommand{\pbvcName}{pbvc}
+% \newcommand{\dvvcName}{dirty}
+\newcommand{\dvvcName}{dvvc}
+
+\newcommand{\havc}[2]{\DefFunc{\havcName}{#1}{#2}}
+\newcommand{\hbvc}[2]{\DefFunc{\hbvcName}{#1}{#2}}
+\newcommand{\pbvc}[2]{\DefFunc{\pbvcName}{#1}{#2}}
+\newcommand{\dvvc}[2]{\DefFunc{\dvvcName}{#1}{#2}}
+
+\newcommand{\hbvcThread}[2]{\DefFuncUpper{\hbvcName}{#1}{#2}}
+\newcommand{\pbvcThread}[2]{\DefFuncUpper{\pbvcName}{#1}{#2}}
+\newcommand{\dvvcThread}[2]{\DefFuncUpper{\dvvcName}{#1}{#2}}
+
+\newcommand{\hbvcPartial}[2]{\DefFunc{sub\hbvcName}{#1}{#2}}
+\newcommand{\pbvcPartial}[2]{\DefFunc{sub\pbvcName}{#1}{#2}}
+\newcommand{\dvvcPartial}[2]{\DefFunc{sub\dvvcName}{#1}{#2}}
 
 \newcommand{\HAVCDef}{\ensuremath{\Threads \mapsto \IDs}}
 \newcommand{\HBVCDef}{\ensuremath{\Threads \times \Vars \mapsto \IDs}}
@@ -212,7 +233,6 @@
 % \renewcommand{\myparagraph}[1]{\textbf{#1}:}
 
 
-
 % ---------------------------------------------------------
 % Theorems and Proofs
 % ---------------------------------------------------------
@@ -261,3 +281,23 @@
 \SetKwFunction{FHAVC}{HAVC-Builder}
 \SetKwFunction{FPBVC}{PBVC-Builder}
 \SetKwFunction{FCPRD}{CPRD}
+\SetKwFunction{FCPRDOpt}{CPRD-Optimized}
+
+
+% ---------------------------------------------------------
+% TODOs
+% ---------------------------------------------------------
+
+\newcommand{\todo}[1]{\noindent\begin{center}\fbox{\textbf{TODO: } #1}\end{center}}
+\renewcommand{\todo}[1]{\noindent\fbox{\textbf{TODO: } #1}}
+\renewcommand{\todo}[1]{\noindent\begin{minipage}{\columnwidth}\fbox{\parbox{\columnwidth}{\textbf{TODO: } #1}}\end{minipage}}
+\renewcommand{\todo}[1]{}
+
+
+% ---------------------------------------------------------
+% Ifs
+% ---------------------------------------------------------
+
+% \def\IfShowRuntimeComplexity{\iftrue}
+\def\IfShowRuntimeComplexity{\iffalse}
+
