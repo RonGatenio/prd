@@ -226,8 +226,17 @@ The execution trace is modeled using two directed acyclic graphs (DAGs):
 We abstract the program execution with a \HBGName and denote it as $\HBG = (\Nodes, \HBEdges)$. A directed path from node $\NodeE_1$ to node $\NodeE_2$ implies that the event at $\NodeE_1$ happens-before the event at $\NodeE_2$, establishing a precedence relation.
 The graph structures the nodes to reflect the execution of the program threads. Nodes within the same thread are linked by intra-thread edges, illustrating sequential execution steps, while nodes across different threads are linked by inter-thread edges, demonstrating the happens-before relationship between them.
 Each node in our $\HBG$ has a maximum of $\abs{\Threads}$ incoming and outgoing edges, since we permit only one happens-before relation from each thread to any given node.
+\autoref{fig:graphs} presents a \HBGName (in black) generated from a provided code snippet.
 
-\todo{Add image of HBG}
+\begin{figure}
+    \centering
+    \includegraphics[width=\linewidth]{images/Fig1.png}
+    % \caption{$\HBG$ and $\PDG$: The code on the left shows an atomic write to variable $x$ and its effect in another thread}
+    % \Description{$\HBG$ (black) and $\PDG$ (red)}
+    \caption{Illustration of $\HBG$ and $\PDG$: The code on the left initiates an atomic write to variable $x$ in one thread and its subsequent read in another thread. The generated graphs on the right display the happens-before relations (in black) within and across threads, as well as the program-dependency relation (in red).}
+    \Description{Happens-before graph (HBG) in black and Program-dependency graph (PDG) in red, demonstrating the causal and data dependencies between events from two threads.}
+    \label{fig:graphs}
+\end{figure}
 
 % TODO: HBG constrains:
 %       V - deg_out(v) <= T, deg_in(v) <= T
@@ -250,6 +259,7 @@ Each node in our $\HBG$ has a maximum of $\abs{\Threads}$ incoming and outgoing 
 
 We abstract the program-dependence analysis with a \PDGName and denote it as $\PDG = (\Nodes, \PDEdges)$. Within this graph, an edge from $\tempNodeOne$ to $\tempNodeTwo$ indicates that the execution of $\tempNodeOne$ depends on the result of $\tempNodeTwo$.
 Our analysis specifically targets dependencies in dynamic executions where a read event $\tempNodeTwo$ precedes the first immediate dependent write event $\tempNodeOne$ within the same thread but on a different cache line.
+\autoref{fig:graphs} presents a \PDGName (in red) generated from a provided code snippet, where a write event to variable $y$ is dependent on a read event of the variable $x$.
 
 The rationale behind this specification is that a \NameRace occurs only if the dependent write event modifies a different cache line than the read event.We focus on the first immediate dependent write following a read because if a subsequent dependent write event was influenced by the non-persisted read data, then the same data must have influenced the first immediate dependent write event. Therefore, the \NameRace would have already been established there.
 
@@ -260,10 +270,6 @@ This specification ensures that $\abs{\PDEdges} \leq \abs{\ReadNodes}$, simplify
 
 % TODO: 
 % \todo{should we acknowlage the fact that we don't detect inter-thread program dependencies? If so, how? After all, a dependency could be hidden within a volatile memory location and used again in another thread. If we traced everything, ofcourse the "first" dependency would be in the same thread.}
-
-
-% TODO: add image of both graphs with threads etc.
-\todo{Add image of PDG or of bothe graphs together}
 
 
 % ~~~~~~~~~~~~~~~~~~~~~~~
@@ -359,8 +365,15 @@ The first vector clock constraint asserts that $\NodeR$ must not be persisted be
 
 The second vector clock constraint ensures that $\NodeW$ does not persist before $\NodeWEx$ and that it does not execute after $\NodeR$. This condition implies that $\NodeW$ occurs before $\NodeR$ or concurrently with it, allowing $\NodeW$ to potentially influence the value read by $\NodeR$ in certain executions of the program.
 
-% TODO: show interval image
-\todo{Image of the range defined by the vector clocks}
+In \autoref{fig:cprrange}, we present an example illustrating the critical range defined by $\PBVC{}{}$ and $\HAVC{}{}$, within which potentially violating write event nodes reside.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.5\linewidth]{images/Fig2.png}
+    \caption{\NameRace Range}
+    \Description{\NameRace Range}
+    \label{fig:cprrange}
+\end{figure}
 
 % TODO: missing info:
 %       1. r and w' are on the same thread in our analysis
@@ -497,10 +510,9 @@ The runtime complexity of \autoref{alg:pbvc} is $\bigO{\abs{\Nodes}\abs{\Vars}\a
 \subsection{\NameRaceDetector}
 \label{sec:cprd}
 In \autoref{alg:cprd}, we utilize the previously constructed {\SignHAVC}s and {\SignPBVC}s to detect {\NameRace}s as defined in \autoref{def:race}. We examine each program-dependency edge from the \PDGName ($\PDG$), targeting scenarios where the read operation $\NodeR$ is not yet persisted.
-Our objective is to pinpoint all write nodes $\NodeW$ that not only access the same memory location as $\NodeR$ but also are executed within the critical time window—spanning from the latest persistency point of the memory location to the immediate point where an event happens-after $\NodeR$.
+Our objective is to pinpoint all write nodes $\NodeW$ that not only access the same memory location as $\NodeR$ but also are executed within the critical time window—spanning from the latest persistency point of the memory location to the immediate point where an event happens-after $\NodeR$. This critical time window is illustrated in \autoref{fig:cprrange}.
 % For each valid dependency, our goal is to identify write nodes $\NodeW$ that access the same memory location as $\NodeR$ and fall within the critical time window defined by the memory location's persistency time and the time of the first event that happens-after $\NodeR$.
 
-\todo{Add reference to an image showing the "time window"}
 
 \IfShowRuntimeComplexity
 The runtime complexity of \autoref{alg:cprd} is $\bigO{\abs{\PDEdges}\abs{\WriteNodes}}$. And since $\abs{\PDEdges} \leq \abs{\ReadNodes}$, we can say that the runtime complexity is closer to $\bigO{\abs{\Nodes}^2}$.
@@ -778,7 +790,6 @@ These tools collectively highlight the diverse strategies employed to tackle the
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Bibliography
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\balance
 \bibliographystyle{unsrt}
 \bibliography{references}
 
