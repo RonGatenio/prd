@@ -356,8 +356,10 @@ Below, we formalize the definition of \NameRace based on our causal state vector
     
     For this race to occur, both $\NodeR$ and $\NodeW$ must access the same memory location denoted as $\VarX$, while $\NodeWEx$ must operate on a different cache line.
     Additionally, the following two constraints are satisfied:
-    $$\PBVC{\NodeWEx}{\thread{\NodeR}, \VarX} < \idx{\NodeR},$$
-    $$\PBVC{\NodeWEx}{\thread{\NodeW}, \VarX} < \idx{\NodeW} < \HAVC{\NodeR}{\thread{\NodeW}}.$$
+    \begin{gather*}
+        \PBVC{\NodeWEx}{\thread{\NodeR}, \VarX} < \idx{\NodeR}\\
+        \PBVC{\NodeWEx}{\thread{\NodeW}, \VarX} < \idx{\NodeW} < \HAVC{\NodeR}{\thread{\NodeW}}
+    \end{gather*}
 
 \end{definition}
 
@@ -370,7 +372,8 @@ In \autoref{fig:cprrange}, we present an example illustrating the critical range
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.5\linewidth]{images/Fig2.png}
-    \caption{\NameRace Range}
+    \caption{{\NameRace}s range.}
+    % \caption{{\NameRace}s range as defined by $\PBVCSign$ and $\HAVCSign$ in \autoref{def:race}.}
     \Description{\NameRace Range}
     \label{fig:cprrange}
 \end{figure}
@@ -734,12 +737,17 @@ To tackle the performance degradation associated with propagation of vector cloc
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Implementation}
 \label{sec:implementation}
+\NameRaceDetector operates through a structured process divided into sequential stages, as depicted in \autoref{fig:system}.
+The process begins with the compilation of the target program using LLVM, enhanced with our custom \textit{PRDPass}. This pass employs LLVM's ThreadSanitizer (TSan) \cite{tsan2009} and DataFlowSanitizer (DFSan) \cite{dfsan2020} to capture essential execution details, such as happens-before relations and program dependencies, respectively. After compiling the executable, it is run to gather runtime data, which is then used to construct the \HBGName ($\HBG$) and \PDGName ($\PDG$).
+% The process begins with the compilation of the target program using LLVM alongside our custom \textit{PRDPass} to capture essential execution details, such as happens-before and program dependency relations. Upon running the compiled executable, the system captures runtime data, which is then used to construct the \HBGName and \PDGName. The final stage involves the \NameRace detection algorithm (detailed in \autoref{sec:algorithm}), which analyzes the graphs to detect and report instances of {\NameRace}s.
 
-% TODO: add image of full system
-\todo{Image of the full system like in the research proposal}
-
-\subsection{Program Instrumentation}
-\todo{TSan and DFSan ? I already explained this. Why do we need this section?}
+\begin{figure*}
+    \centering
+    \includegraphics[width=\linewidth]{images/system.png}
+    \caption{\NameRaceDetector workflow diagram: Illustrates the key stages including compilation, $\HBG$ and $\PDG$ generation, and \NameRace detection.}
+    \Description{\NameRaceDetector system architecture, showing stages from compilation to detection.}
+    \label{fig:system}
+\end{figure*}
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -750,6 +758,11 @@ To tackle the performance degradation associated with propagation of vector cloc
 
 \subsection{Experimental Setup}
 \subsection{Results}
+
+Benchmarks
+\cite{fastfair2018}
+\cite{clht2015} \cite{recipe2019}
+\cite{cceh2019}
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

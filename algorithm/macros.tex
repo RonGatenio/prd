@@ -150,13 +150,21 @@
 \renewcommand{\thread}[1]{\DefFunc{thr}{}{#1}}
 \newcommand{\idx}[1]{\DefFunc{idx}{}{#1}}
 
-\newcommand{\HAVC}[2]{\DefFunc{HAVC}{#1}{#2}}
-\newcommand{\HBVC}[2]{\DefFunc{HBVC}{#1}{#2}}
-\newcommand{\PBVC}[2]{\DefFunc{PBVC}{#1}{#2}}
+\newcommand{\HAVCName}{HAVC}
+\newcommand{\HBVCName}{HBVC}
+\newcommand{\PBVCName}{PBVC}
 
-\newcommand{\havcName}{havc}
-\newcommand{\hbvcName}{hbvc}
-\newcommand{\pbvcName}{pbvc}
+\newcommand{\HAVCSign}{\FontSet{\HAVCName}{}{}}
+\newcommand{\HBVCSign}{\FontSet{\HBVCName}{}{}}
+\newcommand{\PBVCSign}{\FontSet{\PBVCName}{}{}}
+
+\newcommand{\HAVC}[2]{\DefFunc{\HAVCName}{#1}{#2}}
+\newcommand{\HBVC}[2]{\DefFunc{\HBVCName}{#1}{#2}}
+\newcommand{\PBVC}[2]{\DefFunc{\PBVCName}{#1}{#2}}
+
+\newcommand{\havcName}{\MakeLowercase{\HAVCName}}
+\newcommand{\hbvcName}{\MakeLowercase{\HBVCName}}
+\newcommand{\pbvcName}{\MakeLowercase{\PBVCName}}
 % \newcommand{\dvvcName}{dirty}
 \newcommand{\dvvcName}{dvvc}
 
@@ -291,7 +299,7 @@
 \newcommand{\todo}[1]{\noindent\begin{center}\fbox{\textbf{TODO: } #1}\end{center}}
 \renewcommand{\todo}[1]{\noindent\fbox{\textbf{TODO: } #1}}
 \renewcommand{\todo}[1]{\noindent\begin{minipage}{\columnwidth}\fbox{\parbox{\columnwidth}{\textbf{TODO: } #1}}\end{minipage}}
-\renewcommand{\todo}[1]{}
+% \renewcommand{\todo}[1]{}
 
 
 % ---------------------------------------------------------
