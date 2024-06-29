@@ -1,0 +1,78 @@
+{
+    "CCEH": {
+        "compile": {
+            "directory": "/app/benchmarks/CCEH",
+            "commands": [
+                "make clean",
+                "make"
+            ]
+        },
+        "run": {
+            "directory": "/app/benchmarks/CCEH",
+            "command": "./run_pmdk --threads={threads} --keys={keys}",
+            "default_args": {
+                "threads": 4,
+                "keys": 1000
+            }
+        },
+        "trace_file": "/app/results/traces/multi_threaded_cceh.trace",
+        "results_file": "/app/results/races/cceh.races"
+    },
+    "FAST_FAIR": {
+        "compile": {
+            "directory": "/app/benchmarks/FAST_FAIR",
+            "commands": [
+                "make clean",
+                "make"
+            ]
+        },
+        "run": {
+            "directory": "/app/benchmarks/FAST_FAIR",
+            "command": "./run_pmdk --threads={threads} --keys={keys}",
+            "default_args": {
+                "threads": 4,
+                "keys": 1000
+            }
+        },
+        "trace_file": "/app/results/traces/fast-fair-pmdk.trace",
+        "results_file": "/app/results/races/fastfair.races"
+    },
+    "MEMCACHED": {
+        "compile": {
+            "directory": "/app/benchmarks/memcached-pmem",
+            "commands": [
+                "./autogen.sh",
+                "./configure",
+                "make"
+            ]
+        },
+        "run": {
+            "directory": "/app/benchmarks/memcached-pmem",
+            "command": "memcached -u root -m 64 -o pslab,pslab_file={trace_file}",
+            "default_args": {
+                "trace_file": "/app/results/traces/memcached.trace"
+            }
+        },
+        "trace_file": "/app/results/traces/memcached.trace",
+        "results_file": "/app/results/races/memcached.races"
+    },
+    "RECIPE": {
+        "compile": {
+            "directory": "/app/benchmarks/RECIPE",
+            "commands": [
+                "make clean",
+                "make"
+            ]
+        },
+        "run": {
+            "directory": "/app/benchmarks/RECIPE",
+            "command": "./run --threads={threads} --keys={keys}",
+            "default_args": {
+                "threads": 4,
+                "keys": 1000
+            }
+        },
+        "trace_file": "/app/results/traces/pclht.trace",
+        "results_file": "/app/results/races/pclht.races"
+    }
+}
