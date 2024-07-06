@@ -1,5 +1,7 @@
 #include "sanitizer_common/sanitizer_stacktrace_printer.h"
 #include "../tsan_symbolize.h"
+#include "../tsan_defs.h"
+#include "../tsan_rtl.h"
 #include "cprd.h"
 
 
@@ -67,8 +69,21 @@ void Cprd::s_get_symbol_info(InternalScopedString& iss, ThreadState *thr, uptr p
   }
 }
 
-Cprd& Cprd::s_get_instance() {
+Cprd& Cprd::_s_get_instance() {
   static Cprd cprd;
+  return cprd;
+}
+
+Cprd& Cprd::s_get_instance() {
+  ThreadState *thr = cur_thread();
+
+  int prev_ignore_sync = thr->ignore_sync;
+  thr->ignore_sync = 1;
+
+  Cprd &cprd = Cprd::_s_get_instance();
+
+  thr->ignore_sync = prev_ignore_sync;
+
   return cprd;
 }
 
@@ -194,8 +209,25 @@ void Cprd::instrument_fence(ThreadState *thr, uptr pc) {
 }
 
 void Cprd::log_happens_before_edge(u64 source_thread, u64 source_epoch, u64 target_thread, u64 target_epoch, const char* comment) {
-  const char* comment_prefix = comment ? "  # " : "";
+  const char* comment_prefix = "  # ";
+  
+  if (!comment) {
+    comment = "";
+    comment_prefix = "";
+  }
+
   Printf("%d:HB_EDGE:%d:%d:%d:%d%s%s\n", target_thread, source_thread, source_epoch, target_thread, target_epoch, comment_prefix, comment);
+}
+
+void Cprd::log_epoch_inc(u64 thread, u64 source_epoch, u64 target_epoch, const char* comment) {
+  const char* comment_prefix = "  # ";
+  
+  if (!comment) {
+    comment = "";
+    comment_prefix = "";
+  }
+
+  Printf("%d:EPOC_INC:%d:%d%s%s\n", thread, source_epoch, target_epoch, comment_prefix, comment);
 }
 
 dfsan_label CprdThreadState::get_unused_label() {
@@ -203,13 +235,13 @@ dfsan_label CprdThreadState::get_unused_label() {
     dfsan_label unused_label = m_unused_labels[m_unused_labels.Size() - 1];
     m_unused_labels.PopBack();
 
-    TRACE_LOG("Using an unused label %hx", unused_label);
+    TRACE_LOG("Using an unused label %x", unused_label);
 
     return unused_label;
   }
 
   dfsan_label label = dfsan_create_label(nullptr, nullptr);
-  TRACE_LOG("Created new label %hx", label);
+  TRACE_LOG("Created new label %x", label);
 
   return label;
 }
@@ -234,7 +266,7 @@ void CprdThreadState::df_mark_read(u64 event_id, u64 tid, uptr pc, uptr addr, u3
     // InternalScopedString label_name(2 * GetPageSizeCached());
     // label_name.append("pd-%p-%p", addr, pc);
     
-    // TRACE_LOG("Creating label %hx - %s", label, label_name.data());
+    // TRACE_LOG("Creating label %x - %s", label, label_name.data());
     // Printf("Creating label\n");
 
     // label = dfsan_create_label(label_name.data(), nullptr);
@@ -259,7 +291,7 @@ void CprdThreadState::df_mark_read(u64 event_id, u64 tid, uptr pc, uptr addr, u3
     dependency_state->size = size;
     dependency_state->pc = pc;
     dependency_state->life = PENDING_READS_LIFE_MAX;
-    TRACE_LOG("Added a pending read on %p at %p of size %d with label %hx", addr, pc, size, label);
+    TRACE_LOG("Added a pending read on %p at %p of size %d with label %x", addr, pc, size, label);
   }
 }
 
@@ -272,7 +304,7 @@ void CprdThreadState::df_process_write(u64 event_id, u64 tid, uptr pc, uptr addr
     return;
   }
 
-  TRACE_LOG("labels for %p of size %d at %p: label_content=%hx, label_address=%hx", addr, size, pc, label_content, label_address);
+  TRACE_LOG("labels for %p of size %d at %p: label_content=%x, label_address=%x", addr, size, pc, label_content, label_address);
 
   TRACE_LOG("Found %d pending reads", df_pending_reads.count());
 
@@ -287,7 +319,7 @@ void CprdThreadState::df_process_write(u64 event_id, u64 tid, uptr pc, uptr addr
     }
     
     if (!dfsan_has_label(label_content, it->label) && !dfsan_has_label(label_address, it->label)) {
-      TRACE_LOG("Ignored - no label %hx", it->label);
+      TRACE_LOG("Ignored - no label %x", it->label);
       continue;
     }
 

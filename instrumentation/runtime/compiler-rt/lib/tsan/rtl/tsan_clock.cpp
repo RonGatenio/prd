@@ -12,6 +12,7 @@
 #include "tsan_clock.h"
 #include "tsan_rtl.h"
 #include "sanitizer_common/sanitizer_placement_new.h"
+#include "cprd/cprd.h"
 
 // SyncClock and ThreadClock implement vector clocks for sync variables
 // (mutexes, atomic variables, file descriptors, etc) and threads, respectively.
@@ -155,7 +156,7 @@ void ThreadClock::acquire(ClockCache *c, SyncClock *src) {
       if (clk_[tid] < dirty.epoch) {
 
         if (tid_ != tid) {
-          Printf("%d:HB_EDGE:%d:%d:%d:%d  # ThreadClock::acquire 1\n", tid_, tid, dirty.epoch, tid_, clk_[tid_]);
+          cprd::Cprd::s_get_instance().log_happens_before_edge(tid, dirty.epoch, tid_, clk_[tid_],  "ThreadClock::acquire 1");
         }
 
         clk_[tid] = dirty.epoch;
@@ -178,7 +179,7 @@ void ThreadClock::acquire(ClockCache *c, SyncClock *src) {
       if (*dst_pos < epoch) {
 
         if (tid_ != tid) {
-          Printf("%d:HB_EDGE:%d:%d:%d:%d  # ThreadClock::acquire 2 (full)\n", tid_, tid, epoch, tid_, clk_[tid_]);
+          cprd::Cprd::s_get_instance().log_happens_before_edge(tid, epoch, tid_, clk_[tid_],  "ThreadClock::acquire 2 (full)");
         }
 
         *dst_pos = epoch;
@@ -228,12 +229,9 @@ void ThreadClock::releaseStoreAcquire(ClockCache *c, SyncClock *sc) {
     if (clk_[i] < ce.epoch) {
       if (clk_[i] != ce.epoch && tid_ != i)
       {
-        Printf("%d:HB_EDGE:%d:%d:%d:%d  # ThreadClock::releaseStoreAcquire\n", tid_, i, ce.epoch, tid_, clk_[tid_]);
+        cprd::Cprd::s_get_instance().log_happens_before_edge(i, ce.epoch, tid_, clk_[tid_],  "ThreadClock::releaseStoreAcquire");
       }
-      else
-      {
-        Printf("# %d:HB_EDGE:%d:%d:%d:%d  # ThreadClock::releaseStoreAcquire\n", tid_, i, ce.epoch, tid_, clk_[tid_]);
-      }
+      
       clk_[i] = ce.epoch;
       acquired = true;
     }
@@ -439,9 +437,9 @@ void ThreadClock::set(ClockCache *c, unsigned tid, u64 v) {
   DCHECK_GE(v, clk_[tid]);
 
   if (tid_ == tid) {
-    Printf("%d:EPOC_INC:%d:%d  # ThreadClock::set(ClockCache*, unsigned, u64)\n", tid_, clk_[tid_], v);
+    cprd::Cprd::s_get_instance().log_epoch_inc(tid_, clk_[tid_], v, "ThreadClock::set(ClockCache*, unsigned, u64)");
   } else if (clk_[tid] != v) {
-    Printf("%d:HB_EDGE:%d:%d:%d:%d  # ThreadClock::set(ClockCache*, unsigned, u64)\n", tid_, tid, v, tid_, clk_[tid_]);
+    cprd::Cprd::s_get_instance().log_happens_before_edge(tid, v, tid_, clk_[tid_],  "ThreadClock::set(ClockCache*, unsigned, u64)");
   }
 
   clk_[tid] = v;

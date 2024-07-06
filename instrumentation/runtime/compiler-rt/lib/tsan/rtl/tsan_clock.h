@@ -14,6 +14,7 @@
 
 #include "tsan_defs.h"
 #include "tsan_dense_alloc.h"
+#include "cprd/cprd.h"
 
 namespace __tsan {
 
@@ -226,14 +227,14 @@ ALWAYS_INLINE void ThreadClock::set(u64 v) {
   DCHECK_GE(v, clk_[tid_]);
 
   if (clk_[tid_] != v) {
-    Printf("%d:EPOC_INC:%d:%d  # ThreadClock::set(u64)\n", tid_, clk_[tid_], v);
+    cprd::Cprd::s_get_instance().log_epoch_inc(tid_, clk_[tid_], v, "ThreadClock::set(u64)");
   }
 
   clk_[tid_] = v;
 }
 
 ALWAYS_INLINE void ThreadClock::tick() {
-  Printf("%d:EPOC_INC:%d:%d  # ThreadClock::tick()\n", tid_, clk_[tid_], clk_[tid_]+1);
+  cprd::Cprd::s_get_instance().log_epoch_inc(tid_, clk_[tid_], clk_[tid_]+1, "ThreadClock::tick()");
   clk_[tid_]++;
 }
 

@@ -17,7 +17,7 @@
 extern "C" {
 #endif
 
-typedef unsigned long long size_t;
+typedef unsigned long long u64;
 typedef unsigned short dfsan_label;
 
 /// Stores information associated with a specific label identifier.  A label
@@ -36,7 +36,7 @@ struct dfsan_label_info {
 };
 
 /// Signature of the callback argument to dfsan_set_write_callback().
-typedef void (*dfsan_write_callback_t)(int fd, const void *buf, size_t count);
+typedef void (*dfsan_write_callback_t)(int fd, const void *buf, u64 count);
 
 /// Computes the union of \c l1 and \c l2, possibly creating a union label in
 /// the process.
@@ -46,11 +46,11 @@ dfsan_label dfsan_union(dfsan_label l1, dfsan_label l2);
 dfsan_label dfsan_create_label(const char *desc, void *userdata);
 
 /// Sets the label for each address in [addr,addr+size) to \c label.
-void dfsan_set_label(dfsan_label label, void *addr, size_t size);
+void dfsan_set_label(dfsan_label label, void *addr, u64 size);
 
 /// Sets the label for each address in [addr,addr+size) to the union of the
 /// current label for that address and \c label.
-void dfsan_add_label(dfsan_label label, void *addr, size_t size);
+void dfsan_add_label(dfsan_label label, void *addr, u64 size);
 
 /// Retrieves the label associated with the given data.
 ///
@@ -61,7 +61,7 @@ void dfsan_add_label(dfsan_label label, void *addr, size_t size);
 dfsan_label dfsan_get_label(long data);
 
 /// Retrieves the label associated with the data at the given address.
-dfsan_label dfsan_read_label(const void *addr, size_t size);
+dfsan_label dfsan_read_label(const void *addr, u64 size);
 
 /// Retrieves a pointer to the dfsan_label_info struct for the given label.
 const struct dfsan_label_info *dfsan_get_label_info(dfsan_label label);
@@ -74,7 +74,7 @@ int dfsan_has_label(dfsan_label label, dfsan_label elem);
 dfsan_label dfsan_has_label_with_desc(dfsan_label label, const char *desc);
 
 /// Returns the number of labels allocated.
-size_t dfsan_get_label_count(void);
+u64 dfsan_get_label_count(void);
 
 /// Flushes the DFSan shadow, i.e. forgets about all labels currently associated
 /// with the application memory.  Use this call to start over the taint tracking
@@ -102,10 +102,10 @@ void dfsan_dump_labels(int fd);
 /// needs to see the parameters of the function and the labels.
 /// FIXME: implement more hooks.
 void dfsan_weak_hook_memcmp(void *caller_pc, const void *s1, const void *s2,
-                            size_t n, dfsan_label s1_label,
+                            u64 n, dfsan_label s1_label,
                             dfsan_label s2_label, dfsan_label n_label);
 void dfsan_weak_hook_strncmp(void *caller_pc, const char *s1, const char *s2,
-                             size_t n, dfsan_label s1_label,
+                             u64 n, dfsan_label s1_label,
                              dfsan_label s2_label, dfsan_label n_label);
 #ifdef __cplusplus
 }  // extern "C"

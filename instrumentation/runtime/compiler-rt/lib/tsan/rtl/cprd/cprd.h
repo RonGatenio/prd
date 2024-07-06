@@ -3,7 +3,7 @@
 
 #include "dfsan/dfsan_interface.h"
 #include "../tsan_defs.h"
-#include "../tsan_rtl.h"
+#include "sanitizer_common/sanitizer_vector.h"
 #include "cprd_common.h"
 #include "cprd_array.h"
 #include "cprd_unordered_collection.h"
@@ -78,6 +78,7 @@ class Cprd {
 
   static void _s_log_callstack(InternalScopedString& iss, ThreadState *thr, uptr pc);
   static void _s_log_loaded_modules();
+  static Cprd& _s_get_instance();
 
  public:
   static Cprd& s_get_instance();
@@ -105,8 +106,11 @@ class Cprd {
   void instrument_flush(ThreadState *thr, uptr pc, uptr addr);
   void instrument_fence(ThreadState *thr, uptr pc);
 
-  // TODO: not used yet
+  /********************************************************************
+   * Vector Clocks Instrumentation
+  *********************************************************************/
   void log_happens_before_edge(u64 source_thread, u64 source_epoch, u64 target_thread, u64 target_epoch, const char* comment = nullptr);
+  void log_epoch_inc(u64 thread, u64 source_epoch, u64 target_epoch, const char* comment = nullptr);
 };
 
 }  // namespace cprd
