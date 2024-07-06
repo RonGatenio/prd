@@ -1,140 +1,130 @@
 import json
 import subprocess
-import time
+import os
 import argparse
+import random
+import string
+import shutil
+import threading
+import time
+from contextlib import contextmanager
 from alive_progress import alive_bar
-from about_time import about_time
-from threading import Thread
+import pycprd
+import pycprd.prd_runner
+
+
+def elapse_time_bar():
+    return alive_bar(stats=False, monitor=False, refresh_secs=0.01)
 
 
 def run_command(command, cwd=None):
-    result = subprocess.run(command, shell=True, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    if result.returncode != 0:
-        print(f"[!] Error running command: {command}\n{result.stderr.decode()}")
-    return result
+    with elapse_time_bar():
+        process = subprocess.Popen(command, shell=True, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        stdout, stderr = process.communicate()
+
+    if process.returncode != 0:
+        print(f"[!] Error running command: {command}\n{stderr.decode()}")
 
 
-def show_elapsed_time(start_time, stop_flag):
-    while not stop_flag.is_set():
-        elapsed = time.time() - start_time
-        print(f"\r[*] Elapsed time: {elapsed:.2f} seconds", end="")
-        time.sleep(1)
-    print()
+def generate_random_pm_file():
+    filename = ''.join(random.choices(string.ascii_lowercase, k=8))
+    return f"/tmp/{filename}_pmem_data"
 
 
-def compile_benchmark(compile_commands, compile_dir, benchmark_name):
-    print(f"\n[*] Compiling benchmark '{benchmark_name}'...\n")
-    with alive_bar(len(compile_commands), title='Compiling') as bar:
+def compile_benchmark(compile_commands, compile_dir, binary, binary_output):
+    if not os.path.exists(binary_output):
         for command in compile_commands:
-            print(f"\n[*] Compiling with command: {command}")
-            start_time = time.time()
-            stop_flag = Thread(target=show_elapsed_time, args=(start_time,))
-            stop_flag.start()
-            with about_time() as t:
-                run_command(command, cwd=compile_dir)
-            stop_flag.join()
-            print(f"[*] Time taken: {t.duration_human}")
-            bar()
+            print(f"[*] Compiling with command: {command}")
+            run_command(command, cwd=compile_dir)
+        shutil.copy2(binary, binary_output)
+        print(f"[*] Copied binary to {binary_output}")
+    else:
+        print(f"[*] Using existing executable: {binary_output}")
 
 
-def run_benchmark_command(run_command_final, run_dir, benchmark_name):
-    print(f"\n[*] Running benchmark '{benchmark_name}' with command: {run_command_final}\n")
-    start_time = time.time()
-    stop_flag = Thread(target=show_elapsed_time, args=(start_time,))
-    stop_flag.start()
-    with about_time() as t:
-        run_command(run_command_final, cwd=run_dir)
-    stop_flag.join()
-    print(f"[*] Execution time for {benchmark_name}: {t.duration_human}")
+def execute_benchmark(run_command_final, run_dir):
+    print(f"[*] Running with command: {run_command_final}")
+    run_command(run_command_final, cwd=run_dir)
 
 
-def analyze_trace(trace_file, results_file, benchmark_name):
-    prd_command = f"pycprd {trace_file} > {results_file}"
-    print(f"\n[*] Analyzing trace file with PRD for '{benchmark_name}'...\n")
-    start_time = time.time()
-    stop_flag = Thread(target=show_elapsed_time, args=(start_time,))
-    stop_flag.start()
-    with about_time() as t:
-        run_command(prd_command)
-    stop_flag.join()
-    print(f"[*] PRD analysis time for {benchmark_name}: {t.duration_human}")
+def analyze_prd(trace_file, results_file, stats_file, timings):
+    pycprd.prd_runner.run(trace_file)
+    # TODO: create this func:
+    # prd_results, prd_timings = pyprd_runner.run_prd_analysis(trace_file)
+    # timings.update(prd_timings)
 
-    with open(results_file, 'r') as file:
-        results = file.read()
-    print(f"\n[*] Results for {benchmark_name}:\n{results}")
+    # with open(results_file, 'w') as file:
+    #     file.write(prd_results)
+    # print(f"[*] Results saved to {results_file}")
+
+    # with open(stats_file, 'w') as file:
+    #     file.write("--- Benchmark Summary ---\n")
+    #     for key, value in timings.items():
+    #         file.write(f"{key}: {value:.2f}\n")
+    # print(f"[*] Stats saved to {stats_file}")
 
 
-def run_benchmark(benchmark_name, config, run_args):
+def run_benchmark(benchmark_name, config):
     benchmark_config = config.get(benchmark_name, {})
     if not benchmark_config:
         print(f"[!] Benchmark '{benchmark_name}' not found in configuration.")
         return
 
-    compile_config = benchmark_config.get("compile", {})
-    run_config = benchmark_config.get("run", {})
+    output_dir = benchmark_config["output_dir"]
+    os.makedirs(output_dir, exist_ok=True)
 
-    compile_dir = compile_config.get("directory")
-    compile_commands = compile_config.get("commands", [])
+    compile_config = benchmark_config["compile"]
+    run_config = benchmark_config["run"]
+    binary = benchmark_config["binary"]
 
-    run_dir = run_config.get("directory")
-    run_command_template = run_config.get("command")
-    default_args = run_config.get("default_args", {})
+    compile_dir = compile_config["directory"]
+    compile_commands = compile_config["commands"]
 
-    trace_file = benchmark_config.get("trace_file")
-    results_file = benchmark_config.get("results_file")
+    run_dir = run_config["directory"]
+    run_command_template = run_config["command"]
+    nkeys = run_config["default_args"]["nkeys"]
+    nthreads = run_config["default_args"]["nthreads"]
 
-    if not compile_dir or not compile_commands or not run_dir or not run_command_template or not trace_file or not results_file:
-        print(f"[!] Invalid configuration for benchmark '{benchmark_name}'.")
-        return
+    pm_file = generate_random_pm_file()
+    trace_file = os.path.join(output_dir, f"{benchmark_name}_{nkeys}_{nthreads}.trace")
+    results_file = os.path.join(output_dir, f"{benchmark_name}_{nkeys}_{nthreads}.races")
+    stats_file = os.path.join(output_dir, f"{benchmark_name}_{nkeys}_{nthreads}.stats")
+    binary_output = os.path.join(output_dir, f"{benchmark_name}.exe")
+
+    timings = {}
 
     try:
-        compile_benchmark(compile_commands, compile_dir, benchmark_name)
+        # Compile
+        compile_benchmark(compile_commands, compile_dir, binary, binary_output)
 
-        run_args_combined = {**default_args, **run_args}
-        run_command_final = run_command_template.format(**run_args_combined, trace_file=trace_file)
+        # Execute
+        run_args = {
+            "pm_file": pm_file,
+            "nkeys": nkeys,
+            "nthreads": nthreads,
+            "trace_file": trace_file
+        }
+        run_command_final = run_command_template.format(**run_args)
+        execute_benchmark(run_command_final, run_dir)
 
-        run_benchmark_command(run_command_final, run_dir, benchmark_name)
-
-        analyze_trace(trace_file, results_file, benchmark_name)
+        # Analyze
+        analyze_prd(trace_file, results_file, stats_file, timings)
 
     except Exception as e:
         print(f"[!] An error occurred while running the benchmark '{benchmark_name}': {e}")
 
 
-def list_benchmarks(config):
-    print("\n[*] Available Benchmarks:")
-    for benchmark in config.keys():
-        print(f" - {benchmark}")
-
-
 def main():
     parser = argparse.ArgumentParser(description='Benchmark Runner for PRD')
-    parser.add_argument('benchmark', type=str, nargs='?', help='The name of the benchmark to run')
-    parser.add_argument('--config', type=str, default='benchmarks.json', help='Path to the configuration file')
-    parser.add_argument('--args', type=str, nargs='*', help='Arguments to override default run arguments')
-    parser.add_argument('--list', action='store_true', help='List all available benchmarks')
+    parser.add_argument('benchmark', type=str, help='The name of the benchmark to run')
+    parser.add_argument('--config', type=str, default=os.path.join(os.path.dirname(__file__), 'benchmarks.json'), help='Path to the configuration file')
 
     args = parser.parse_args()
 
     with open(args.config, 'r') as file:
         config = json.load(file)
 
-    if args.list:
-        list_benchmarks(config)
-        return
-
-    if not args.benchmark:
-        print("[!] Please specify a benchmark to run or use --list to see all available benchmarks.")
-        return
-
-    run_args = {}
-    if args.args:
-        for arg in args.args:
-            key, value = arg.split('=')
-            run_args[key] = value
-
-    run_benchmark(args.benchmark, config, run_args)
-
+    run_benchmark(args.benchmark, config)
 
 if __name__ == "__main__":
     main()

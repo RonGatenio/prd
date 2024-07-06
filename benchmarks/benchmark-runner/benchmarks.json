@@ -1,75 +1,93 @@
 {
     "CCEH": {
+        "output_dir": "/app/results/CCEH",
         "compile": {
-            "directory": "/app/benchmarks/CCEH",
+            "directory": "/app/benchmarks/CCEH/CCEH-PMDK",
             "commands": [
-                "make clean",
-                "make"
+                "make -j"
             ]
         },
         "run": {
-            "directory": "/app/benchmarks/CCEH",
-            "command": "./run_pmdk --threads={threads} --keys={keys}",
+            "directory": "/app/benchmarks/CCEH/CCEH-PMDK/bin",
+            "command": "./multi_threaded_cceh {pm_file} {nkeys} {nthreads} 2> {trace_file}",
             "default_args": {
-                "threads": 4,
-                "keys": 1000
+                "pm_file": "/tmp/pmem_cceh_data",
+                "nkeys": 1000,
+                "nthreads": 4
             }
         },
-        "trace_file": "/app/results/traces/multi_threaded_cceh.trace",
-        "results_file": "/app/results/races/cceh.races"
+        "binary": "/app/benchmarks/CCEH/CCEH-PMDK/bin/multi_threaded_cceh"
     },
     "FAST_FAIR": {
+        "output_dir": "/app/results/FAST_FAIR",
         "compile": {
-            "directory": "/app/benchmarks/FAST_FAIR",
+            "directory": "/app/benchmarks/FAST_FAIR/concurrent_pmdk",
             "commands": [
-                "make clean",
-                "make"
+                "make -j"
             ]
         },
         "run": {
             "directory": "/app/benchmarks/FAST_FAIR",
-            "command": "./run_pmdk --threads={threads} --keys={keys}",
+            "command": "./concurrent_pmdk/bin/btree_concurrent -n {nkeys} -t {nthreads} -i ./sample_input.txt -p {pm_file} 2> {trace_file}",
             "default_args": {
-                "threads": 4,
-                "keys": 1000
+                "pm_file": "/tmp/pmem_btree_data",
+                "nkeys": 1000,
+                "nthreads": 4
+            },
+            "artifacts": {
+                "trace": "/app/results/traces/fast-fair-pmdk.trace"
             }
         },
-        "trace_file": "/app/results/traces/fast-fair-pmdk.trace",
-        "results_file": "/app/results/races/fastfair.races"
+        "binary": "/app/benchmarks/FAST_FAIR/concurrent_pmdk/bin/btree_concurrent"
     },
     "MEMCACHED": {
+        "output_dir": "./output/MEMCACHED",
         "compile": {
             "directory": "/app/benchmarks/memcached-pmem",
             "commands": [
                 "./autogen.sh",
                 "./configure",
                 "make"
-            ]
+            ],
+            "artifacts": {
+                "binary": "/app/benchmarks/memcached-pmem/memcached",
+                "log": "/app/benchmarks/memcached-pmem/build.log"
+            }
         },
         "run": {
             "directory": "/app/benchmarks/memcached-pmem",
             "command": "memcached -u root -m 64 -o pslab,pslab_file={trace_file}",
-            "default_args": {
-                "trace_file": "/app/results/traces/memcached.trace"
+            "default_args": {},
+            "artifacts": {
+                "trace": "/app/results/traces/memcached.trace"
             }
         },
         "trace_file": "/app/results/traces/memcached.trace",
         "results_file": "/app/results/races/memcached.races"
     },
     "RECIPE": {
+        "output_dir": "./output/RECIPE",
         "compile": {
             "directory": "/app/benchmarks/RECIPE",
             "commands": [
                 "make clean",
                 "make"
-            ]
+            ],
+            "artifacts": {
+                "binary": "/app/benchmarks/RECIPE/pclht",
+                "log": "/app/benchmarks/RECIPE/build.log"
+            }
         },
         "run": {
             "directory": "/app/benchmarks/RECIPE",
-            "command": "./run --threads={threads} --keys={keys}",
+            "command": "./P-CLHT/build/pclht {pm_file} {nkeys} {nthreads} 2> {trace_file}",
             "default_args": {
-                "threads": 4,
-                "keys": 1000
+                "pm_file": "/tmp/pmem_pclht_data",
+                "nkeys": 10000,
+                "nthreads": 4
+            },
+            "artifacts": {
+                "trace": "/app/results/traces/pclht.trace"
             }
         },
         "trace_file": "/app/results/traces/pclht.trace",
