@@ -2,13 +2,14 @@
 # Setup stage
 #####################################################################
 
-FROM ubuntu:latest AS setup
+FROM ubuntu:22.04 AS setup
 
 # Set LLVM version
 ENV LLVM_VERSION 14
 
 # Install dev packages
-RUN apt-get update && apt-get install -y llvm-${LLVM_VERSION} llvm-${LLVM_VERSION}-dev clang-${LLVM_VERSION}
+RUN apt update
+RUN apt install -y llvm-${LLVM_VERSION} llvm-${LLVM_VERSION}-dev clang-${LLVM_VERSION}
 RUN apt install -y cmake
 RUN apt install -y python3-pip
 RUN apt install -y build-essential libboost-all-dev libpapi-dev
@@ -34,13 +35,10 @@ RUN ln -s /usr/include/llvm-c-${LLVM_VERSION} /usr/include/llvm-c
 
 
 #####################################################################
-# Build stage
+# Build Cprd stage
 #####################################################################
 
-FROM setup AS build
-
-# Create a working directory
-WORKDIR /app
+FROM setup AS build-cprd
 
 # Copy instrumentation folder to container
 COPY instrumentation /app/instrumentation
@@ -49,12 +47,15 @@ COPY instrumentation /app/instrumentation
 WORKDIR /app/instrumentation/scripts
 RUN dos2unix *.sh
 
-# Setup env
-RUN ./setup-env.sh
-RUN cat /app/instrumentation/scripts/setup-env.sh >> ~/.bashrc
-
 # Build pass and runtime lib
 RUN ./build.sh
+
+
+#####################################################################
+# Build PyCprd stage
+#####################################################################
+
+FROM setup AS build-pycprd
 
 # Copy pyprd folder to container
 COPY pyprd /app/pyprd
@@ -65,13 +66,32 @@ RUN python3 setup.py install
 
 
 #####################################################################
+# Tool Ready stage
+#####################################################################
+
+FROM setup AS cprd
+
+# Copy cprd
+COPY --from=build-cprd /app/instrumentation/scripts/setup-env.sh /app/instrumentation/scripts/setup-env.sh
+COPY --from=build-cprd /app/build /app/build
+
+# Copy pycprd
+COPY --from=build-pycprd /usr/local /usr/local
+
+# Setup env
+WORKDIR /app/instrumentation/scripts
+RUN ./setup-env.sh
+RUN cat ./setup-env.sh >> ~/.bashrc
+
+# Set workdir
+WORKDIR /app
+
+
+#####################################################################
 # Benchmarks stage
 #####################################################################
 
-FROM build AS benchmarks
-
-# Copy from build stage
-COPY --from=build /app /app
+FROM cprd AS benchmarks
 
 # Copy benchmarks folder
 COPY benchmarks /app/benchmarks
