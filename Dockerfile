@@ -27,6 +27,9 @@ RUN apt install -y libtbb-dev libjemalloc-dev
 # Install gdb for debugging
 RUN apt install -y gdb
 
+# Install tini for the startup script
+RUN apt install -y tini
+
 # Set llvm env
 ENV PATH /usr/lib/llvm-${LLVM_VERSION}/bin:$PATH
 
@@ -42,9 +45,10 @@ FROM setup AS build-cprd
 
 # Copy instrumentation folder to container
 COPY instrumentation /app/instrumentation
+COPY scripts /app/scripts
 
 # Setup scripts
-WORKDIR /app/instrumentation/scripts
+WORKDIR /app/scripts
 RUN dos2unix *.sh
 
 # Build pass and runtime lib
@@ -62,6 +66,7 @@ COPY pyprd /app/pyprd
 
 # Install pyprd
 WORKDIR /app/pyprd
+RUN python3 -m pip install -r requirements.txt
 RUN python3 setup.py install
 
 
@@ -72,19 +77,22 @@ RUN python3 setup.py install
 FROM setup AS cprd
 
 # Copy cprd
-COPY --from=build-cprd /app/instrumentation/scripts/setup-env.sh /app/instrumentation/scripts/setup-env.sh
+COPY --from=build-cprd /app/scripts /app/scripts
 COPY --from=build-cprd /app/build /app/build
 
 # Copy pycprd
 COPY --from=build-pycprd /usr/local /usr/local
 
 # Setup env
-WORKDIR /app/instrumentation/scripts
+WORKDIR /app/scripts
 RUN ./setup-env.sh
 RUN cat ./setup-env.sh >> ~/.bashrc
 
 # Set workdir
 WORKDIR /app
+
+# Use tini as the entry point
+ENTRYPOINT ["/usr/bin/tini", "--", "/app/scripts/entrypoint.sh"]
 
 
 #####################################################################
@@ -96,21 +104,27 @@ FROM cprd AS benchmarks
 # Copy benchmarks folder
 COPY benchmarks /app/benchmarks
 
-# Make results compilations folder
-ENV CPRD_RESULTS_BIN /app/results/bin
-RUN mkdir -p ${CPRD_RESULTS_BIN}
-
-# Make results traces folder
-ENV CPRD_RESULTS_TRACES /app/results/traces
-RUN mkdir -p ${CPRD_RESULTS_TRACES}
-
-# Make results races folder
-ENV CPRD_RESULTS_RACES /app/results/races
-RUN mkdir -p ${CPRD_RESULTS_RACES}
-
 # Setup benchmarks
 WORKDIR /app/benchmarks
-RUN dos2unix *.sh
-RUN ./run.sh
 
-ENTRYPOINT ["/bin/bash"]
+# ENTRYPOINT [ "/app/instrumentation/scripts/setup-env.sh" ]
+# CMD [ "/bin/bash", "-c", "/app/benchmarks/run.sh; /bin/bash" ]
+# ENTRYPOINT [ "/bin/bash" ]
+
+WORKDIR /app/benchmarks/benchmark-runner
+
+# Set the entry point to run the benchmarks
+# ENTRYPOINT ["/bin/bash", "-c"]
+
+# Set the default command to run the Python script and then start a bash shell
+# CMD ["if [ -z \"$@\" ]; then python3 benchmark_runner.py FAST_FAIR; fi; exec \"$@\""]
+
+# CMD ["python3", "benchmark_runner.py", "list"]
+CMD ["python3", "benchmark_runner.py", "FAST_FAIR"]
+# CMD python3 benchmark_runner.py FAST_FAIR
+# CMD [ "/bin/bash", "-c", "python3 benchmark_runner.py FAST_FAIR; /bin/bash" ]
+# CMD [ "/bin/bash" ]
+
+# ENTRYPOINT ["/bin/bash"]
+
+
