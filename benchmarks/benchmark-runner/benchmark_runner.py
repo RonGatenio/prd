@@ -5,8 +5,8 @@ import argparse
 import random
 import string
 import shutil
-import threading
 import time
+import threading
 from contextlib import contextmanager
 from alive_progress import alive_bar
 import pycprd
@@ -17,9 +17,9 @@ def elapse_time_bar():
     return alive_bar(stats=False, monitor=False, refresh_secs=0.01)
 
 
-def run_command(command, cwd=None):
+def run_command(command, cwd=None, stdout=subprocess.PIPE, stderr=subprocess.PIPE):
     with elapse_time_bar():
-        process = subprocess.Popen(command, shell=True, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        process = subprocess.Popen(command, shell=True, cwd=cwd, stdout=stdout, stderr=stderr)
         stdout, stderr = process.communicate()
 
     if process.returncode != 0:
@@ -42,9 +42,11 @@ def compile_benchmark(compile_commands, compile_dir, binary, binary_output):
         print(f"[*] Using existing executable: {binary_output}")
 
 
-def execute_benchmark(run_command_final, run_dir):
+def execute_benchmark(run_command_final, run_dir, trace_file):
     print(f"[*] Running with command: {run_command_final}")
-    run_command(run_command_final, cwd=run_dir)
+    
+    with open(trace_file, 'w') as f:
+        run_command(run_command_final, cwd=run_dir, stderr=f)
 
 
 def analyze_prd(trace_file, results_file, stats_file, timings):
@@ -102,17 +104,15 @@ def run_benchmark(benchmark_name, config):
             "pm_file": pm_file,
             "nkeys": nkeys,
             "nthreads": nthreads,
-            "trace_file": trace_file
         }
         run_command_final = run_command_template.format(**run_args)
-        execute_benchmark(run_command_final, run_dir)
+        execute_benchmark(run_command_final, run_dir, trace_file)
 
         # Analyze
         analyze_prd(trace_file, results_file, stats_file, timings)
 
     except Exception as e:
         print(f"[!] An error occurred while running the benchmark '{benchmark_name}': {e}")
-
 
 def main():
     parser = argparse.ArgumentParser(description='Benchmark Runner for PRD')

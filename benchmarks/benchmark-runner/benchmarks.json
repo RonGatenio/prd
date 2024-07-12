@@ -9,7 +9,7 @@
         },
         "run": {
             "directory": "/app/benchmarks/CCEH/CCEH-PMDK/bin",
-            "command": "./multi_threaded_cceh {pm_file} {nkeys} {nthreads} 2> {trace_file}",
+            "command": "./multi_threaded_cceh {pm_file} {nkeys} {nthreads}",
             "default_args": {
                 "pm_file": "/tmp/pmem_cceh_data",
                 "nkeys": 1000,
@@ -28,7 +28,7 @@
         },
         "run": {
             "directory": "/app/benchmarks/FAST_FAIR",
-            "command": "./concurrent_pmdk/bin/btree_concurrent -n {nkeys} -t {nthreads} -i ./sample_input.txt -p {pm_file} 2> {trace_file}",
+            "command": "./concurrent_pmdk/bin/btree_concurrent -n {nkeys} -t {nthreads} -i ./sample_input.txt -p {pm_file}",
             "default_args": {
                 "pm_file": "/tmp/pmem_btree_data",
                 "nkeys": 1000,
@@ -80,7 +80,7 @@
         },
         "run": {
             "directory": "/app/benchmarks/RECIPE",
-            "command": "./P-CLHT/build/pclht {pm_file} {nkeys} {nthreads} 2> {trace_file}",
+            "command": "./P-CLHT/build/pclht {pm_file} {nkeys} {nthreads}",
             "default_args": {
                 "pm_file": "/tmp/pmem_pclht_data",
                 "nkeys": 10000,
