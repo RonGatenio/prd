@@ -52,13 +52,15 @@ class PersistencyRace:
 
 class PersistencyRaces:
     def __init__(self):
-        self._races:                Set[PersistencyRace]                       = set()
-        self._races_by_pc:          Dict[int, Dict[int, Set[PersistencyRace]]] = defaultdict(lambda: defaultdict(set))
-        self._races_by_pc_tstate:   Dict[int, Dict[int, Set[str]]]             = defaultdict(lambda: defaultdict(set))
-        self._races_by_pc_wx_hb_wy: Dict[int, Dict[int, Set[str]]]             = defaultdict(lambda: defaultdict(set))
-        self._races_by_info:        Dict[int, Dict[int, Set[PersistencyRace]]] = defaultdict(lambda: defaultdict(set))
-        self._races_by_info_tstate: Dict[int, Dict[int, Set[str]]]             = defaultdict(lambda: defaultdict(set))
-        self._races_by_info_wx_hb_wy: Dict[int, Dict[int, Set[str]]]             = defaultdict(lambda: defaultdict(set))
+        self._races:                  Set[PersistencyRace]                        = set()
+        self._races_by_pc:            Dict[int, Dict[int, Set[PersistencyRace]]]  = defaultdict(lambda: defaultdict(set))
+        self._races_by_pc_tstate:     Dict[int, Dict[int, Set[str]]]              = defaultdict(lambda: defaultdict(set))
+        self._races_pcs_by_tstate:    Dict[str, Set[Tuple[int, int]]]             = defaultdict(set)
+        self._races_by_pc_wx_hb_wy:   Dict[int, Dict[int, Set[str]]]              = defaultdict(lambda: defaultdict(set))
+        self._races_by_rw_pcs:        Dict[Tuple[int, int], Set[PersistencyRace]] = defaultdict(set)
+        self._races_by_info:          Dict[int, Dict[int, Set[PersistencyRace]]]  = defaultdict(lambda: defaultdict(set))
+        self._races_by_info_tstate:   Dict[int, Dict[int, Set[str]]]              = defaultdict(lambda: defaultdict(set))
+        self._races_by_info_wx_hb_wy: Dict[int, Dict[int, Set[str]]]              = defaultdict(lambda: defaultdict(set))
     
     @staticmethod
     def _get_race_id_by_pc(race: PersistencyRace):
@@ -77,6 +79,14 @@ class PersistencyRaces:
         return self._races_by_pc
     
     @property
+    def races_pcs_by_tstate(self):
+        return self._races_pcs_by_tstate
+    
+    @property
+    def races_by_rw_pcs(self):
+        return self._races_by_rw_pcs
+    
+    @property
     def races_by_info(self):
         return self._races_by_info
 
@@ -89,7 +99,9 @@ class PersistencyRaces:
         read_already_saved  = race.read_node.pc  in self._races_by_pc
         write_already_saved = race.write_node.pc in self._races_by_pc[race.read_node.pc]
         self._races_by_pc[race.read_node.pc][race.write_node.pc].add(race)
+        self._races_by_rw_pcs[(race.read_node.pc, race.write_node.pc)].add(race)
         self._races_by_pc_tstate[race.read_node.pc][race.write_node.pc].add(tstate)
+        self._races_pcs_by_tstate[tstate].add((race.read_node.pc, race.write_node.pc))
         self._races_by_pc_wx_hb_wy[race.read_node.info][race.write_node.info].add(wx_hb_wy)
         
         read_already_saved  = race.read_node.info  in self._races_by_info
@@ -97,10 +109,6 @@ class PersistencyRaces:
         self._races_by_info[race.read_node.info][race.write_node.info].add(race)
         self._races_by_info_tstate[race.read_node.info][race.write_node.info].add(tstate)
         self._races_by_info_wx_hb_wy[race.read_node.info][race.write_node.info].add(wx_hb_wy)
-
-    def clear(self):
-        self._races.clear()
-        self._races_by_pc.clear()
         
     @staticmethod
     def races_iterator(races: Dict[int, Dict[int, Set[PersistencyRace]]]) -> Generator[Tuple[int, ReadNode, WriteNode, Set[WriteNode]], None, None]:
@@ -177,7 +185,7 @@ class PersistencyRaceDetector:
                  show_only_first_bug_in_thread=False):
         self._hbg = hbg
         self._pdg = pdg
-        self._races = PersistencyRaces()
+        self._races = None
 
         self._ignore_inter_thread_edges     = ignore_inter_thread_edges
         self._ignore_flush_nodes            = ignore_flush_nodes
@@ -210,8 +218,11 @@ class PersistencyRaceDetector:
             lines.append('Races')
             lines.append(f"{INDENT}Total races by trace events      {len(self._races.races):,}")
             lines.append(f"{INDENT}Total races by instructions      {sum(map(len, self._races.races_by_pc.values())):,}")
+            lines.append(f"{INDENT}Total races by instructions (RW) {len(self._races.races_by_rw_pcs):,}")
             lines.append(f"{INDENT}Total races by callstack (info)  {sum(map(len, self._races.races_by_info.values())):,}")
             lines.append(f"{INDENT}Total races by read instructions {len(list(self._races.race_nodes_by_read_pc())):,}")
+            lines.append(f"{INDENT}Total inter races                {len(self._races.races_pcs_by_tstate['inter']):,}")
+            lines.append(f"{INDENT}Total intra races                {len(self._races.races_pcs_by_tstate['intra']):,}")
             lines.append(f"{INDENT}Duration                         {self._time_first_stage + self._time_second_stage:.2f} sec")
             lines.append(f"{INDENT}{INDENT}1st stage duration {self._time_first_stage:.2f} sec")
             lines.append(f"{INDENT}{INDENT}2nd stage duration {self._time_second_stage:.2f} sec")
@@ -467,7 +478,7 @@ class PersistencyRaceDetector:
                         dirty_cachelines[n.tid].update_child(dirty_cachelines_per_epoch[child])
 
     def run(self, validate=False, use_faster_version=True):
-        self._races.clear()
+        self._races = PersistencyRaces()
 
         with utils.timeit() as t:
             vc_per_read_node = self._build_happens_after_vector_clocks()
