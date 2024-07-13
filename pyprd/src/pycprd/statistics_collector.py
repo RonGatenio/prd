@@ -32,6 +32,8 @@ class StatisticsCollector:
         
         if as_percentage:
             value = f"{value:,.2%}"
+        elif isinstance(value, bool):
+            value = f'{value}'
         elif isinstance(value, float):
             value = f"{value:,.2f}"
         elif isinstance(value, int):
