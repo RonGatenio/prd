@@ -2,6 +2,7 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import Dict, Generator, List, Set, Tuple
 import logging
+from .statistics_collector import StatisticsCollector
 from .nodes import AbstractNode, NodeType, ReadNode, WriteNode, FlushNode, EpochNode
 from .types import ThreadId, Cacheline
 from .trace_event_info import TraceEventInfo
@@ -199,39 +200,33 @@ class PersistencyRaceDetector:
         
         self._race_counter_dropped_by_read_persistency = 0
 
-    def stats(self) -> str:
-        lines = []
+    def stats(self) -> StatisticsCollector:
+        s = StatisticsCollector('PRD')
         
-        INDENT = ' ' * 2
-
         # Presets
-        lines.append('Presets')
-        lines.append(f"{INDENT}Ignore inter-thread edges (skipping Epoch nodes)                     {self._ignore_inter_thread_edges}")
-        lines.append(f"{INDENT}Ignore flush nodes                                                   {self._ignore_flush_nodes}")
-        lines.append(f"{INDENT}Ignore Persisted-Before vectors (all Write nodes are unflushed)      {self._ignore_persisted_before_index}")
-        lines.append(f"{INDENT}Ignore Happens-After vectors (no nodes happen-after the read node)   {self._ignore_happens_after_index}")
-        lines.append(f"{INDENT}Ignore read node persistency (the read is never considered flushed)  {self._ignore_read_node_persistency}")
-        lines.append(f"{INDENT}Show only first bug in thread (don't iterate over all W(X)s)         {self._show_only_first_bug_in_thread}")
-
+        s.add_statistic('Presets', 'Ignore inter-thread edges (skipping Epoch nodes)', self._ignore_inter_thread_edges)
+        s.add_statistic('Presets', 'Ignore flush nodes', self._ignore_flush_nodes)
+        s.add_statistic('Presets', 'Ignore Persisted-Before vectors (all Write nodes are unflushed)', self._ignore_persisted_before_index)
+        s.add_statistic('Presets', 'Ignore Happens-After vectors (no nodes happen-after the read node)', self._ignore_happens_after_index)
+        s.add_statistic('Presets', 'Ignore read node persistency (the read is never considered flushed)', self._ignore_read_node_persistency)
+        s.add_statistic('Presets', "Show only first bug in thread (don't iterate over all W(X)s)", self._show_only_first_bug_in_thread)
+        
         # Races
         if self._races:
-            lines.append('Races')
-            lines.append(f"{INDENT}Total races by trace events      {len(self._races.races):,}")
-            lines.append(f"{INDENT}Total races by instructions      {sum(map(len, self._races.races_by_pc.values())):,}")
-            lines.append(f"{INDENT}Total races by instructions (RW) {len(self._races.races_by_rw_pcs):,}")
-            lines.append(f"{INDENT}Total races by callstack (info)  {sum(map(len, self._races.races_by_info.values())):,}")
-            lines.append(f"{INDENT}Total races by read instructions {len(list(self._races.race_nodes_by_read_pc())):,}")
-            lines.append(f"{INDENT}Total inter races                {len(self._races.races_pcs_by_tstate['inter']):,}")
-            lines.append(f"{INDENT}Total intra races                {len(self._races.races_pcs_by_tstate['intra']):,}")
-            lines.append(f"{INDENT}Duration                         {self._time_first_stage + self._time_second_stage:.2f} sec")
-            lines.append(f"{INDENT}{INDENT}1st stage duration {self._time_first_stage:.2f} sec")
-            lines.append(f"{INDENT}{INDENT}2nd stage duration {self._time_second_stage:.2f} sec")
+            s.add_statistic('Races', "By trace events",      len(self._races.races))
+            s.add_statistic('Races', "By instructions",      sum(map(len, self._races.races_by_pc.values())))
+            s.add_statistic('Races', "By instructions (RW)", len(self._races.races_by_rw_pcs))
+            s.add_statistic('Races', "By callstack (info)",  sum(map(len, self._races.races_by_info.values())))
+            s.add_statistic('Races', "By read instructions", len(list(self._races.race_nodes_by_read_pc())))
+            
+            s.add_statistic('Races Types', "Inter", len(self._races.races_pcs_by_tstate['inter']))
+            s.add_statistic('Races Types', "Intra", len(self._races.races_pcs_by_tstate['intra']))
+            
+            s.add_statistic('Duration', 'Total [sec]', self._time_first_stage + self._time_second_stage)
+            s.add_statistic('Duration', '  1st Stage [sec]', self._time_first_stage)
+            s.add_statistic('Duration', '  2nd Stage [sec]', self._time_second_stage)
 
-        max_line_size = max(map(len, lines))
-        lines.insert(0, f'{" CPRD Stats ":#^{max_line_size}}')
-        lines.append(f'{"":#^{max_line_size}}')
-
-        return '\n'.join(lines)
+        return s
 
     @property
     def hbg(self):

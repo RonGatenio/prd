@@ -11,6 +11,7 @@ from contextlib import contextmanager
 from alive_progress import alive_bar
 import pycprd
 import pycprd.prd_runner
+from pycprd.statistics_collector import StatisticsCollector
 from pycprd.utils import timeit
 
 
@@ -32,7 +33,9 @@ def generate_random_pm_file():
     return f"/tmp/{filename}_pmem_data"
 
 
-def compile_benchmark(compile_commands, compile_dir, binary, binary_output):
+def compile_benchmark(compile_commands, compile_dir, binary, binary_output) -> StatisticsCollector:
+    stats = StatisticsCollector('Compile')
+    
     if not os.path.exists(binary_output):
         with timeit('Benchmark Compiled') as benchmark_compile_time:
             for command in compile_commands:
@@ -41,62 +44,43 @@ def compile_benchmark(compile_commands, compile_dir, binary, binary_output):
             shutil.copy2(binary, binary_output)
             print(f"[*] Copied binary to {binary_output}")
             
-        return {
-            'benchmark_compile_time': benchmark_compile_time.total
-        }
+        stats.add_statistic('Benchmark Duration', 'Compile time [sec]', benchmark_compile_time.total)
     else:
         print(f"[*] Using existing executable: {binary_output}")
-        return {}
+    
+    return stats
 
 
-def execute_benchmark(run_command_final, run_dir, trace_file):
+def execute_benchmark(run_command_final, run_dir, trace_file) -> StatisticsCollector:
+    stats = StatisticsCollector('Execution')
+
     print(f"[*] Running with command: {run_command_final}")
     
     with timeit('Benchmark Execution') as benchmark_execution:
         with open(trace_file, 'w') as f:
             run_command(run_command_final, cwd=run_dir, stderr=f)
     
-    return {
-        'benchmark_execution_time': benchmark_execution.total
-    }
-
-
-def analyze_prd(trace_file, races_file):
-    prd, execution_stats = pycprd.prd_runner.run(trace_file)
-    
-    s, t = pycprd.prd_runner.races_to_str(prd)
-    
-    with open(races_file, 'w') as f:
-        f.write(s)
-    
-    stats = {
-        'total_race': len(prd.races.races_by_rw_pcs),
-        'inter_races': len(prd.races.races_pcs_by_tstate['inter']),
-        'intra_races': len(prd.races.races_pcs_by_tstate['intra']),
-        'total_race_by_event': len(prd.races.races),
-        'races_to_str_evaluation_time': t,
-    }
-    
-    stats.update(execution_stats)
+    stats.add_statistic('Benchmark Duration', 'Execution time [sec]', benchmark_execution.total)
     
     return stats
+
+
+def analyze_prd(trace_file, races_file) -> StatisticsCollector:
+    prd, stats = pycprd.prd_runner.run(trace_file)
     
-    # TODO: create this func:
-    # prd_results, prd_timings = pyprd_runner.run_prd_analysis(trace_file)
-    # timings.update(prd_timings)
-
-    # with open(results_file, 'w') as file:
-    #     file.write(prd_results)
-    # print(f"[*] Results saved to {results_file}")
-
-    # with open(stats_file, 'w') as file:
-    #     file.write("--- Benchmark Summary ---\n")
-    #     for key, value in timings.items():
-    #         file.write(f"{key}: {value:.2f}\n")
-    # print(f"[*] Stats saved to {stats_file}")
+    races_str, t = pycprd.prd_runner.races_to_str(prd)
+    
+    with open(races_file, 'w') as f:
+        f.write(races_str)
+        
+    stats.add_statistic('Duration', 'Races Print Evaluation [sec]', t)
+    
+    return stats
 
 
 def run_benchmark(benchmark_name, config):
+    stats = StatisticsCollector(f'Benchmark Execution {benchmark_name}')
+    
     benchmark_config = config.get(benchmark_name, {})
     if not benchmark_config:
         print(f"[!] Benchmark '{benchmark_name}' not found in configuration.")
@@ -123,40 +107,39 @@ def run_benchmark(benchmark_name, config):
     stats_file = os.path.join(output_dir, f"{benchmark_name}_{nkeys}_{nthreads}.stats")
     binary_output = os.path.join(output_dir, f"{benchmark_name}.exe")
 
-    stats = {
-        'name': benchmark_name,
-        'trace_file': trace_file,
-        'races_file': races_file,
-        'binary_output': binary_output,
-    }
+    stats.add_statistic('Benchmark Presets', 'Name', benchmark_name)
+    stats.add_statistic('Benchmark Output', 'Trace file', trace_file)
+    stats.add_statistic('Benchmark Output', 'Races file', races_file)
+    stats.add_statistic('Benchmark Output', 'Executable', binary_output)
 
     try:
         # Compile
         s = compile_benchmark(compile_commands, compile_dir, binary, binary_output)
-        stats.update(s)
+        stats.merge(s)
 
         # Execute
+        stats.add_statistic('Benchmark Presets', 'nkeys', nkeys)
+        stats.add_statistic('Benchmark Presets', 'nthreads', nthreads)
+
         run_args = {
             "pm_file": pm_file,
             "nkeys": nkeys,
             "nthreads": nthreads,
         }
-        stats.update(run_args)
         
         run_command_final = run_command_template.format(**run_args)
         s = execute_benchmark(run_command_final, run_dir, trace_file)
-        stats.update(s)
+        stats.merge(s)
 
         # Analyze
         s = analyze_prd(trace_file, races_file)
-        stats.update(s)
+        stats.merge(s)
         
         # Save stats
         with open(stats_file, 'w') as f:
-            json.dump(stats, f)
+            f.write(stats.to_json())
             
-        from pprint import pprint
-        pprint(stats)
+        print(stats)
 
     except Exception as e:
         print(f"[!] An error occurred while running the benchmark '{benchmark_name}': {e}")

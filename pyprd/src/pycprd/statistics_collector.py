@@ -7,10 +7,10 @@ class StatisticsCollector:
         self.title = title
         self.statistics = OrderedDict()
 
-    def add_statistic(self, category, subcategory, value, as_percentage=False):
+    def add_statistic(self, category, subcategory, value, as_percentage=False, indent=0):
         if category not in self.statistics:
             self.statistics[category] = OrderedDict()
-        self.statistics[category][subcategory] = {'value': value, 'as_percentage': as_percentage}
+        self.statistics[category][subcategory] = {'value': value, 'as_percentage': as_percentage, 'indent': indent}
 
     def set_title(self, title):
         self.title = title
@@ -25,14 +25,19 @@ class StatisticsCollector:
             else:
                 d[k] = v
 
-    def _format_value(self, value, as_percentage):
+    def _format_entry(self, entry: dict):
+        value = entry['value']
+        as_percentage = entry.get('as_percentage', False)
+        indent = entry.get('indent', 0)
+        
         if as_percentage:
-            return f"{value:,.2%}"
+            value = f"{value:,.2%}"
         if isinstance(value, float):
-            return f"{value:,.2f}"
+            value = f"{value:,.2f}"
         if isinstance(value, int):
-            return f"{value:,}"
-        return str(value)
+            value = f"{value:,}"
+        
+        return f"{'':{indent}}{value}"
 
     def to_str(self, min_width=50, space_filler='.'):
         space_inner = '  '
@@ -40,7 +45,7 @@ class StatisticsCollector:
         
         max_cat_len = max((len(cat) for cat in self.statistics), default=0)
         max_subcat_len = max((len(subcat) for cat in self.statistics.values() for subcat in cat), default=0) + len(space_outer) + len(space_inner)
-        max_val_len = max((len(self._format_value(val['value'], val['as_percentage'])) for cat in self.statistics.values() for val in cat.values()), default=0) + len(space_outer) + len(space_inner)
+        max_val_len = max((len(self._format_entry(val)) for cat in self.statistics.values() for val in cat.values()), default=0) + len(space_outer) + len(space_inner)
         max_width = max(max(max_subcat_len + max_val_len, max_cat_len) + 10, min_width)
         
         sep_line = f"{'':#^{max_width}}"
@@ -55,7 +60,7 @@ class StatisticsCollector:
             output.append(f"{f' {category} ':~^{max_width}}")
 
             for subcategory, value in subcategories.items():
-                formatted_value = self._format_value(value['value'], value['as_percentage'])
+                formatted_value = self._format_entry(value)
                 output.append(f"{f'{space_outer}{subcategory}{space_inner}':{space_filler}<{max_subcat_len}}{f'{space_inner}{formatted_value}{space_outer}':{space_filler}>{max_width-max_subcat_len}}")
 
         output.append(sep_line)

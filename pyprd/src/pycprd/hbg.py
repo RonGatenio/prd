@@ -8,6 +8,7 @@ from . import nodes
 from .nodes import ReadNode, WriteNode
 from . import utils
 from . import config
+from .statistics_collector import StatisticsCollector
 
 
 class EdgeType(Enum):
@@ -198,34 +199,73 @@ class HBG:
 
         return {cacheline: (cacheline_last[cacheline] - cacheline_first[cacheline]) / len(self._nodes) for cacheline in cacheline_first}
 
-    def stats(self, full=False) -> str:
+    def stats(self) -> StatisticsCollector:
         import statistics
         
-        lines = []
+        s = StatisticsCollector("HBG")
         
-        INDENT = ' ' * 2
-
-        # Threads
-        lines.append(f'Number of Threads     {len(self.tids):,}')
-
-        # Variables
-        lines.append(f'Number of Variables   {len(self._vars):,}')
+        # general
+        s.add_statistic('General', 'Nodes/Events', self._graph.number_of_nodes())
+        s.add_statistic('General', 'Edges', self._graph.number_of_edges())
+        s.add_statistic('General', 'Threads', len(self.tids))
+        s.add_statistic('General', 'Variables', len(self._vars))
+        
+        # Nodes
+        s.add_statistic('Nodes/Events', 'Total', self._graph.number_of_nodes())
+        for t in nodes.NodeType:
+            s.add_statistic('Nodes/Events', f'  {t.name}', len(self.get_nodes_by_type(t)))
+        
+        # Edges
+        s.add_statistic('Edges', 'Total', self._graph.number_of_edges())
+        s.add_statistic('Edges', '  Inter', self.inter.number_of_edges())
+        s.add_statistic('Edges', '  Intra', self.intra.number_of_edges())
+        
+        # Variable sizes
         for k in sorted(self._vars_by_size):
-            lines.append(f'{INDENT}{k:<2} {len(self._vars_by_size[k]):,}')
+            s.add_statistic('Variable Sizes', f'Size {k}', len(self._vars_by_size[k]))
 
         # Nodes per variable statistics
-        lines.append('Nodes per variable statistics')
         total_nodes_per_var = sorted(list(map(len, self._vars.values())))
         assert sum(total_nodes_per_var) == len(self.read_write_nodes)
-        lines.append(f'{INDENT}Average      {len(self.read_write_nodes) / len(self._vars):,.2f}')
-        lines.append(f'{INDENT}Variance     {statistics.variance(total_nodes_per_var):,.2f}')
-        total_nodes_per_var_set = set(total_nodes_per_var)
-        lines.append(f'{INDENT}Unique sizes {len(total_nodes_per_var_set):,}')
-        if len(total_nodes_per_var_set) < 15:
-            lines.append(f'{INDENT}Sizes        {sorted(list(total_nodes_per_var_set), reverse=True)}')
-        # lines.append(f'{INDENT}2nd max  {total_nodes_per_var[-2]}')
-        # lines.append(f'{INDENT}Min      {min(total_nodes_per_var)}')
-            
+        
+        s.add_statistic('Nodes Per Variable', 'Average', len(self.read_write_nodes) / len(self._vars))
+        s.add_statistic('Nodes Per Variable', 'Variance', statistics.variance(total_nodes_per_var))
+
+        # PC
+        s.add_statistic('Instructions', 'Total', len(self._pc_info))
+        s.add_statistic('Instructions', '  Read', len({r.pc for r in self._nodes_by_type[nodes.NodeType.READ]}))
+        s.add_statistic('Instructions', '  Write', len({r.pc for r in self._nodes_by_type[nodes.NodeType.WRITE]}))
+        s.add_statistic('Instructions', '  Flush', len({r.pc for r in self._nodes_by_type[nodes.NodeType.FLUSH]}))
+        s.add_statistic('Instructions', 'Executions per instruction', self._graph.number_of_nodes()/len(self._pc_info))
+
+        # Cachelines
+        s.add_statistic('Cachelines', 'Total', len(self._cachelines))
+        s.add_statistic('Cachelines', 'Size', self._cacheline_size)
+
+        cacheline_liveliness = self._cacheline_liveliness_analysis()
+
+        s.add_statistic('Cachelines', 'Max liveliness', max(cacheline_liveliness.values()), as_percentage=True)
+        s.add_statistic('Cachelines', 'Average length', statistics.mean(cacheline_liveliness.values()), as_percentage=True)
+        s.add_statistic('Cachelines', 'Median length', statistics.median(cacheline_liveliness.values()), as_percentage=True)
+        
+        nodes_per_cacheline = defaultdict(int)
+        for n in self._nodes:
+            if nodes.NodeType.is_instruction_type(n.itype):
+                nodes_per_cacheline[n.get_cacheline_address()] += 1
+        
+        s.add_statistic('Nodes Per Cacheline', 'Max', max(nodes_per_cacheline.values()))
+        s.add_statistic('Nodes Per Cacheline', 'Median', statistics.median(nodes_per_cacheline.values()))
+        s.add_statistic('Nodes Per Cacheline', 'Average', statistics.mean(nodes_per_cacheline.values()))
+        s.add_statistic('Nodes Per Cacheline', 'Variance', statistics.variance(nodes_per_cacheline.values()))
+
+        # DaisyChains
+        if self._daisy_chains:
+            daisy_chains = list(self._daisy_chains.get_daisychains())
+            s.add_statistic('Variable Chains', 'Total chains', len(daisy_chains))
+            s.add_statistic('Variable Chains', 'Max length', max(map(len, daisy_chains)))
+            s.add_statistic('Variable Chains', 'Average length', statistics.mean(map(len, daisy_chains)))
+            s.add_statistic('Variable Chains', 'Median length', statistics.median(map(len, daisy_chains)))
+
         # RW Candidates
         _write_pcs_by_read_pc = defaultdict(set)
         for var, read_nodes in self._read_nodes_by_vars.items():
@@ -234,62 +274,9 @@ class HBG:
                 _write_pcs_by_read_pc[r.pc] |= ({w.pc for w in write_nodes})
 
         _total_rw_couples = sum(map(len, _write_pcs_by_read_pc.values()))
-        lines.append(f'R/W Candidates {_total_rw_couples:,}')
-
-        # PC
-        lines.append('Instructions')
-        lines.append(f'{INDENT}Total instructions            {len(self._pc_info):,}')
-        lines.append(f'{INDENT}{INDENT}Total read instructions  {len({r.pc for r in self._nodes_by_type[nodes.NodeType.READ]}):,}')
-        lines.append(f'{INDENT}{INDENT}Total write instructions {len({r.pc for r in self._nodes_by_type[nodes.NodeType.WRITE]}):,}')
-        lines.append(f'{INDENT}{INDENT}Total flush instructions {len({r.pc for r in self._nodes_by_type[nodes.NodeType.FLUSH]}):,}')
-        lines.append(f'{INDENT}Trace events per instructions {self._graph.number_of_nodes()/len(self._pc_info):,.2f}')
-        self._pc_info
-
-        # Cachelines
-        lines.append(f'Number of Cachelines  {len(self._cachelines):,}')
-        lines.append(f'Cacheline size        {self._cacheline_size}')
-
-        cacheline_liveliness = self._cacheline_liveliness_analysis()
-
-        lines.append(f'{INDENT}Max liveliness {max(cacheline_liveliness.values()) * 100:,.2f}%')
-        lines.append(f'{INDENT}Average length {statistics.mean(cacheline_liveliness.values()) * 100:,.2f}%')
-        lines.append(f'{INDENT}Median length  {statistics.median(cacheline_liveliness.values()) * 100:,.2f}%')
-
-        lines.append('Nodes per cacheline statistics')
-        nodes_per_cacheline = defaultdict(int)
-        for n in self._nodes:
-            if nodes.NodeType.is_instruction_type(n.itype):
-                nodes_per_cacheline[n.get_cacheline_address()] += 1
-
-        lines.append(f'{INDENT}Max      {max(nodes_per_cacheline.values())}')
-        lines.append(f'{INDENT}Median   {statistics.median(nodes_per_cacheline.values())}')
-        lines.append(f'{INDENT}Average  {statistics.mean(nodes_per_cacheline.values()):,.2f}')
-        lines.append(f'{INDENT}Variance {statistics.variance(nodes_per_cacheline.values()):,.2f}')
-
-        # Nodes
-        lines.append(f'Number of Nodes       {self._graph.number_of_nodes():,}')
-        for t in nodes.NodeType:
-            lines.append(f'{INDENT}{t.name:6} {len(self.get_nodes_by_type(t)):,}')
-
-        # Edges
-        if full:
-            lines.append(f'Number of Edges       {self._graph.number_of_edges():,}')
-            lines.append(f'{INDENT}Inter Edges {self.inter.number_of_edges():,}')
-            lines.append(f'{INDENT}Intra Edges {self.intra.number_of_edges():,}')
-
-        # DaisyChains
-        if self._daisy_chains:
-            daisy_chains = list(self._daisy_chains.get_daisychains())
-            lines.append(f'Number of chains      {len(daisy_chains):,}')
-            lines.append(f'{INDENT}Max length     {max(map(len, daisy_chains)):,}')
-            lines.append(f'{INDENT}Average length {statistics.mean(map(len, daisy_chains)):,.2f}')
-            lines.append(f'{INDENT}Median length  {statistics.median(map(len, daisy_chains)):,.2f}')
-
-        max_line_size = max(map(len, lines))
-        lines.insert(0, f'{" HBG Stats ":#^{max_line_size}}')
-        lines.append(f'{"":#^{max_line_size}}')
-
-        return '\n'.join(lines)
+        s.add_statistic('R/W Candidates', 'Total', _total_rw_couples)
+        
+        return s
     
     def __len__(self):
         return len(self._nodes)
