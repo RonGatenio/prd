@@ -8,7 +8,7 @@ SCRIPTS_DIR="$(cd "$(dirname "$0")" && pwd)"
 # Setup env
 . $SCRIPTS_DIR/setup-env.sh
 
-SRC_DIR=$SCRIPTS_DIR/../instrumentation
+SRC_DIR=$APP_ROOT/instrumentation
 
 # Create build folder
 mkdir $APP_BUILD

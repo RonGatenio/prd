@@ -17,8 +17,22 @@ SCRIPTS_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 # Execute the command passed as arguments, if any
 if [ "$#" -gt 0 ]; then
-  exec "$@"
+
+  # Start the child process in the foreground
+  "$@" &
+
+  # Get the PID of the child process
+  child_pid=$!
+
+  # Wait for the child process to exit
+  wait $child_pid
+
+  # Open an interactive shell
+  exec /bin/bash
+
 else
+  
   # If no command is provided, fall back to an interactive bash shell
   exec /bin/bash
+
 fi

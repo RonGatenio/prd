@@ -4,8 +4,10 @@
 
 FROM ubuntu:22.04 AS setup
 
+ARG DEBIAN_FRONTEND=noninteractive
+
 # Set LLVM version
-ENV LLVM_VERSION 14
+ENV LLVM_VERSION=14
 
 # Install dev packages
 RUN apt update
@@ -31,7 +33,7 @@ RUN apt install -y gdb
 RUN apt install -y tini
 
 # Set llvm env
-ENV PATH /usr/lib/llvm-${LLVM_VERSION}/bin:$PATH
+ENV PATH=/usr/lib/llvm-${LLVM_VERSION}/bin:$PATH
 
 RUN ln -s /usr/include/llvm-${LLVM_VERSION} /usr/include/llvm
 RUN ln -s /usr/include/llvm-c-${LLVM_VERSION} /usr/include/llvm-c
