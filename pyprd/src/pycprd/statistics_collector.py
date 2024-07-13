@@ -32,9 +32,9 @@ class StatisticsCollector:
         
         if as_percentage:
             value = f"{value:,.2%}"
-        if isinstance(value, float):
+        elif isinstance(value, float):
             value = f"{value:,.2f}"
-        if isinstance(value, int):
+        elif isinstance(value, int):
             value = f"{value:,}"
         
         return f"{'':{indent}}{value}"
@@ -62,6 +62,7 @@ class StatisticsCollector:
             for subcategory, value in subcategories.items():
                 formatted_value = self._format_entry(value)
                 output.append(f"{f'{space_outer}{subcategory}{space_inner}':{space_filler}<{max_subcat_len}}{f'{space_inner}{formatted_value}{space_outer}':{space_filler}>{max_width-max_subcat_len}}")
+            output.append('')
 
         output.append(sep_line)
         return '\n'.join(output)

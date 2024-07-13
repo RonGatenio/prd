@@ -213,9 +213,8 @@ class PersistencyRaceDetector:
         
         # Races
         if self._races:
-            s.add_statistic('Races', "By trace events",      len(self._races.races))
             s.add_statistic('Races', "By instructions",      sum(map(len, self._races.races_by_pc.values())))
-            s.add_statistic('Races', "By instructions (RW)", len(self._races.races_by_rw_pcs))
+            s.add_statistic('Races', "By trace events",      len(self._races.races))
             s.add_statistic('Races', "By callstack (info)",  sum(map(len, self._races.races_by_info.values())))
             s.add_statistic('Races', "By read instructions", len(list(self._races.race_nodes_by_read_pc())))
             
