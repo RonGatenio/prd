@@ -69,16 +69,17 @@ def analyze_prd(trace_file, races_file):
     with open(races_file, 'w') as f:
         f.write(s)
     
-    return {
+    stats = {
         'total_race': len(prd.races.races_by_rw_pcs),
-        'inter_races': prd.races.races_pcs_by_tstate['inter'],
-        'intra_races': prd.races.races_pcs_by_tstate['intra'],
+        'inter_races': len(prd.races.races_pcs_by_tstate['inter']),
+        'intra_races': len(prd.races.races_pcs_by_tstate['intra']),
         'total_race_by_event': len(prd.races.races),
-        'hbg_build_time': execution_stats.hbg_build,
-        'pdg_build_time': execution_stats.pdg_build,
-        'algorithm_time': execution_stats.cprd_time,
         'races_to_str_evaluation_time': t,
     }
+    
+    stats.update(execution_stats)
+    
+    return stats
     
     # TODO: create this func:
     # prd_results, prd_timings = pyprd_runner.run_prd_analysis(trace_file)

@@ -1,6 +1,6 @@
+from collections import OrderedDict
 from dataclasses import dataclass
 from typing import Tuple
-# from timeit import timeit
 
 from .trace_parser import TraceParser
 from .pdg import generate_mock_pdg_v2
@@ -8,19 +8,9 @@ from .prd import PersistencyRaceDetector
 from .utils import timeit
 
 
-@dataclass
-class PRDExecutionStats:
-    hbg_build: float
-    pdg_build: float
-    cprd_time: float
-
-
-@dataclass
-class PersistencyRaceDetectorRunner:
-    pass
-
-
-def run(trace_file: str) -> Tuple[PersistencyRaceDetector, PRDExecutionStats]:
+def run(trace_file: str, use_mock_pdg=False) -> Tuple[PersistencyRaceDetector, dict]:
+    stats = OrderedDict()
+    
     with timeit(f'open trace file "{trace_file}"'):
         trace = TraceParser.from_file(trace_file)
 
@@ -31,7 +21,7 @@ def run(trace_file: str) -> Tuple[PersistencyRaceDetector, PRDExecutionStats]:
         print(hbg.stats(True))
 
     with timeit('pdg build') as pdg_build:
-        if False:
+        if use_mock_pdg:
             pdg = generate_mock_pdg_v2(hbg)
         else:
             pdg = trace.build_pdg(hbg, True)
@@ -49,7 +39,13 @@ def run(trace_file: str) -> Tuple[PersistencyRaceDetector, PRDExecutionStats]:
         
     print(prd.stats())
     
-    return prd, PRDExecutionStats(hbg_build.total, pdg_build.total, cprd_time.total)
+    stats.update({
+        'hbg_build_time': hbg_build.total,
+        'pdg_build_time': pdg_build.total,
+        'algorithm_time': cprd_time.total,
+    })
+    
+    return prd, stats
 
 
 def races_to_str(prd: PersistencyRaceDetector) -> Tuple[str, float]:
