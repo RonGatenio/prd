@@ -103,33 +103,10 @@ ENTRYPOINT ["/usr/bin/tini", "--", "/app/scripts/entrypoint.sh"]
 
 FROM cprd AS benchmarks
 
-# Copy benchmarks folder
 COPY benchmarks /app/benchmarks
-
-# Setup benchmarks
-WORKDIR /app/benchmarks
-
-# ENTRYPOINT [ "/app/instrumentation/scripts/setup-env.sh" ]
-# CMD [ "/bin/bash", "-c", "/app/benchmarks/run.sh; /bin/bash" ]
-# ENTRYPOINT [ "/bin/bash" ]
 
 WORKDIR /app/benchmarks/benchmark-runner
 
-# Set the entry point to run the benchmarks
-# ENTRYPOINT ["/bin/bash", "-c"]
-
-# Set the default command to run the Python script and then start a bash shell
-# CMD ["if [ -z \"$@\" ]; then python3 benchmark_runner.py FAST_FAIR; fi; exec \"$@\""]
-# ENTRYPOINT ["/usr/bin/tini", "--", "/app/scripts/entrypoint.sh"]
-
-# CMD ["python3", "benchmark_runner.py", "list"]
-# CMD ["python3", "benchmark_runner.py", "FAST_FAIR"]
 RUN dos2unix *.sh
+
 CMD ["./benchmarks.sh"]
-# CMD python3 benchmark_runner.py FAST_FAIR
-# CMD [ "/bin/bash", "-c", "python3 benchmark_runner.py FAST_FAIR; /bin/bash" ]
-# CMD [ "/bin/bash" ]
-
-# ENTRYPOINT ["/bin/bash"]
-
-
