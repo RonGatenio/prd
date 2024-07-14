@@ -25,7 +25,7 @@ def run_command(command, cwd=None, stdout=subprocess.PIPE, stderr=subprocess.PIP
         stdout, stderr = process.communicate()
 
     if process.returncode != 0:
-        print(f"[!] Error running command: {command}\n{stderr.decode()}")
+        print(f"[!] Error running command: {command} (LE={process.returncode})")
 
 
 def generate_random_pm_file():
@@ -78,7 +78,8 @@ def analyze_prd(trace_file, races_file) -> StatisticsCollector:
     return stats
 
 
-def run_benchmark(benchmark_name, config):
+def run_benchmark(benchmark_name, config, nkeys=None):
+    print(f'[*] Running Benchmark {benchmark_name}')
     stats = StatisticsCollector(f'Benchmark Execution {benchmark_name}')
     
     benchmark_config = config.get(benchmark_name, {})
@@ -98,18 +99,21 @@ def run_benchmark(benchmark_name, config):
 
     run_dir = run_config["directory"]
     run_command_template = run_config["command"]
-    nkeys = run_config["default_args"]["nkeys"]
+    nkeys = run_config["default_args"]["nkeys"] if nkeys is None else nkeys
     nthreads = run_config["default_args"]["nthreads"]
 
     pm_file = generate_random_pm_file()
     trace_file = os.path.join(output_dir, f"{benchmark_name}_{nkeys}_{nthreads}.trace")
     races_file = os.path.join(output_dir, f"{benchmark_name}_{nkeys}_{nthreads}.races")
     stats_file = os.path.join(output_dir, f"{benchmark_name}_{nkeys}_{nthreads}.stats")
+    stats_json_file = os.path.join(output_dir, f"{benchmark_name}_{nkeys}_{nthreads}.stats.json")
     binary_output = os.path.join(output_dir, f"{benchmark_name}.exe")
 
     stats.add_statistic('Benchmark Presets', 'Name', benchmark_name)
     stats.add_statistic('Benchmark Output', 'Trace file', trace_file)
     stats.add_statistic('Benchmark Output', 'Races file', races_file)
+    stats.add_statistic('Benchmark Output', 'Stats file', stats_file)
+    stats.add_statistic('Benchmark Output', 'Stats json', stats_json_file)
     stats.add_statistic('Benchmark Output', 'Executable', binary_output)
 
     try:
@@ -137,24 +141,29 @@ def run_benchmark(benchmark_name, config):
         
         # Save stats
         with open(stats_file, 'w') as f:
+            f.write(stats.to_str())
+            
+        with open(stats_json_file, 'w') as f:
             f.write(stats.to_json())
             
         print(stats)
 
     except Exception as e:
         print(f"[!] An error occurred while running the benchmark '{benchmark_name}': {e}")
+        raise e
 
 def main():
     parser = argparse.ArgumentParser(description='Benchmark Runner for PRD')
     parser.add_argument('benchmark', type=str, help='The name of the benchmark to run')
     parser.add_argument('--config', type=str, default=os.path.join(os.path.dirname(__file__), 'benchmarks.json'), help='Path to the configuration file')
+    parser.add_argument('--nkeys', type=int, default=None, help='nKeys used in benchmark')
 
     args = parser.parse_args()
 
     with open(args.config, 'r') as file:
         config = json.load(file)
 
-    run_benchmark(args.benchmark, config)
+    run_benchmark(args.benchmark, config, nkeys=args.nkeys)
 
 if __name__ == "__main__":
     main()

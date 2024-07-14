@@ -9,7 +9,7 @@ from .prd import PersistencyRaceDetector
 from .utils import timeit
 
 
-def run(trace_file: str, use_mock_pdg=False) -> Tuple[PersistencyRaceDetector, StatisticsCollector]:
+def run(trace_file: str, use_mock_pdg=False, print_stats=False) -> Tuple[PersistencyRaceDetector, StatisticsCollector]:
     stats = StatisticsCollector('PRD')
     
     with timeit(f'open trace file "{trace_file}"'):
@@ -20,6 +20,8 @@ def run(trace_file: str, use_mock_pdg=False) -> Tuple[PersistencyRaceDetector, S
 
     with timeit('hbg stats'):
         _stats = hbg.stats()
+        
+    if print_stats:
         print(_stats)
     stats.merge(_stats)
     
@@ -41,7 +43,8 @@ def run(trace_file: str, use_mock_pdg=False) -> Tuple[PersistencyRaceDetector, S
         prd.run(use_faster_version=True)
         
     _stats = prd.stats()
-    print(_stats)
+    if print_stats:
+        print(_stats)
     stats.merge(_stats)
     
     stats.add_statistic('Duration', 'HBG build [sec]', hbg_build.total)

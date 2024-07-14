@@ -8,8 +8,8 @@
             ]
         },
         "run": {
-            "directory": "/app/benchmarks/CCEH/CCEH-PMDK/bin",
-            "command": "./multi_threaded_cceh {pm_file} {nkeys} {nthreads}",
+            "directory": "/app/benchmarks/CCEH",
+            "command": "./CCEH-PMDK/bin/multi_threaded_cceh {pm_file} {nkeys} {nthreads}",
             "default_args": {
                 "pm_file": "/tmp/pmem_cceh_data",
                 "nkeys": 1000,
@@ -33,9 +33,6 @@
                 "pm_file": "/tmp/pmem_btree_data",
                 "nkeys": 1000,
                 "nthreads": 4
-            },
-            "artifacts": {
-                "trace": "/app/results/traces/fast-fair-pmdk.trace"
             }
         },
         "binary": "/app/benchmarks/FAST_FAIR/concurrent_pmdk/bin/btree_concurrent"
@@ -66,31 +63,22 @@
         "results_file": "/app/results/races/memcached.races"
     },
     "RECIPE": {
-        "output_dir": "./output/RECIPE",
+        "output_dir": "/app/results/RECIPE",
         "compile": {
-            "directory": "/app/benchmarks/RECIPE",
+            "directory": "/app/benchmarks/RECIPE/P-CLHT",
             "commands": [
-                "make clean",
-                "make"
-            ],
-            "artifacts": {
-                "binary": "/app/benchmarks/RECIPE/pclht",
-                "log": "/app/benchmarks/RECIPE/build.log"
-            }
+                "mkdir build && cd build && cmake .. && make -j"
+            ]
         },
         "run": {
-            "directory": "/app/benchmarks/RECIPE",
-            "command": "./P-CLHT/build/pclht {pm_file} {nkeys} {nthreads}",
+            "directory": "/app/benchmarks/RECIPE/P-CLHT/build",
+            "command": "./pclht {pm_file} {nkeys} {nthreads}",
             "default_args": {
                 "pm_file": "/tmp/pmem_pclht_data",
                 "nkeys": 10000,
                 "nthreads": 4
-            },
-            "artifacts": {
-                "trace": "/app/results/traces/pclht.trace"
             }
         },
-        "trace_file": "/app/results/traces/pclht.trace",
-        "results_file": "/app/results/races/pclht.races"
+        "binary": "/app/benchmarks/RECIPE/P-CLHT/build/pclht"
     }
 }

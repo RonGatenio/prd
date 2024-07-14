@@ -120,9 +120,12 @@ WORKDIR /app/benchmarks/benchmark-runner
 
 # Set the default command to run the Python script and then start a bash shell
 # CMD ["if [ -z \"$@\" ]; then python3 benchmark_runner.py FAST_FAIR; fi; exec \"$@\""]
+# ENTRYPOINT ["/usr/bin/tini", "--", "/app/scripts/entrypoint.sh"]
 
 # CMD ["python3", "benchmark_runner.py", "list"]
-CMD ["python3", "benchmark_runner.py", "FAST_FAIR"]
+# CMD ["python3", "benchmark_runner.py", "FAST_FAIR"]
+RUN dos2unix *.sh
+CMD ["./benchmarks.sh"]
 # CMD python3 benchmark_runner.py FAST_FAIR
 # CMD [ "/bin/bash", "-c", "python3 benchmark_runner.py FAST_FAIR; /bin/bash" ]
 # CMD [ "/bin/bash" ]
