@@ -47,10 +47,10 @@
 
 % The introduction of new Nonvolatile Memory (NVM) technologies with byte-addressable access and DRAM performance has increased the interest in developing crash-consistent software. However, these features introduce complex challenges in ensuring data consistency, especially under concurrent access scenarios.
 
-Nonvolatile Memory (NVM) technologies like Intel’s Optane offer new avenues for building high-performance and crash-consistent applications by combining byte-addressable DRAM-like characteristics with non-volatility. However, these features introduce complex challenges in ensuring data consistency, especially under concurrent access scenarios.
+Nonvolatile Memory (NVM) technologies offer new avenues for building high-performance and crash-consistent applications by combining byte-addressable DRAM-like characteristics with non-volatility. However, these features introduce complex challenges in ensuring data consistency, especially under concurrent access scenarios.
 
 This paper introduces \SignRaceDetector, a specialized tool designed to detect {\NameRace}s—specific type of concurrency bugs in PM environments that can lead to critical inconsistencies following system failures.
-\SignRaceDetector utilizes graph-theoretical analysis along with happens-before and program-dependence analysis to map causal relationships and dependencies among program operations. By leveraging these analyses, \SignRaceDetector efficiently generalizes across multiple thread interleavings to detect potential races within a single program execution, significantly enhancing the speed and efficiency of race detection.
+\SignRaceDetector utilizes graph-theoretical analysis along with happens-before and program-dependence analysis to map causal relationships and dependencies among program operations. While these analyses are well-established techniques in data-race detection, \SignRaceDetector efficiently generalizes across multiple thread interleavings to detect potential races within a single program execution, significantly enhancing the speed and efficiency of race detection in NVM environments.
 
 % TODO: write about the evaluation results
 
@@ -66,15 +66,37 @@ This paper introduces \SignRaceDetector, a specialized tool designed to detect {
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Introduction}
 
-Nonvolatile Memory (NVM) technologies such as Intel’s Optane DC Persistent Memory \cite{intel2019optane} integrate the persistence of traditional storage with the performance characteristics of DRAM. This unique combination facilitates direct, byte-addressable access to persistent data, unlocking the potential for crash-consistent applications that previously would have incurred significant storage overhead. However, despite these advantages, the integration of NVM into existing computing paradigms introduces new complexities, particularly in ensuring data consistency across volatile and persistent memory layers.
+Nonvolatile Memory (NVM) technologies, such as Intel's Optane DC Persistent Memory \cite{intel2019optane} or Compute Express Link (CXL) attached SSDs, represent a significant advancement in computer memory design, offering a unique combination of byte-addressable access and DRAM-like performance with the added benefit of non-volatility. These characteristics open new avenues for building high-performance, crash-consistent applications that maintain data integrity across power failures and system crashes. However, the integration of NVM into existing computing paradigms introduces new complexities, particularly in ensuring data consistency across volatile and persistent memory layers.
 
-In the realm of NVM, data residing on volatile CPU caches does not automatically persist upon power failures, and cache lines may be evicted in a sequence that diverges from the program’s actual store order. This inconsistency poses a challenge: to guarantee data persistence, developers must manually manage cache line eviction using explicit flush (e.g., CLWB) and fence (e.g., SFENCE) instructions \cite{intel2020abi}. Unfortunately, even experienced developers can introduce bugs into their programs if they are not thoroughly acquainted with these persistent memory (PM) programming models, necessitating bug detection tools specifically engineered for NVM-related inconsistencies.
+% TODO: eADR might require very specific hardware. read about this. Will it work with CXL?
+Optane with Asynchronous DRAM Refresh (ADR) doesn't guarantee the persistence of cache contents during a power failure. This limitation requires programmers to explicitly ensure that critical data is flushed from the CPU cache to the persistent memory. Technologies like Optane eADR \cite{intel2021optane_eadr} promise to address these issues by ensuring cache persistence, but they are not yet widespread. Therefore, developers must continue to support the more common Optane ADR. We anticipate that future hardware technologies will integrate these features more seamlessly, reducing the burden on developers.
 
-This work targets a specific concurrency-related bug prevalent in NVM programs, originally identified as \NamePMRaceRace by Chen, Zhangyu, et al. \cite{pmrace2022}. This bug occur when one thread commits durable side effects, such as writes to persistent memory (PM), based on non-persisted data written by another thread.
-Such scenarios can cause inconsistent NVM states post-crash, especially if the system crashes before the read location is persisted. Throughout this paper, we refer to this bug as \NameRace.
-% This bug occurs when a read from a non-persisted NVM location influences a subsequent write to another NVM location, which is then persisted before the initial read location. This sequence can lead to an inconsistent state post-crash if the system fails before the read location is persisted. Throughout this work, we refer to such bug as \NameRace.
+Ensuring data persistence in NVM involves using an Application Binary Interface (ABI) that provides instructions for flushing memory to the cache. On Intel architectures \cite{intel2020abi}, instructions like Cache Line Write Back (CLWB) and Store Fence (SFENCE) are used. CLWB writes modified cache lines back to memory without invalidating them, ensuring that the data is persisted. SFENCE ensures that all store instructions before the fence are completed before any subsequent store instructions. These operations are critical for maintaining data consistency but are expensive in terms of performance. As a result, programmers strive to minimize their use, which can inadvertently lead to concurrency bugs.
 
-To address this issue, we introduce \NameRaceDetector (\SignRaceDetector), a tool that leverages graph-theoretical constructs to detect \NameRace conditions effectively. \SignRaceDetector integrates program instrumentation techniques to perform happens-before and program-dependence analyses, thereby mapping causal relationships and dependencies between program operations. Using a \HBGName ($\HBG$) and a \PDGName ($\PDG$) \SignRaceDetector traverses the execution trace of the program to identify potential inconsistencies.
+Different architectures have their own mechanisms for ensuring data persistence. For example, ARM architectures \cite{arm2020abi} provide instructions like Data Cache Clean (DC CVAC) and Data Memory Barrier (DMB) to ensure memory access ordering and persistence. These instructions ensure that data is properly persisted in memory but also come with a high performance cost.
+
+This work targets a specific concurrency-related bug prevalent in NVM programs, originally identified as \textit{\NamePMRaceRace} by Chen, Zhangyu, et al. \cite{pmrace2022}. This bug occurs when one thread commits durable side effects, such as writes to persistent memory (PM), based on non-persisted data written by another thread. Such scenarios can cause inconsistent NVM states post-crash, especially if the system crashes before the read location is persisted. Throughout this paper, we refer to this bug as \textit{\NameRace}.
+
+In simpler terms, a \NameRace happens when a thread writes data to PM but gets interrupted before the data is explicitly flushed. If another thread reads this unflushed data and uses it to modify another PM location, and if this modification is persisted before the original data, it can create an inconsistent memory state.
+
+To illustrate, consider Harris's Linked-List \cite{harris2001}. In this data structure, the insert operation involves creating a new node, linking it to the next node, and then using an atomic operation to link the previous node to the new node. Now, imagine that another thread attempts to insert a node immediately after the newly inserted node and succeeds. Even if an explicit flush operation is added at the end of the insert operation to ensure persistence, thread interleavings could still cause issues. Specifically, the first insert operation might be interrupted just before the flush, while the second insert operation completes entirely. If a crash occurs at this moment, the system might recover to a state where neither node appears in the list, even though the second operation had seemingly completed. This example demonstrates how \NameRace conditions can lead to significant inconsistencies, as operations that were fully executed might be lost if their persistence wasn't properly managed.
+
+Chen, Zhang, Hua, and Ding introduced PMRace, a specialized tool for identifying crash-consistency bugs in persistent memory (PM) applications, targeting \NamePMRaceRace. PMRace employs PM-aware coverage-guided fuzz testing to explore various execution interleavings that could reveal hidden inconsistencies. By instrumenting the target application, PMRace captures detailed information on PM-specific operations. Each run of the tool focuses on a specific set of conditions and is likely to detect only one bug, requiring multiple runs to comprehensively identify all potential issues. This approach sets a benchmark for effective bug detection in concurrent PM systems but can be resource-intensive and time-consuming.
+
+Building on these insights, we introduce \NameRaceDetector (\SignRaceDetector), a tool designed to effectively identify and diagnose \NameRace conditions in PM environments. \SignRaceDetector leverages well-established techniques from data-race detection, such as happens-before analysis, to map causal relationships between program operations. Additionally, it uses program-dependence analysis to detect data dependencies among operations. By using a \HBGName ($\HBG$) and a \PDGName ($\PDG$), \SignRaceDetector traverses the execution trace of the program to identify potential inconsistencies.
+
+The happens-before analysis, commonly used in traditional data-race detection, plays a crucial role in our approach. It helps establish the temporal and causal relationships between program events by creating a partial order of events based on synchronization primitives. This technique enables us to analyze multiple possible interleavings of program execution within a single run, ensuring that different execution sequences are treated as equivalent.
+However, the precision of this generalization technique is heavily dependent on the accuracy of the happens-before analysis. The fewer happens-before relationships we recognize, the more potential races, including false positives, we will detect. This is because, without recognizing these relationships, all read and write operations would be considered as happening in parallel, leading to a guaranteed detection of races.
+
+\SignRaceDetector works by first instrumenting the program to log memory operations and synchronization events, capturing a detailed execution trace. This trace is then analyzed to construct a comprehensive model of the program's execution. The $\HBG$ maps the happens-before relationships between operations, while the $\PDG$ identifies dependencies based on data flow. By combining these analyses, \SignRaceDetector can pinpoint potential \NameRace conditions. Optimization techniques are applied to handle large traces efficiently, ensuring that the detection process remains scalable and practical for real-world applications.
+
+By leveraging these techniques, \SignRaceDetector achieves comprehensive coverage of possible race conditions while significantly enhancing the speed and efficiency of race detection in NVM programs. This approach reduces the need for numerous individual test runs, making the detection process more practical and resource-efficient.
+
+
+% TODO: contributions?
+
+% In the following sections, we go into the technical background of NVM technologies and persistent memory programming models, providing a foundation for understanding the complexities of ensuring data consistency. We then describe the design and implementation of \NameRaceDetector, followed by a comprehensive evaluation of its performance. Finally, we discuss related work in the field and conclude with insights and future directions for research.
+
 
 The remainder of this paper is organized as follows: \autoref{sec:preliminaries} discusses the theoretical foundations and the necessary background, \autoref{sec:algorithm} describes the detailed algorithm developed for \NameRace detection, \autoref{sec:implementation} covers the implementation details, and \autoref{sec:evaluation} evaluates the approach against established benchmarks. Finally, \autoref{sec:conclusions} concludes the paper with a summary of findings and potential areas for future research.
 % TODO: more sections
@@ -94,58 +116,78 @@ The remainder of this paper is organized as follows: \autoref{sec:preliminaries}
 
 
 \subsection{Persistent Memory Programming}
-% TODO: rewrite
 % \todo{introduction and explanation about persistent memory programming paradigms, technologies, and their applications}
-Persistent Memory (PM) represents a significant advance in memory technology by combining the durability of storage devices with the speed and byte-addressability of traditional RAM. This unique characteristic allows applications to directly access and manipulate data in memory using byte-level load and store instructions, circumventing the page cache and offering performance akin to DRAM.
+Persistent Memory (PM) represents a significant advance in memory technology by combining the durability of storage devices with the byte-addressability of traditional RAM. This unique characteristic allows applications to directly access and manipulate data in memory using byte-level load and store instructions, circumventing the page cache and offering performance akin to DRAM.
 
-However, the intrinsic non-volatility of PM, such as that found in technologies like 3D XPoint, introduces additional complexities in programming, especially concerning crash consistency. Data in PM persists through power outages, presenting challenges in ensuring data consistency if a system crashes. Unlike PM, CPU caches are volatile and do not automatically preserve data upon power failure. This discrepancy necessitates managing the order of data persistence, which hinges on how cache lines are evicted—either through automatic system processes or explicit flush operations.
+However, the intrinsic non-volatility of PM, such as that found in technologies like 3D XPoint, introduces additional complexities in programming, especially concerning crash consistency. Data in PM persists through power outages, presenting challenges in ensuring data consistency if a system crashes. Unlike PM, CPU caches can be volatile and may not automatically preserve data upon power failure. This discrepancy necessitates managing the order of data persistence, which hinges on how cache lines are evicted—either through automatic system processes or explicit flush operations.
 
 Programming for PM must carefully manage these aspects to maintain data integrity and system consistency after crashes. Developers can use high-level programming constructs like logging or copy-on-write (CoW) mechanisms to enforce crash consistency, but these methods often come with significant performance overheads. As a lower-level alternative, specific instructions such as CLWB (Cache Line Write Back) and SFENCE (Store Fence) in the x86 instruction set, or DC CVAP (Clean Cache Line to Point of Persistence) and DSB (Data Synchronization Barrier) in ARM, provide direct control over cache line flushing and memory ordering. These tools help ensure that writes are properly ordered and visible before subsequent operations.
+However, synchronization primitives like these can be performance-intensive, leading programmers to minimize their use whenever possible.
 
 Furthermore, non-temporal store instructions offer another method by directly writing data to PM, bypassing the volatile CPU caches. While this approach avoids caching overheads, it eliminates the benefits of fast data retrieval for frequently accessed ("hot") data, making it less suitable for such use cases.
 
 Overall, effective PM programming requires a deep understanding of both the underlying hardware features and the software techniques necessary to exploit this technology fully while ensuring robust crash consistency.
 
-
-\subsection{Program Instrumentation}
-Program instrumentation involves recording runtime events to analyze the behavior of a program during its execution. By leveraging LLVM's \cite{llvm2004} instrumentation capabilities, we systematically track every access to persistent memory (PM), including reads, writes, and explicit memory synchronization commands such as flush and fence instructions.
-
 \subsection{Happens-Before}
-The happens-before relation that determines a causal relation between event in a program execution. Originally formulated by Leslie Lamport \cite{lamport1978}.
+The happens-before relationship, originally formulated by Leslie Lamport \cite{lamport1978}, determines the causal ordering of events in a program execution. It is commonly used to reason about the sequence and dependencies of operations in concurrent and distributed systems and is a prominent concept in data race detection algorithms.
+The basic idea is that a pair of events \((e_i, e_j)\) are related if communication between processes allows information to be transmitted from \(e_i\) to \(e_j\).
+This concept was initially defined by Lamport for distributed systems, and it can be adapted to multi-threaded programs by treating threads as processes and the events observed by our race detector as the events occurring in the system.
 
-\myparagraph{\HBGName}
-Lamport’s happens-before graph (HBG) \cite{lamport1978} is a theoretical construct used to model the execution dynamics of concurrent programs. Within this graph, every executed instruction is represented as a node, and directed edges between these nodes create a partial-order that outlines the execution order between instructions.
+The happens-before relationship is a partial order on the events of a particular execution of a multi-threaded program and can be understood through the following principles. First, within a single thread, the order of instructions as written in the program code defines the happens-before relationship. If instruction \(A\) appears before instruction \(B\) in the same thread, then \(A\) happens-before \(B\). Second, synchronization operations such as acquiring and releasing locks, spawning and joining threads, syncronized atomic reads and writes to the same memory address, and other inter-thread communication mechanisms establish additional happens-before relationships across threads. For instance, if thread \(T1\) releases a lock and subsequently thread \(T2\) acquires the same lock, then all operations in \(T1\) that happened-before the release are considered to happen-before any operations in \(T2\) after the lock acquisition. Lastly, the relation is transitive, so if \(A\) happens-before \(B\) and \(B\) happens-before \(C\), then \(A\) happens-before \(C\).
 
-This abstraction is particularly useful for analyzing concurrent executions \cite{chess2008}, as it decouples the execution order from the actual timing of instructions. Consequently, different executions that may run at varying speeds but share the same happens-before graph are considered behaviorally equivalent, reflecting consistent execution behavior despite temporal differences.
+\myparagraph{Happens-Before Graph}
+From the happens-before relationship, we can derive a happens-before graph (HBG). In this graph, each executed instruction is represented as a node, and directed edges between these nodes create a partial order that outlines the execution order between instructions. Specifically, if an event \(A\) happens-before an event \(B\), then there is a directed path from \(A\) to \(B\) in the graph.
+The HBG is particularly useful for visualizing and analyzing concurrent executions, as it decouples the execution order from the actual timing of instructions. Consequently, different executions that may run at varying speeds but share the same happens-before graph are considered behaviorally equivalent, reflecting consistent execution behavior despite temporal differences. This abstraction helps in identifying potential concurrency issues like data races and ensures a consistent understanding of the execution order.
 
 \myparagraph{Vector Clocks}
-Vector clocks, based on Lamport's timestamps \cite{lamport1978} and further developed in \cite{fidge1987vc} and \cite{mattern1988vc}, are a widely used method to capture the causality between events in parallel and distributed systems, and to determine the happens-before partial-order between them. Intuitively, vector clocks represent the known state of execution across all program threads, from the view of a single event in the execution.
-% Vector clocks, building upon Lamport's timestamps \cite{lamport1978} and further developed in \cite{fidge1987vc} and \cite{mattern1988vc}, are a widely used mechanism for capturing causality among events in parallel and distributed systems. 
-% This tool is used to determine the happens-before partial-order of the executed program events. Intuitively, vector clocks represent the known state of execution across all program threads, from the view of a single event in the execution.
+Vector clocks, based on Lamport's timestamps \cite{lamport1978} and further developed by Fidge \cite{fidge1987vc} and Mattern \cite{mattern1988vc}, are a widely used method to capture the causality between events in parallel and distributed systems and to determine the happens-before partial order between them. They are commonly used in data race detection algorithms.
+In our algorithm, we rely on the concept of vector clocks to reason about the temporal state of each event in the HBG.
 
-\myparagraph{ThreadSanitizer (TSan)}
-LLVM's TSan \cite{tsandoc}, originally developed by Google \cite{tsan2009} and now maintained by The Clang Team, is a tool that detects and reports data races through program instrumentation. TSan utilizes vector clocks to monitor thread interactions including thread creations, lock acquisitions, and atomic operations such as compare-and-swap, fetch-and-add, etc. This process effectively establishes a comprehensive happens-before partial-ordering of program execution. 
+A vector clock is a data structure that keeps track of the logical time of events in a distributed system. It is represented as an array of counters, where each counter corresponds to a process or thread in the system. Each process maintains its own vector clock, which it updates according to specific rules: each process increments its own counter before issuing an event. When a process sends a message, it includes its current vector clock with the message. Upon receiving a message, a process updates its vector clock by taking the element-wise maximum of its own vector clock and the received vector clock.
 
-We leverage the vector clock updates mechanism of TSan to record the happens-before relationships among concurrent program events.
+Intuitively, vector clocks represent the known state of execution across all threads from the perspective of a single event. If event \(A\) has a vector clock value of \(V_A\) and event \(B\) has a vector clock value of \(V_B\), then \(A\) happens-before \(B\) if and only if \(V_A\) is element-wise less than \(V_B\). This property allows vector clocks to efficiently capture and compare the causal relationships between events.
 
+By using vector clocks, we can precisely track the happens-before relationships across all events in a system, which is crucial for detecting concurrency issues and understanding the execution flow of parallel and distributed programs. This detailed tracking helps in ensuring consistency and correctness in the presence of concurrent operations.
 
 \subsection{Program Dependence Analysis}
-Program dependency is a relation between two instructions or statements, $S1$ and $S2$. This relation exists if the outcome of $S1$ directly influences the outcome of $S2$, necessitating that $S1$ be executed before $S2$ to ensure correct program behavior.
-% There are two main types of program-dependencies:
+Program dependence is a relation between two instructions or statements, \(S1\) and \(S2\). This relation exists if the outcome of \(S1\) directly influences the outcome of \(S2\), necessitating that \(S1\) be executed before \(S2\) to ensure correct program behavior.
+There are two types of program dependence: data dependence and control dependence.
+
+Data dependencies arise between two operations when the output of one operation is required as input for the other. For instance, if \(S1\) computes a value that \(S2\) uses, there is a data dependency from \(S1\) to \(S2\). For example:
+\begin{verbatim}
+S1: x = 5;
+S2: y = x + 1;
+\end{verbatim}
+In this case, \(S2\) is dependent on \(S1\) because \(S2\) uses the value of \texttt{x} computed by \(S1\).
+
+Control dependencies exist when the execution path of one operation depends on the outcome of a conditional branch affecting another operation. Specifically, \(S1\) controls the execution of \(S2\) if the decision to execute \(S2\) is based on a condition evaluated in \(S1\). For example:
+\begin{verbatim}
+if (condition) {
+    S1;
+}
+S2;
+\end{verbatim}
+Here, the execution of \(S1\) is control-dependent on the evaluation of the `condition`. If the condition is true, \(S1\) will execute; otherwise, it will not. \(S2\) is not directly control-dependent on the `condition`.
 
 \myparagraph{\PDGName}
 % TODO: choose who to site. the definition here is from pd1992. \cite{pd1988} \cite{pd1990} \cite{pd1991} \cite{pd1992} \cite{pd1994book}
-The \PDGName ($\PDG$) \cite{pd1988} is a directed, acyclic graph that models the execution flow of a program as a partial order. In the $\PDG$, each node corresponds to an executed instruction, and directed edges illustrate the dependencies that exist between these instructions.
-Dependencies in a $\PDG$ can be classified into several types \cite{pd1992}, primarily including data dependencies and control dependencies. A data dependency arises between two operations when the output of one operation (e.g., a value produced) is required as input for the other operation. Conversely, a control dependency exists when the execution path of one operation depends on the outcome of a conditional branch affecting another operation.
+The \PDGName (\(\PDG\)) \cite{pd1988} is a directed, acyclic graph that models the execution flow of a program as a partial order. Each node in the \(\PDG\) corresponds to an executed instruction, and directed edges illustrate the dependencies between these instructions. The \(\PDG\) helps visualize and analyze these dependencies, making it easier to understand how different parts of a program interact. By representing both data and control dependencies, the \(\PDG\) provides a comprehensive view of the execution flow, which is used to optimize compilers, verify programs, and analyze parallel execution.
 
+\subsection{Program Instrumentation}
+Program instrumentation involves recording runtime events to analyze the behavior of a program during its execution. By leveraging LLVM's \cite{llvm2004} instrumentation capabilities, we systematically track every access to persistent memory (PM), including reads, writes, and explicit memory synchronization commands such as flush and fence instructions. This detailed tracking is essential for identifying potential concurrency issues and ensuring data consistency.  Our approach incorporates two key LLVM tools: ThreadSanitizer (TSan) and DataFlowSanitizer (DFSan), each serving a specific purpose in our analysis.
+
+\myparagraph{ThreadSanitizer (TSan)}
+LLVM's TSan \cite{tsandoc}, originally developed by Google \cite{tsan2009} and now maintained by The Clang Team, is a tool that detects and reports data races through program instrumentation. TSan utilizes vector clocks to monitor thread interactions, including thread creations, lock acquisitions, and atomic operations such as compare-and-swap, fetch-and-add, etc. By capturing these interactions, TSan effectively establishes a comprehensive happens-before partial-ordering of program execution. 
+
+We leverage TSan's vector clock updates to record the happens-before relationships among concurrent program events. This information is crucial for constructing the happens-before graph (\HBGName), which maps out the temporal and causal relationships between events, aiding in the detection of \NameRace conditions.
 
 \myparagraph{DataFlowSanitizer (DFSan)}
+LLVM's DFSan \cite{dfsan2020} is a dynamic data flow analysis tool capable of tagging memory locations and tracing their flow throughout the execution of the program. DFSan assigns labels to memory locations during read operations, which allows us to track how data propagates through the program.
 
-LLVM's DFSan \cite{dfsan2020} is a dynamic data flow analysis tool capable of tagging memory locations and tracing their flow throughout the execution of the program.
+We employ DFSan's memory tagging mechanism to label read operations and subsequently track all such tagged reads that influence write operations later in the program within each thread. These labels help us identify data dependencies by showing how data read at one point in the program affects subsequent write operations.
+This capability enables us to understand which write operations to PM are influnced by a read operation from a different memory location in PM.
 
-We employ DFSan's memory tagging mechanism to label read operations and subsequently track all such tagged reads that influence write operations later in the program within each thread.
-
-Currently, DFSan is limited to producing data-dependency analyses and does not account for control-dependencies. In our discussions, we will observe that while program dependency (PD) analysis helps eliminate false positives from these results, there is potential for future enhancements. Expanding our analysis to include control dependencies could allow for the identification of additional race conditions currently overlooked as false positives.
+Currently, DFSan is limited to producing data-dependency analyses and does not account for control dependencies. This limitation means that we won't be able to detect all program dependence relationships and might miss some {\NameRace}s in our detection. Expanding our analysis to include control dependencies could allow for the identification of additional race conditions currently overlooked.
 
 % Note that since we are not trying to find causality between events using DFSan, we ignore cases when a dependency is inter-thread. 
 
@@ -192,25 +234,15 @@ Currently, DFSan is limited to producing data-dependency analyses and does not a
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % \section{Background}
 % \section{Background and Preliminaries}
-\section{Data Structures and Definitions}
+\section{Underlying Data Structures}
+In order to detect {\NameRace}s in a program execution, we use a program instrumentation tool
+
 
 % ---------------------------------------------------------
 % Definitions - Program Trace Representation
 % ---------------------------------------------------------
 % \subsection{Program Trace Representation}
 The program trace categorizes events into three main types: event nodes $\Nodes$, happens-before edges $\HBEdges$, and program dependency edges $\PDEdges$. We denote the subsets of Read, Write, and Flush event nodes as $\ReadNodes$, $\WriteNodes$, and $\FlushNodes$, respectively. Each event node $\NodeV$ is associated with a variable $\var{\NodeV} \in \Vars$ indicating the memory address accessed, and a thread $\thread{\NodeV} \in \Threads$ indicating the executing thread. Each event node is also sequentially identified by $\idx{\NodeV} \in \IDs$ within its thread, reflecting the execution order.
-
-
-
-
-
-
-
-
-
-
-
-
 
 % ---------------------------------------------------------
 % Graphical Representation
@@ -611,7 +643,7 @@ Instead of maintaining separate vector clocks $\hbvc{\NodeV}{\Thread, \VarX}$ an
 To tackle the performance degradation associated with propagation of vector clocks for all variables, we employ a mechanism we call DVVC. This strategy focuses updates only on variables that necessitate changes, utilizing a flagging system to manage updates across threads. When a variable $\VarX$ in one thread is updated, a DVVC flags this event, ensuring that other threads are notified only as necessary. This method significantly reduces the runtime of the algorithm.
 
 
-\iffalse
+% \iffalse
 \begin{algorithm}
     \caption{\NameRaceDetector - Optimized}
     \label{alg:cprdopt}
@@ -726,7 +758,7 @@ To tackle the performance degradation associated with propagation of vector cloc
         \KwRet $\pbvc{}{}$
     }
 \end{algorithm}
-\fi
+% \fi
 
 % \subsection{Correctness}
 % \todo{This subsection is still in early stages}
@@ -757,7 +789,22 @@ The process begins with the compilation of the target program using LLVM, enhanc
 \label{sec:evaluation}
 
 \subsection{Experimental Setup}
+Our experiments run on...
+
+We have tested on the following existing open-source concurrent PM systems, including hashing-based indexes like P-CLHT \cite{clht2015} from RECIPE \cite{recipe2019}, and CCEH \cite{cceh2019}, and a tree-based index like FAST-FAIR B+-Tree \cite{fastfair2018}.
+
+- bugs found
+    - bug types
+        initializations, missing HB interinsics, flags, real bugs etc
+    - comparison with no HB relations?
+- PMRace comparison
+- Races found as a factor of keys
+- Algorithm time
+
+
+
 \subsection{Results}
+
 
 Benchmarks
 \cite{fastfair2018}
