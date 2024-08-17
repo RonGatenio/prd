@@ -32,7 +32,8 @@
 % \newcommand{\race}{\myrace}
 % \renewcommand{\race}{PM Inter-thread Inconsistency\xspace}
 
-\newcommand{\NameRace}{Persistency Race\xspace}
+% \newcommand{\NameRace}{Persistency Race\xspace}
+\newcommand{\NameRace}{persistency race\xspace}
 \newcommand{\SignRace}{PR\xspace}
 
 \newcommand{\NameRaceDetector}{\NameRace Detector\xspace}
@@ -298,7 +299,7 @@
 
 \newcommand{\todo}[1]{\noindent\begin{center}\fbox{\textbf{TODO: } #1}\end{center}}
 \renewcommand{\todo}[1]{\noindent\fbox{\textbf{TODO: } #1}}
-\renewcommand{\todo}[1]{\noindent\begin{minipage}{\columnwidth}\fbox{\parbox{\columnwidth}{\textbf{TODO: } #1}}\end{minipage}}
+\renewcommand{\todo}[1]{\newline\noindent\begin{minipage}{\columnwidth}\fbox{\parbox{\columnwidth}{\textbf{TODO: } #1}}\end{minipage}\newline}
 % \renewcommand{\todo}[1]{}
 
 
