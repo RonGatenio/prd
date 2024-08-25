@@ -115,15 +115,7 @@ The remainder of this paper is organized as follows: \autoref{sec:preliminaries}
 \section{Preliminaries}
 \label{sec:preliminaries}
 
-% % \myparagraph{PM}
-% \myparagraph{PMRace}
-% % \myparagraph{LLVM Instrumentation}
-% \myparagraph{Happens-Before}
-% \myparagraph{Program-Dependence}
-
-
 \subsection{Persistent Memory Programming}
-% \todo{introduction and explanation about persistent memory programming paradigms, technologies, and their applications}
 Persistent Memory (PM) represents a significant advance in memory technology by combining the durability of storage devices with the byte-addressability of traditional RAM. This unique characteristic allows applications to directly access and manipulate data in memory using byte-level load and store instructions, circumventing the page cache and offering performance akin to DRAM.
 
 However, the intrinsic non-volatility of PM introduces additional complexities in programming, especially concerning crash consistency. Unlike PM, CPU caches can be volatile and may not automatically preserve data upon power failure. This discrepancy necessitates managing the order of data persistence, which hinges on how cache lines are evicted—either through automatic system processes or explicit flush operations.
@@ -139,11 +131,11 @@ Overall, effective PM programming requires a deep understanding of both the unde
 
 \subsection{Happens-Before}
 The happens-before relationship, originally formulated by Leslie Lamport \cite{lamport1978}, determines the causal ordering of events in a program execution. It is commonly used to reason about the sequence and dependencies of operations in concurrent and distributed systems and is a prominent concept in data race detection algorithms.
-The basic idea is that a pair of events \((e_i, e_j)\) are related if communication between processes allows information to be transmitted from \(e_i\) to \(e_j\).
+The basic idea is that a pair of events $(e_i, e_j)$ are related if communication between processes allows information to be transmitted from $e_i$ to $e_j$.
 
-The happens-before relationship is a partial order on the events of a particular execution of a multi-threaded program and can be understood through the following principles. First, within a single thread, the order of instructions as written in the program code defines the happens-before relationship. If instruction \(A\) appears before instruction \(B\) in the same thread, then \(A\) happens-before \(B\). Second, synchronization operations such as acquiring and releasing locks, spawning and joining threads, syncronized atomic reads and writes to the same memory address, and other inter-thread communication mechanisms establish additional happens-before relationships across threads. For instance, if thread \(T1\) releases a lock and subsequently thread \(T2\) acquires the same lock, then all operations in \(T1\) that happened-before the release are considered to happen-before any operations in \(T2\) after the lock acquisition. Lastly, the relation is transitive, so if \(A\) happens-before \(B\) and \(B\) happens-before \(C\), then \(A\) happens-before \(C\).
+The happens-before relationship is a partial order on the events of a particular execution of a multi-threaded program and can be understood through the following principles. First, within a single thread, the order of instructions as written in the program code defines the happens-before relationship. If instruction $A$ appears before instruction $B$ in the same thread, then $A$ happens-before $B$. Second, synchronization operations such as acquiring and releasing locks, spawning and joining threads, syncronized atomic reads and writes to the same memory address, and other inter-thread communication mechanisms establish additional happens-before relationships across threads. For instance, if thread $T1$ releases a lock and subsequently thread $T2$ acquires the same lock, then all operations in $T1$ that happened-before the release are considered to happen-before any operations in $T2$ after the lock acquisition. Lastly, the relation is transitive, so if $A$ happens-before $B$ and $B$ happens-before $C$, then $A$ happens-before $C$.
 
-\myparagraph{Happens-Before Graph}
+\myparagraph{\HBGName}
 From the happens-before relationship, we derive the happens-before graph ($\HBG$) in a straightforward manner. In this graph, each executed instruction is represented as a node, and directed edges between these nodes capture the direct happens-before relations that arise due to program order and synchronization operations. It is important to note that while the happens-before relationship defines a partial order, not every pair of related events will have a direct edge between them in the graph. Instead, the $\HBG$ reflects the immediate, direct dependencies.
 The full happens-before relation is represented by the transitive closure of these edges. Therefore, if an event $A$ happens-before an event $B$, there may not be a direct edge between $A$ and $B$; however, there will always be a directed path from $A$ to $B$ in the graph, possibly passing through intermediate nodes that represent other events in the program execution.
 
@@ -155,37 +147,40 @@ In our algorithm, we rely on the concept of vector clocks to reason about the te
 
 A vector clock is a data structure that keeps track of the logical time of events in a distributed system. It is represented as an array of counters, where each counter corresponds to a process or thread in the system. Each process maintains its own vector clock, which it updates according to specific rules: each process increments its own counter before issuing an event. When a process sends a message, it includes its current vector clock with the message. Upon receiving a message, a process updates its vector clock by taking the element-wise maximum of its own vector clock and the received vector clock.
 
-Intuitively, a local vector clock of thread $T$ signifies for any thread $T'$ when $T$ was last updated with information about $T'$. If event \(A\) has a vector clock value of \(V_A\) and event \(B\) has a vector clock value of \(V_B\), then \(A\) happens-before \(B\) if and only if \(V_A\) is element-wise less or equal to \(V_B\).
+Intuitively, a local vector clock of thread $T$ signifies for any thread $T'$ when $T$ was last updated with information about $T'$. If event $A$ has a vector clock value of $V_A$ and event $B$ has a vector clock value of $V_B$, then $A$ happens-before $B$ if and only if $V_A$ is element-wise less or equal to $V_B$.
 For example, when a message is sent from $T_1$ to $T_2$, $T_2$ explicitly updates its clock in a way that ensures that $V_{T_1}$ is element-wise less or equal to $V_{T_2}$.
 This property allows vector clocks to efficiently capture and compare the causal relationships between events.
 
 By using vector clocks, we can precisely track the happens-before relationships across all events in a system, which is crucial for detecting concurrency issues and understanding the execution flow of parallel and distributed programs.
 
 \subsection{Program Dependence Analysis}
-\todo{Need to go over the differences between data flow technics and the creation of the ddg. need to explain that i'm actually doing data flow analysis}
-Program dependence is a relation between two instructions or statements, \(S1\) and \(S2\). This relation exists if the outcome of \(S1\) directly influences the outcome of \(S2\), necessitating that \(S1\) be executed before \(S2\) to ensure correct program behavior.
-There are two types of program dependence: data dependence and control dependence.
+Program dependence refers to the relationship between two instructions or statements, \texttt{S1} and \texttt{S2}, where the execution of \texttt{S1} can affect the behavior of \texttt{S2}, either directly or indirectly. This relationship necessitates that \texttt{S1} be executed before \texttt{S2} to ensure correct program behavior. There are two primary types of program dependence: data dependence and control dependence.
 
-Data dependencies arise between two operations when the output of one operation is required as input for the other. For instance, if \(S1\) computes a value that \(S2\) uses, there is a data dependency from \(S1\) to \(S2\). For example:
+Data dependencies occur when the output of one operation is required as input for another. For example, if \texttt{S1} computes a value that \texttt{S2} uses, \texttt{S2} is dependent on \texttt{S1}. In the example below:
 \begin{verbatim}
 S1: x = 5;
 S2: y = x + 1;
 \end{verbatim}
-In this case, \(S2\) is dependent on \(S1\) because \(S2\) uses the value of \texttt{x} computed by \(S1\).
-\todo{Do we add transitivity?}
+\texttt{S2} is dependent on \texttt{S1} because \texttt{S2} uses the value of \texttt{x} computed by \texttt{S1}.
 
-Control dependencies exist when the execution path of one operation depends on the outcome of a conditional branch affecting another operation. Specifically, \(S1\) controls the execution of \(S2\) if the decision to execute \(S2\) is based on a condition evaluated in \(S1\). For example:
+Control dependencies exist when the execution of one operation depends on the outcome of a conditional branch. Specifically, \texttt{S2} is control-dependent on \texttt{S1} if the decision to execute \texttt{S2} is based on a condition evaluated in \texttt{S1}. For example:
 \begin{verbatim}
-if (condition) {
-    S1;
+if (S1) {
+    S2;
 }
-S2;
+S3;
 \end{verbatim}
-Here, the execution of \(S1\) is control-dependent on the evaluation of the `condition`. If the condition is true, \(S1\) will execute; otherwise, it will not. \(S2\) is not directly control-dependent on the `condition`.
+Here, \texttt{S2} is control-dependent on the evaluation of \texttt{S1}. If \texttt{S1} evaluates to true, \texttt{S2} will execute; otherwise, it will not. However, \texttt{S3} is not control-dependent on \texttt{S1} and will execute regardless of \texttt{S1}'s evaluation.
+
+Program dependencies can be evaluated using either static analysis or dynamic analysis techniques. Static analysis involves examining the program's source code to determine all possible dependencies based on the control flow and data flow without running the program. This approach can identify potential dependencies across all possible execution paths, but it might over-approximate, including dependencies that may never occur in practice.
+
+Dynamic analysis, in contrast, evaluates dependencies by observing the program as it runs, capturing the actual dependencies that arise during specific executions. This method provides a more accurate picture of how dependencies manifest during real-world usage but may miss dependencies that could occur under different execution conditions not covered during the analysis.
+
+One specific approach to evaluating dynamic program dependency is through dynamic data flow analysis, which focuses on tracking how data moves through the program during execution. This approach is the one used in our work and is detected using the DFSan tool.
 
 \myparagraph{\PDGName}
 % TODO: choose who to site. the definition here is from pd1992. \cite{pd1988} \cite{pd1990} \cite{pd1991} \cite{pd1992} \cite{pd1994book}
-The \PDGName (\(\PDG\)) \cite{pd1988} is a directed, acyclic graph that models the execution flow of a program as a partial order. Each node in the \(\PDG\) corresponds to an executed instruction, and directed edges illustrate the data or control dependencies between these instructions. The \(\PDG\) helps visualize and analyze these dependencies, making it easier to understand how different parts of a program interact. By representing both data and control dependencies, the \(\PDG\) provides a comprehensive view of the execution flow, which is used to optimize compilers, verify programs, and analyze parallel execution.
+The \PDGName ($\PDG$) \cite{pd1988} is a directed, acyclic graph that models the execution flow of a program as a partial order. Each node in the $\PDG$ corresponds to an executed instruction, and directed edges illustrate the data or control dependencies between these instructions. The $\PDG$ helps visualize and analyze these dependencies, making it easier to understand how different parts of a program interact. By representing both data and control dependencies, the $\PDG$ provides a comprehensive view of the execution flow, which is used to optimize compilers, verify programs, and analyze parallel execution.
 
 \subsection{Program Instrumentation}
 Program instrumentation involves recording runtime events to analyze the behavior of a program during its execution. By leveraging LLVM's \cite{llvm2004} instrumentation capabilities, we systematically track every access to persistent memory (PM), including reads, writes, and explicit memory synchronization commands such as flush and fence instructions. This detailed tracking is useful for identifying potential concurrency issues and ensuring data consistency.  Our approach incorporates two key LLVM tools: ThreadSanitizer (TSan) and DataFlowSanitizer (DFSan), each serving a specific purpose in our analysis.
