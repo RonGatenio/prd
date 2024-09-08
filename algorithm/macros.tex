@@ -34,6 +34,7 @@
 
 % \newcommand{\NameRace}{Persistency Race\xspace}
 \newcommand{\NameRace}{persistency race\xspace}
+\newcommand{\NameRaceCaps}{Persistency Race\xspace}
 \newcommand{\SignRace}{PR\xspace}
 
 \newcommand{\NameRaceDetector}{\NameRace Detector\xspace}
@@ -195,6 +196,7 @@
 \newcommand{\HBSign}{\overset{hb}{\prec}}
 % \renewcommand{\HBSign}{\ensuremath{\FontSet{happen-before}}}
 \newcommand{\HB}[2]{\ensuremath{{#1} \HBSign {#2}}}
+\newcommand{\HBThree}[3]{\ensuremath{{#1} \HBSign {#2} \HBSign {#3}}}
 
 % \newcommand{\PDSign}{\overset{pd}{\to}}
 \newcommand{\PDSign}{\overset{depends}{\to}}
@@ -251,6 +253,7 @@
 % \newtheorem{theorem}{Theorem}[section]
 % \newtheorem{corollary}[theorem]{Corollary}
 % \newtheorem{claim}[theorem]{Claim}
+\newtheorem{claim}{Claim}
 % \newtheorem{lemma}[theorem]{Lemma}
 % \newtheorem{proposition}[theorem]{Proposition}
 % \newtheorem{result}[theorem]{Result}
@@ -299,7 +302,7 @@
 
 \newcommand{\todo}[1]{\noindent\begin{center}\fbox{\textbf{TODO: } #1}\end{center}}
 \renewcommand{\todo}[1]{\noindent\fbox{\textbf{TODO: } #1}}
-\renewcommand{\todo}[1]{\newline\noindent\begin{minipage}{\columnwidth}\fbox{\parbox{\columnwidth}{\textbf{TODO: } #1}}\end{minipage}\newline}
+\renewcommand{\todo}[1]{\newline\noindent\begin{minipage}{\columnwidth}\fbox{\parbox{0.95\columnwidth}{\textbf{TODO: } #1}}\end{minipage}\newline}
 % \renewcommand{\todo}[1]{}
 
 

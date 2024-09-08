@@ -81,9 +81,13 @@ Ensuring data persistence in NVM involves using an Application Binary Interface 
 This work targets a specific concurrency-related bug prevalent in NVM programs, originally identified as \textit{\NamePMRaceRace} by Chen, Zhangyu, et al. \cite{pmrace2022}. This bug occurs when one thread writes to persistent memory (PM) data that is based on volatile data currently in cache. Such scenarios can cause inconsistent NVM states post-crash, if the system crashes before the read location is persisted. Throughout this paper, we refer to this bug as \textit{\NameRace}.
 
 \todo{Add drawing for the next part - maybe use figure 1 and make it horizontal to show it better}
-Specifically, a \NameRace starts when a thread writes data to PM but gets interrupted before the data is explicitly written to the PM. Next, another thread reads this volatile data and uses it to modify another memory location. Finally, this latter modification is persisted to memory before the original data does. This sequence of events can create an inconsistent memory state, and we denote it a \textit{\NameRace}.
+
+Specifically, a \NameRace starts when a thread writes data to PM location but gets interrupted before the data is explicitly written to the PM. Next, another thread reads this volatile data and uses it to modify another PM location. Finally, this latter modification is persisted to memory before the original data does. This sequence of events can create an inconsistent memory state, and we denote it a \textit{\NameRace}.
+
+More formally, a \NameRace can be represented as a tuple of three execution events: a write event to a PM location $x$, a read event of that same location $x$ (which may follow the initial write), and a subsequent write event to a different PM location $y$ that is influenced by the read event. This tuple manifests as a bug when the write to $y$ is persisted before the write to $x$, leading to potential inconsistencies in the PM state.
 
 \todo{Add drawing for the next part - name the 2 nodes that are added to the list and name the threads T1 and T2. Show this in an image like in the old presentation that I made}
+
 To illustrate the detrimental effect the persistency bug may have, consider Harris's Linked-List \cite{harris2001}. In this data structure, the insert operation involves creating a new node, linking it to the next node, and then using an atomic operation to link the previous node to the new node. Now, imagine that another thread attempts to insert a node immediately after the newly inserted node and succeeds. Even if an explicit flush operation is added at the end of the insert operation to ensure persistence, thread interleavings could still cause issues. Specifically, the first insert operation might be interrupted just before the flush, while the second insert operation completes entirely. If a crash occurs at this moment, the system might recover to a state where neither node appears in the list, even though the second operation had seemingly completed. This example demonstrates how \NameRace conditions can lead to significant inconsistencies, as operations that were completed might be lost if their persistence wasn't properly managed.
 
 Chen, Zhang, Hua, and Ding \cite{pmrace2022} introduced PMRace, a specialized tool for identifying crash-consistency bugs in persistent memory (PM) applications, targeting \NamePMRaceRace. PMRace employs PM-aware coverage-guided fuzz testing to explore various execution interleavings that could reveal hidden inconsistencies. By instrumenting the target application, PMRace captures information on PM-specific operations. Each run of the tool focuses on a specific set of conditions and is likely to detect only one bug, requiring multiple runs to comprehensively identify all potential issues. This approach sets a benchmark for bug detection in concurrent PM systems but can be resource-intensive and time-consuming.
@@ -136,7 +140,7 @@ The basic idea is that a pair of events $(e_i, e_j)$ are related if communicatio
 The happens-before relationship is a partial order on the events of a particular execution of a multi-threaded program and can be understood through the following principles. First, within a single thread, the order of instructions as written in the program code defines the happens-before relationship. If instruction $A$ appears before instruction $B$ in the same thread, then $A$ happens-before $B$. Second, synchronization operations such as acquiring and releasing locks, spawning and joining threads, syncronized atomic reads and writes to the same memory address, and other inter-thread communication mechanisms establish additional happens-before relationships across threads. For instance, if thread $T1$ releases a lock and subsequently thread $T2$ acquires the same lock, then all operations in $T1$ that happened-before the release are considered to happen-before any operations in $T2$ after the lock acquisition. Lastly, the relation is transitive, so if $A$ happens-before $B$ and $B$ happens-before $C$, then $A$ happens-before $C$.
 
 \myparagraph{\HBGName}
-From the happens-before relationship, we derive the happens-before graph ($\HBG$) in a straightforward manner. In this graph, each executed instruction is represented as a node, and directed edges between these nodes capture the direct happens-before relations that arise due to program order and synchronization operations. It is important to note that while the happens-before relationship defines a partial order, not every pair of related events will have a direct edge between them in the graph. Instead, the $\HBG$ reflects the immediate, direct dependencies.
+From the happens-before relationship, we derive the happens-before graph ($\HBG$) in a straightforward manner. In this graph, each executed instruction is represented as a node, and directed edges between these nodes capture the direct happens-before relations that arise due to program order and synchronization operations. It is important to note that while the happens-before relationship defines a partial order, not every pair of related events will have a direct edge between them in the graph. Instead, the $\HBG$ reflects the immediate, direct dependencies, as defined by the synchronization operations described earlier.
 The full happens-before relation is represented by the transitive closure of these edges. Therefore, if an event $A$ happens-before an event $B$, there may not be a direct edge between $A$ and $B$; however, there will always be a directed path from $A$ to $B$ in the graph, possibly passing through intermediate nodes that represent other events in the program execution.
 
 The $\HBG$ is particularly useful for visualizing and analyzing concurrent executions, as it decouples the execution order from the actual timing of instructions. Consequently, different executions that may run at varying speeds but share the same happens-before graph are considered behaviorally equivalent, reflecting consistent execution behavior despite temporal differences. This abstraction helps in identifying potential concurrency issues like data races and ensures a consistent understanding of the execution order.
@@ -249,7 +253,7 @@ In this chapter, we introduce the key data structures and concepts essential for
 % \subsection{Properties of Program Execution}
 % \subsection{Program Execution Symbolization}
 \subsection{Program Execution Abstraction}
-A program execution is composed of a sequence of events, each representing a specific action such as a read, write, or flush to persistent memory (PM). These events are recorded during execution and organized into a program trace, which is a detailed log of all relevant operations performed by the program.
+A program execution is composed of a sequence of events, each representing a specific action, such as a read, write, or flush to persistent memory. In our context, a flush event is defined as a combination of a cache line flush followed by a fence operation, with the event considered to occur at the point of the fence instruction. These events are recorded during execution and organized into a program trace, which is a detailed log of all relevant operations performed by the program.
 
 In this context, an event node $\NodeV$ corresponds to an individual operation within the program. Each event node is associated with a memory address $\var{\NodeV} \in \Vars$ indicating the location accessed, a thread $\thread{\NodeV} \in \Threads$ indicating the executing thread, and an index $\idx{\NodeV} \in \IDs$ reflecting the sequential execution order of the event within its thread.
 
@@ -258,11 +262,12 @@ The execution trace is then modeled using two directed acyclic graphs (DAGs) tha
 \subsection{\HBGName}
 The \HBGName, denoted as $\HBG = (\Nodes, \HBEdges)$, models the causal relationships between events in the program execution. In this graph, nodes represent individual events, and directed edges represent happens-before relationships, indicating that one event causally precedes another.
 
-In our implementation, each thread is distinct, and edges are tagged as intra-thread or inter-thread. Intra-thread edges connect events within the same thread, reflecting the sequential execution order. Inter-thread edges connect events across different threads, capturing the synchronization and communication between them.
+In our implementation, each thread is distinct, and edges are tagged as intra-thread or inter-thread. Intra-thread edges connect events within the same thread, reflecting the sequential execution order.
+Inter-thread edges connect events across different threads and are determined using the internal vector clock analysis of the TSan tool. These vector clocks are updated whenever a synchronization event occurs, such as acquiring or releasing locks, atomic operations, or any other inter-thread synchronization mechanism. This ensures that the inter-thread edges accurately capture the happens-before relationships established by these synchronization events.
 
-Also, each node in our $\HBG$ has a maximum of $\abs{\Threads}$ incoming and outgoing edges. Each node has one intra-thread edge to the next node in the same thread, and at most one inter-thread edge to any other thread. We limit inter-thread edges to one per thread because multiple edges would be redundant due to the transitive nature of the happens-before relation. Specifically, we retain only the edge linking to the earliest node in the destination thread that happens after the current node, as this suffices to establish the necessary causal relationship.
+Additionally, each node in our $\HBG$ has a maximum of $\abs{\Threads}$ incoming and outgoing edges. Each node has one intra-thread edge to the next node in the same thread, and at most one inter-thread edge to any other thread. We limit inter-thread edges to one per thread because multiple edges would be redundant due to the transitive nature of the happens-before relation. Specifically, we retain only the edge linking to the earliest node in the destination thread that happens-after the current node, as this suffices to establish the necessary causal relationship.
 
-Additionally, we introduce intra-thread cache-line linked lists, where nodes that access the same memory address are linked within their respective threads. For instance, if a node $\NodeV$ reads/writes/flushes a memory address $x$, it is linked to the next node in the thread that writes to $x$. This structure allows us to efficiently find potential race conditions by tracking the sequence of operations on the same memory location.
+To optimize the detection of potential race conditions, we introduce \textit{intra-thread cache-line linked lists}, where nodes that access the same memory address are linked within their respective threads. For instance, if a node $\NodeV$ reads/writes/flushes a memory address $x$, it is linked to the next node in the thread that writes to $x$. This structure allows us to efficiently find potential race conditions by tracking the sequence of operations on the same memory location.
 
 \todo{Add a better drawing here that also shows the intra thread linked lists and the ddg}
 \autoref{fig:graphs} illustrates a sample \HBGName in black.
@@ -327,16 +332,152 @@ This specification ensures that the number of dependency edges in $\PDG$ is limi
 Vector clocks are used extensively in our analysis to track the temporal and causal states of events. We define several types of vector clocks, each serving a specific purpose:
 
 \myparagraph{\NameHAVC (\SignHAVC)}
-Defined for each node $\NodeV \in \Nodes$, $\HAVC{\NodeV}{\Thread}: \HAVCDef$ tracks the earliest event in thread $\Thread$ that happens after $\NodeV$ in the $\HBG$. An event $\NodeU$ is considered to \textit{happen-after} another event $\NodeV$ if $\HAVC{\NodeV}{\thread{\NodeU}} \leq \idx{\NodeU}$, establishing a causal order between these events.
+For each node $\NodeV \in \Nodes$, the vector clock $\HAVC{\NodeV}{\Thread}: \HAVCDef$ tracks the index of the earliest event in thread $\Thread$ that happens-after $\NodeV$ in the $\HBG$.
+Naturally, an event $\NodeU$ is considered to \textit{happen-after} another event $\NodeV$ if $\HAVC{\NodeV}{\thread{\NodeU}} \leq \idx{\NodeU}$.
 
 \myparagraph{\NameHBVC (\SignHBVC)}
-Defined for each node $\NodeV \in \Nodes$, $\HBVC{\NodeV}{\Thread,\VarX}: \HBVCDef$ tracks the latest event in thread $\Thread$ that precedes $\NodeV$ in the $\HBG$ and affects the cache line associated with $\VarX$. An event $\NodeU$ is considered to \textit{happen-before} another event $\NodeV$ if $\idx{\NodeU} \leq \HBVC{\NodeV}{\thread{\NodeU},\var{\NodeU}}$, establishing a causal order between these events.
+For each node $\NodeV \in \Nodes$, the vector clock $\HBVC{\NodeV}{\Thread,\VarX}: \HBVCDef$ tracks the index of the latest event in thread $\Thread$ that precedes $\NodeV$ in the $\HBG$ and affects the cache line associated with $\VarX$. By straightforward reasoning, an event $\NodeU$ is considered to \textit{happen-before} another event $\NodeV$ if $\idx{\NodeU} \leq \HBVC{\NodeV}{\thread{\NodeU},\var{\NodeU}}$.
+The inclusion of the cache line in this definition simplifies the calculation of the following \NamePBVC, where the specific memory variable becomes critical.
 
 \myparagraph{\NamePBVC (\SignPBVC)}
-Defined for each node $\NodeV \in \Nodes$, $\PBVC{\NodeV}{\Thread,\VarX}: \PBVCDef$ tracks the latest event in thread $\Thread$ that precedes $\NodeV$ in the $\HBG$, affects the cache line associated with $\VarX$, and ensures that $\VarX$ has been persisted. An event $\NodeU$ is considered \textit{persisted-before} another event $\NodeV$ if $\idx{\NodeU} \leq \PBVC{\NodeV}{\thread{\NodeU},\var{\NodeU}}$.
+For each node $\NodeV \in \Nodes$, the vector clock $\PBVC{\NodeV}{\Thread,\VarX}: \PBVCDef$ tracks the index of the latest event in thread $\Thread$ that precedes $\NodeV$ in the $\HBG$, affects the cache line associated with $\VarX$, and ensures that $\VarX$ has been persisted. Intuitively, an event $\NodeU$ is considered \textit{persisted-before} another event $\NodeV$ if $\idx{\NodeU} \leq \PBVC{\NodeV}{\thread{\NodeU},\var{\NodeU}}$.
 Persistency here implies that there is a path in the $\HBG$ from $\NodeU$ to $\NodeV$ that contains a flush event on the cache line associated with $\VarX$.
+The significance of the cache line in the definition is that, relative to $\NodeV$, each cache line may persist at a different index within the thread $\Thread$, if at all.
 
-\subsection{\NameRaceCaps}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Persistency Race
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{\NameRaceCaps}
+\label{sec:prd}
+\todo{Recall the inter-thread inconsistency. say that we want to define the race with happens-before in order to have a broader definition that will include multiple interleavings per execution. Later, also, add this to our contribution in the introduction}
+
+As introduced earlier, a \NameRace is a specific type of concurrency bug in NVM programs that can compromise data consistency following a crash. This issue arises when a write to persistent memory (PM) is influenced by a prior read from a volatile cache line that has not yet been persisted. If this volatile data is subsequently used to modify another PM location, and this modification is persisted before the original data, the system may enter an inconsistent state upon recovery.
+
+This race, initially defined as \NamePMRaceRace by Chen, Zhangyu, et al. \cite{pmrace2022}, captures the core concept of the race condition. However, the original definition is limited to specific thread interleavings observed during program execution. To broaden the scope and capture a wider range of potential interleavings, we redefine this race using the happens-before relationship. This redefinition allows us to encompass all equivalent interleavings of the same execution that maintain the same causal dependencies among program events, thereby improving the robustness of race detection.
+
+To formally define \NameRace, we use the notation $\HBSign$ for the happens-before relation and $\PDSign$ for the program-dependence relation. In addition, we will denote 
+% For this definition, we will use the following notation $\HBSign$ to declare a happens-before relation, and $\PDSign$ to declare program-dependance relation
+
+\begin{definition}[\NameRaceCaps]
+    \label{def:race}
+    
+    % A \NameRace exists between three execution event nodes: a read node $\NodeR \in \ReadNodes$, a write node $\NodeW \in \WriteNodes$, and a program-dependent write node $\NodeWEx \in \WriteNodes$ where
+    % \( R(X) \), \( W(X) \), and \( W(Y) \) if:
+    A persistency race exists between three instructions $R(X)$, $W(X)$, and $W(Y)$ if:
+ 
+    % \begin{enumerate}
+    % \begin{enumerate}[label=\roman*., left=0pt, labelindent=0pt, itemindent=0pt, align=left]
+    \begin{enumerate}[label=\roman*., leftmargin=*]
+        \item $X \neq Y$
+        \item $\PD{W(X)}{R(X)}$
+        \item $\HB{R(X)}{W(X)}$
+        \item There does not exist a flush operation $F(X)$ such that $\HBThree{W(X)}{F(X)}{W(Y)}$ or $\HBThree{R(X)}{F(X)}{W(Y)}$
+    \end{enumerate}
+
+
+ % A \NameRace is identified between a read node $\NodeR \in \ReadNodes$, a write node $\NodeW \in \WriteNodes$, and a program-dependent write node $\NodeWEx \in \WriteNodes$ where $(\NodeWEx, \NodeR) \in \PDEdges$. For this race to occur, the following conditions must be satisfied:
+
+ % % \begin{enumerate}[label=\roman*., left=0pt, labelindent=0pt, itemindent=0pt, align=left]
+ % \begin{enumerate}[label=\roman*., leftmargin=*]
+ %     \item Both $\NodeR$ and $\NodeW$ must access the same memory location denoted as $\VarX$, while $\NodeWEx$ must operate on a different cache line.
+ %     \item The vector clock $\PBVC{\NodeWEx}{\thread{\NodeR}, \VarX}$ is less than the index $\idx{\NodeR}$, ensuring that the read operation is not persisted before the earlier write operation.
+ %     \item The vector clock $\PBVC{\NodeWEx}{\thread{\NodeW}, \VarX}$ is less than the index $\idx{\NodeW}$, which in turn must be less than $\HAVC{\NodeR}{\thread{\NodeW}}$. This ensures that the write $\NodeW$ does not persist before $\NodeWEx$ and does not execute after $\NodeR$, allowing $\NodeW$ to potentially influence the value read by $\NodeR$ in certain program executions.
+ % \end{enumerate}
+\end{definition}
+
+
+% As introduced earlier, a \NameRace is a specific type of concurrency bug in NVM programs where data consistency can be compromised following a crash. This occurs when a write to persistent memory (PM) is affected by a prior read from a volatile cache line that has not yet been persisted. If this volatile data is used to modify another PM location, and this latter modification is persisted before the initial data, the system may reach an inconsistent state upon recovery.
+
+% Originally defined as \NamePMRaceRace by Chen, Zhangyu, et al. \cite{pmrace2022}, this definition captures the basic essence of the race condition, it is limited to specific thread interleavings observed during execution. To expand the detection to a broader range of possible interleavings, we redefine this race using the happens-before relationship. By doing so, we ensure that our definition encompasses all equivalent interleavings of the same execution that maintain the same causal dependencies among the program events.
+
+% This type of race was originally defined by Chen, Zhangyu, et al. \cite{pmrace2022} as \NamePMRaceRace.
+
+% While the original definition by Chen et al. captures the basic essence of the race condition, it is limited to specific thread interleavings observed during execution. To expand the detection to a broader range of possible interleavings, we redefine this race using the happens-before relationship. By doing so, we ensure that our definition encompasses all equivalent interleavings of the same execution that maintain the same causal dependencies among the program events.
+
+
+
+
+
+
+
+As introduced earlier, a \NameRace is a specific type of concurrency bug in NVM programs where data consistency can be compromised following a crash. This occurs when a write to persistent memory (PM) is affected by a prior read from a volatile cache line that has not yet been persisted. If this volatile data is used to modify another PM location, and this latter modification is persisted before the initial data, the system may reach an inconsistent state upon recovery.
+
+To formally define a \NameRace, we consider three key events in program execution: a read node $\NodeR \in \ReadNodes$, a write node $\NodeW \in \WriteNodes$, and a program-dependent write node $\NodeWEx \in \WriteNodes$, where the dependency $(\NodeWEx, \NodeR) \in \PDEdges$ is captured by the \PDGName.
+
+\begin{definition}[\NameRaceCaps]
+ \label{def:race}
+ A \NameRace is identified between a read node $\NodeR \in \ReadNodes$, a write node $\NodeW \in \WriteNodes$, and a program-dependent write node $\NodeWEx \in \WriteNodes$ where $(\NodeWEx, \NodeR) \in \PDEdges$. For this race to occur, the following conditions must be satisfied:
+
+ % \begin{enumerate}[label=\roman*., left=0pt, labelindent=0pt, itemindent=0pt, align=left]
+ \begin{enumerate}[label=\roman*., leftmargin=*]
+     \item Both $\NodeR$ and $\NodeW$ must access the same memory location denoted as $\VarX$, while $\NodeWEx$ must operate on a different cache line.
+     \item The vector clock $\PBVC{\NodeWEx}{\thread{\NodeR}, \VarX}$ is less than the index $\idx{\NodeR}$, ensuring that the read operation is not persisted before the earlier write operation.
+     \item The vector clock $\PBVC{\NodeWEx}{\thread{\NodeW}, \VarX}$ is less than the index $\idx{\NodeW}$, which in turn must be less than $\HAVC{\NodeR}{\thread{\NodeW}}$. This ensures that the write $\NodeW$ does not persist before $\NodeWEx$ and does not execute after $\NodeR$, allowing $\NodeW$ to potentially influence the value read by $\NodeR$ in certain program executions.
+ \end{enumerate}
+\end{definition}
+
+
+\begin{definition}[\NameRaceCaps]
+    \label{def:race}
+    A \NameRace is identified between a read node $\NodeR \in \ReadNodes$, a write node $\NodeW \in \WriteNodes$, and a program-dependent write node $\NodeWEx \in \WriteNodes$ where $(\NodeWEx, \NodeR) \in \PDEdges$. For this race to occur, the following conditions must be satisfied:
+    
+    \begin{enumerate}[label=\roman*.]
+        \item Both $\NodeR$ and $\NodeW$ must access the same memory location denoted as $\VarX$, while $\NodeWEx$ must operate on a different cache line.
+        \item The vector clock $\PBVC{\NodeWEx}{\thread{\NodeR}, \VarX}$ is less than the index $\idx{\NodeR}$, ensuring that the read operation is not persisted before the earlier write operation.
+        \item The vector clock $\PBVC{\NodeWEx}{\thread{\NodeW}, \VarX}$ is less than the index $\idx{\NodeW}$, which in turn must be less than $\HAVC{\NodeR}{\thread{\NodeW}}$. This ensures that the write $\NodeW$ does not persist before $\NodeWEx$ and does not execute after $\NodeR$, allowing $\NodeW$ to potentially influence the value read by $\NodeR$ in certain program executions.
+    \end{enumerate}
+\end{definition}
+
+\begin{definition}[\NameRaceCaps]
+    \label{def:race}
+    A \NameRace is identified between a read node $\NodeR \in \ReadNodes$, a write node $\NodeW \in \WriteNodes$, and a program-dependent write node $\NodeWEx \in \WriteNodes$ where $(\NodeWEx, \NodeR) \in \PDEdges$. For this race to occur, both $\NodeR$ and $\NodeW$ must access the same memory location denoted as $\VarX$, while $\NodeWEx$ must operate on a different cache line. 
+
+    Additionally, the following two constraints must be satisfied: 
+    the vector clock $\PBVC{\NodeWEx}{\thread{\NodeR}, \VarX}$ is less than the index $\idx{\NodeR}$, ensuring that the read operation is not persisted before the earlier write operation. Moreover, the vector clock $\PBVC{\NodeWEx}{\thread{\NodeW}, \VarX}$ must be less than the index $\idx{\NodeW}$, which in turn must be less than $\HAVC{\NodeR}{\thread{\NodeW}}$. This constraint guarantees that the write $\NodeW$ does not persist before $\NodeWEx$ and does not execute after $\NodeR$, allowing $\NodeW$ to potentially influence the value read by $\NodeR$ in certain program executions.
+\end{definition}
+
+\todo{False positives in the defintion}
+
+----------------
+
+To formally define a \NameRace, we rely on the notations and data structures established in \autoref{sec:datastructures}.
+
+A \NameRace is represented as follows:
+
+\begin{definition}[\NameRaceCaps]
+    \label{def:race}
+    A \NameRace is identified between a read node $\NodeR \in \ReadNodes$, a write node $\NodeW \in \WriteNodes$, and a program-dependent write node $\NodeWEx \in \WriteNodes$, where $(\NodeWEx, \NodeR) \in \PDEdges$.
+    
+    For this race to occur:
+    \begin{itemize}
+        \item Both $\NodeR$ and $\NodeW$ must access the same memory location, denote`d as $\VarX$.
+        \item $\NodeWEx$ must operate on a different cache line.
+        \item The following two constraints must be satisfied:
+    \end{itemize}
+    \begin{gather*}
+        \PBVC{\NodeWEx}{\thread{\NodeR}, \VarX} < \idx{\NodeR}\\
+        \PBVC{\NodeWEx}{\thread{\NodeW}, \VarX} < \idx{\NodeW} < \HAVC{\NodeR}{\thread{\NodeW}}
+    \end{gather*}
+\end{definition}
+
+The first constraint ensures that $\NodeR$ must not be persisted before $\NodeWEx$, and the second ensures that $\NodeW$ does not persist before $\NodeWEx$ and does not execute after $\NodeR$. These conditions enable the detection of scenarios where $\NodeW$ could influence the value read by $\NodeR$ in certain executions.
+
+This formal definition aligns with our intuitive understanding of the \NameRace. The bug arises because unpersisted data from a read operation is used in subsequent writes that get persisted earlier. This ordering can lead to inconsistencies if a crash occurs before the initial write to the first location is properly committed to PM.
+
+
+
+
+
+
+
+
+- recall to explanation in the intro?
+- formal definition based on the notations and HBG and DDG
+    - explain why this intuitively defines the race
+- redefinition using VCs
+- examples of the race in real applications?
+
 A \NameRace occurs when a write operation to persistent memory (PM) is influenced by a prior read operation from a non-persisted area of PM located on a different cache line. This scenario risks compromising the integrity of the PM state if the write operation becomes durable before the read areas are persisted.
 
 We formally define a \NameRace as follows:
