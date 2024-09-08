@@ -354,9 +354,11 @@ The significance of the cache line in the definition is that, relative to $\Node
 
 As introduced earlier, a \NameRace is a specific type of concurrency bug in NVM programs that can compromise data consistency following a crash. This issue arises when a write to persistent memory (PM) is influenced by a prior read from a volatile cache line that has not yet been persisted. If this volatile data is subsequently used to modify another PM location, and this modification is persisted before the original data, the system may enter an inconsistent state upon recovery.
 
-This race, initially defined as \NamePMRaceRace by Chen, Zhangyu, et al. \cite{pmrace2022}, captures the core concept of the race condition. However, the original definition is limited to specific thread interleavings observed during program execution. To broaden the scope and capture a wider range of potential interleavings, we redefine this race using the happens-before relationship. This redefinition allows us to encompass all equivalent interleavings of the same execution that maintain the same causal dependencies among program events, thereby improving the robustness of race detection.
+Initially defined as \NamePMRaceRace by Chen, Zhangyu, et al. \cite{pmrace2022}, this race condition captures the core concept of the bug but is limited to specific thread interleavings observed during program execution. To expand the scope and capture a broader range of potential interleavings, we redefine this race using the happens-before relationship. This redefinition allows us to encompass all equivalent interleavings of the same execution that maintain the same causal dependencies among program events, thereby enhancing the robustness of race detection.
+% This race, initially defined as \NamePMRaceRace by Chen, Zhangyu, et al. \cite{pmrace2022}, captures the core concept of the race condition. However, the original definition is limited to specific thread interleavings observed during program execution. To broaden the scope and capture a wider range of potential interleavings, we redefine this race using the happens-before relationship. This redefinition allows us to encompass all equivalent interleavings of the same execution that maintain the same causal dependencies among program events, thereby improving the robustness of race detection.
 
-To formally define \NameRace, we use the notation $\HBSign$ for the happens-before relation and $\PDSign$ for the program-dependence relation. In addition, we will denote 
+To formally define \NameRace, we use the notation $\HBSign$ to denote the happens-before relation and $\PDSign$ to denote the program-dependence relation.
+% In addition, we will denote 
 % For this definition, we will use the following notation $\HBSign$ to declare a happens-before relation, and $\PDSign$ to declare program-dependance relation
 
 \begin{definition}[\NameRaceCaps]
@@ -364,27 +366,41 @@ To formally define \NameRace, we use the notation $\HBSign$ for the happens-befo
     
     % A \NameRace exists between three execution event nodes: a read node $\NodeR \in \ReadNodes$, a write node $\NodeW \in \WriteNodes$, and a program-dependent write node $\NodeWEx \in \WriteNodes$ where
     % \( R(X) \), \( W(X) \), and \( W(Y) \) if:
-    A persistency race exists between three instructions $R(X)$, $W(X)$, and $W(Y)$ if:
+    % A persistency race exists between three instructions $R(X)$, $W(X)$, and $W(Y)$ if:
+    A \NameRace exists between three executed instructions: a read instruction $\NodeR \in \ReadNodes$, a write instruction $\NodeW \in \WriteNodes$, and another write instruction $\NodeWEx \in \WriteNodes$, if all the following conditions are met:
  
     % \begin{enumerate}
-    % \begin{enumerate}[label=\roman*., left=0pt, labelindent=0pt, itemindent=0pt, align=left]
-    \begin{enumerate}[label=\roman*., leftmargin=*]
-        \item $X \neq Y$
-        \item $\PD{W(X)}{R(X)}$
-        \item $\HB{R(X)}{W(X)}$
-        \item There does not exist a flush operation $F(X)$ such that $\HBThree{W(X)}{F(X)}{W(Y)}$ or $\HBThree{R(X)}{F(X)}{W(Y)}$
+    % \begin{enumerate}[label=\Roman*., left=0pt, labelindent=0pt, itemindent=0pt, leftmargin=0pt, align=left]
+    % \begin{enumerate}[label=\Roman*., leftmargin=*]
+    % \begin{enumerate}[label=\Roman*., left=0pt, labelindent=0pt, itemindent=0pt, align=left]
+    \begin{enumerate}[label=\Roman*., left=0pt, labelindent=0pt, itemindent=0pt, align=left, itemsep=1.5ex]
+        \item $\var{\NodeR} = \var{\NodeW} \neq \var{\NodeWEx}$
+        \item $\PD{\NodeW}{\NodeR}$
+        \item $\NotHB{\NodeR}{\NodeW}$
+        \item There does not exist a flush operation $\NodeF \in \FlushNodes$ such that $\HBThree{\NodeW}{\NodeF}{\NodeWEx}$ or $\HBThree{\NodeR}{\NodeF}{\NodeWEx}$
     \end{enumerate}
 
+    
+    % % \begin{enumerate}
+    % % \begin{enumerate}[label=\roman*., left=0pt, labelindent=0pt, itemindent=0pt, align=left]
+    % \begin{enumerate}[label=\roman*., leftmargin=*]
+    %     \item $X \neq Y$
+    %     \item $\PD{W(X)}{R(X)}$
+    %     \item $\HB{R(X)}{W(X)}$
+    %     \item There does not exist a flush operation $F(X)$ such that $\HBThree{W(X)}{F(X)}{W(Y)}$ or $\HBThree{R(X)}{F(X)}{W(Y)}$
+    % \end{enumerate}
 
- % A \NameRace is identified between a read node $\NodeR \in \ReadNodes$, a write node $\NodeW \in \WriteNodes$, and a program-dependent write node $\NodeWEx \in \WriteNodes$ where $(\NodeWEx, \NodeR) \in \PDEdges$. For this race to occur, the following conditions must be satisfied:
 
- % % \begin{enumerate}[label=\roman*., left=0pt, labelindent=0pt, itemindent=0pt, align=left]
- % \begin{enumerate}[label=\roman*., leftmargin=*]
- %     \item Both $\NodeR$ and $\NodeW$ must access the same memory location denoted as $\VarX$, while $\NodeWEx$ must operate on a different cache line.
- %     \item The vector clock $\PBVC{\NodeWEx}{\thread{\NodeR}, \VarX}$ is less than the index $\idx{\NodeR}$, ensuring that the read operation is not persisted before the earlier write operation.
- %     \item The vector clock $\PBVC{\NodeWEx}{\thread{\NodeW}, \VarX}$ is less than the index $\idx{\NodeW}$, which in turn must be less than $\HAVC{\NodeR}{\thread{\NodeW}}$. This ensures that the write $\NodeW$ does not persist before $\NodeWEx$ and does not execute after $\NodeR$, allowing $\NodeW$ to potentially influence the value read by $\NodeR$ in certain program executions.
- % \end{enumerate}
+     % A \NameRace is identified between a read node $\NodeR \in \ReadNodes$, a write node $\NodeW \in \WriteNodes$, and a program-dependent write node $\NodeWEx \in \WriteNodes$ where $(\NodeWEx, \NodeR) \in \PDEdges$. For this race to occur, the following conditions must be satisfied:
+    
+     % % \begin{enumerate}[label=\roman*., left=0pt, labelindent=0pt, itemindent=0pt, align=left]
+     % \begin{enumerate}[label=\roman*., leftmargin=*]
+     %     \item Both $\NodeR$ and $\NodeW$ must access the same memory location denoted as $\VarX$, while $\NodeWEx$ must operate on a different cache line.
+     %     \item The vector clock $\PBVC{\NodeWEx}{\thread{\NodeR}, \VarX}$ is less than the index $\idx{\NodeR}$, ensuring that the read operation is not persisted before the earlier write operation.
+     %     \item The vector clock $\PBVC{\NodeWEx}{\thread{\NodeW}, \VarX}$ is less than the index $\idx{\NodeW}$, which in turn must be less than $\HAVC{\NodeR}{\thread{\NodeW}}$. This ensures that the write $\NodeW$ does not persist before $\NodeWEx$ and does not execute after $\NodeR$, allowing $\NodeW$ to potentially influence the value read by $\NodeR$ in certain program executions.
+     % \end{enumerate}
 \end{definition}
+
 
 
 % As introduced earlier, a \NameRace is a specific type of concurrency bug in NVM programs where data consistency can be compromised following a crash. This occurs when a write to persistent memory (PM) is affected by a prior read from a volatile cache line that has not yet been persisted. If this volatile data is used to modify another PM location, and this latter modification is persisted before the initial data, the system may reach an inconsistent state upon recovery.
@@ -394,12 +410,6 @@ To formally define \NameRace, we use the notation $\HBSign$ for the happens-befo
 % This type of race was originally defined by Chen, Zhangyu, et al. \cite{pmrace2022} as \NamePMRaceRace.
 
 % While the original definition by Chen et al. captures the basic essence of the race condition, it is limited to specific thread interleavings observed during execution. To expand the detection to a broader range of possible interleavings, we redefine this race using the happens-before relationship. By doing so, we ensure that our definition encompasses all equivalent interleavings of the same execution that maintain the same causal dependencies among the program events.
-
-
-
-
-
-
 
 As introduced earlier, a \NameRace is a specific type of concurrency bug in NVM programs where data consistency can be compromised following a crash. This occurs when a write to persistent memory (PM) is affected by a prior read from a volatile cache line that has not yet been persisted. If this volatile data is used to modify another PM location, and this latter modification is persisted before the initial data, the system may reach an inconsistent state upon recovery.
 
