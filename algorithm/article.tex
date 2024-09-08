@@ -102,6 +102,7 @@ However, the precision of this generalization technique is heavily dependent on 
 \SignRaceDetector achieves comprehensive coverage of possible race conditions while significantly enhancing the speed and efficiency of race detection in NVM programs. This approach eliminates the need for a large number of individual test runs, making the detection process more practical and resource-efficient.
 
 \todo{When there are numerical results, here is a good place to summarize them!}
+\todo{Write about contribution, like the generalized race definition, the numerical results, etc}
 
 
 % TODO: contributions?
@@ -350,187 +351,55 @@ The significance of the cache line in the definition is that, relative to $\Node
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{\NameRaceCaps}
 \label{sec:prd}
-\todo{Recall the inter-thread inconsistency. say that we want to define the race with happens-before in order to have a broader definition that will include multiple interleavings per execution. Later, also, add this to our contribution in the introduction}
 
 As introduced earlier, a \NameRace is a specific type of concurrency bug in NVM programs that can compromise data consistency following a crash. This issue arises when a write to persistent memory (PM) is influenced by a prior read from a volatile cache line that has not yet been persisted. If this volatile data is subsequently used to modify another PM location, and this modification is persisted before the original data, the system may enter an inconsistent state upon recovery.
 
 Initially defined as \NamePMRaceRace by Chen, Zhangyu, et al. \cite{pmrace2022}, this race condition captures the core concept of the bug but is limited to specific thread interleavings observed during program execution. To expand the scope and capture a broader range of potential interleavings, we redefine this race using the happens-before relationship. This redefinition allows us to encompass all equivalent interleavings of the same execution that maintain the same causal dependencies among program events, thereby enhancing the robustness of race detection.
-% This race, initially defined as \NamePMRaceRace by Chen, Zhangyu, et al. \cite{pmrace2022}, captures the core concept of the race condition. However, the original definition is limited to specific thread interleavings observed during program execution. To broaden the scope and capture a wider range of potential interleavings, we redefine this race using the happens-before relationship. This redefinition allows us to encompass all equivalent interleavings of the same execution that maintain the same causal dependencies among program events, thereby improving the robustness of race detection.
 
 To formally define \NameRace, we use the notation $\HBSign$ to denote the happens-before relation and $\PDSign$ to denote the program-dependence relation.
-% In addition, we will denote 
-% For this definition, we will use the following notation $\HBSign$ to declare a happens-before relation, and $\PDSign$ to declare program-dependance relation
 
 \begin{definition}[\NameRaceCaps]
-    \label{def:race}
+    \label{def:race1}
     
-    % A \NameRace exists between three execution event nodes: a read node $\NodeR \in \ReadNodes$, a write node $\NodeW \in \WriteNodes$, and a program-dependent write node $\NodeWEx \in \WriteNodes$ where
-    % \( R(X) \), \( W(X) \), and \( W(Y) \) if:
-    % A persistency race exists between three instructions $R(X)$, $W(X)$, and $W(Y)$ if:
+    A \NameRace exists between three executed instructions: a read instruction $\NodeR \in \ReadNodes$, a write instruction $\NodeW \in \WriteNodes$, and another write instruction $\NodeWEx \in \WriteNodes$, if all the following conditions are met:
+
+    \begin{enumerate}[label=\Roman*., left=0pt, labelindent=0pt, itemindent=0pt, align=left, itemsep=1.5ex]
+        \item \label{race1:cond:1} $\var{\NodeR} = \var{\NodeW} \neq \var{\NodeWEx}$
+        \item \label{race1:cond:2} $\PD{\NodeW}{\NodeR}$
+        \item \label{race1:cond:3} $\NotHB{\NodeR}{\NodeW}$
+        \item \label{race1:cond:4} There does not exist a flush operation $\NodeF \in \FlushNodes$ such that $\HBThree{\NodeW}{\NodeF}{\NodeWEx}$ or $\HBThree{\NodeR}{\NodeF}{\NodeWEx}$
+    \end{enumerate}
+\end{definition}
+
+In this formal definition, we outline the necessary conditions for a \NameRace to exist.
+Condition \ref{race1:cond:1} ensures that the read instruction $\NodeR$ and the write instruction $\NodeW$ access the same memory location, denoted as $\var{\NodeR} = \var{\NodeW}$, while the other write instruction $\NodeWEx$ modifies a different memory location, $\var{\NodeWEx}$. 
+Condition \ref{race1:cond:2} establishes that the write $\NodeW$ is program-dependent on the read $\NodeR$, meaning $\NodeW$ is influenced by the value read by $\NodeR$.
+Condition \ref{race1:cond:3} states that $\NodeR$ does not happen-before $\NodeW$, which means that $\NodeW$ could execute concurrently with $\NodeR$ or even happen-before it. In simpler terms, this condition ensures that $\NodeW$ does not happen-after $\NodeR$.
+Condition \ref{race1:cond:4} specifies that there must not exist a flush operation that occurs between $\NodeW$ and $\NodeWEx$, or between $\NodeR$ and $\NodeWEx$ in the happens-before relationship. This ensures that the data written by $\NodeWEx$ and/or read by $\NodeR$ may not have been persisted to memory yet and could still be volatile.
+
+To facilitate the practical detection of \NameRace conditions in our algorithm, which will be presented later, we rewrite the race using the previously defined causal vector clocks from \autoref{sec:vc}.
+
+\begin{definition}[\NameRaceCaps with Causal Vector Clocks]
+    \label{def:race2}
+    
     A \NameRace exists between three executed instructions: a read instruction $\NodeR \in \ReadNodes$, a write instruction $\NodeW \in \WriteNodes$, and another write instruction $\NodeWEx \in \WriteNodes$, if all the following conditions are met:
  
-    % \begin{enumerate}
-    % \begin{enumerate}[label=\Roman*., left=0pt, labelindent=0pt, itemindent=0pt, leftmargin=0pt, align=left]
-    % \begin{enumerate}[label=\Roman*., leftmargin=*]
-    % \begin{enumerate}[label=\Roman*., left=0pt, labelindent=0pt, itemindent=0pt, align=left]
     \begin{enumerate}[label=\Roman*., left=0pt, labelindent=0pt, itemindent=0pt, align=left, itemsep=1.5ex]
-        \item $\var{\NodeR} = \var{\NodeW} \neq \var{\NodeWEx}$
-        \item $\PD{\NodeW}{\NodeR}$
-        \item $\NotHB{\NodeR}{\NodeW}$
-        \item There does not exist a flush operation $\NodeF \in \FlushNodes$ such that $\HBThree{\NodeW}{\NodeF}{\NodeWEx}$ or $\HBThree{\NodeR}{\NodeF}{\NodeWEx}$
-    \end{enumerate}
-
-    
-    % % \begin{enumerate}
-    % % \begin{enumerate}[label=\roman*., left=0pt, labelindent=0pt, itemindent=0pt, align=left]
-    % \begin{enumerate}[label=\roman*., leftmargin=*]
-    %     \item $X \neq Y$
-    %     \item $\PD{W(X)}{R(X)}$
-    %     \item $\HB{R(X)}{W(X)}$
-    %     \item There does not exist a flush operation $F(X)$ such that $\HBThree{W(X)}{F(X)}{W(Y)}$ or $\HBThree{R(X)}{F(X)}{W(Y)}$
-    % \end{enumerate}
-
-
-     % A \NameRace is identified between a read node $\NodeR \in \ReadNodes$, a write node $\NodeW \in \WriteNodes$, and a program-dependent write node $\NodeWEx \in \WriteNodes$ where $(\NodeWEx, \NodeR) \in \PDEdges$. For this race to occur, the following conditions must be satisfied:
-    
-     % % \begin{enumerate}[label=\roman*., left=0pt, labelindent=0pt, itemindent=0pt, align=left]
-     % \begin{enumerate}[label=\roman*., leftmargin=*]
-     %     \item Both $\NodeR$ and $\NodeW$ must access the same memory location denoted as $\VarX$, while $\NodeWEx$ must operate on a different cache line.
-     %     \item The vector clock $\PBVC{\NodeWEx}{\thread{\NodeR}, \VarX}$ is less than the index $\idx{\NodeR}$, ensuring that the read operation is not persisted before the earlier write operation.
-     %     \item The vector clock $\PBVC{\NodeWEx}{\thread{\NodeW}, \VarX}$ is less than the index $\idx{\NodeW}$, which in turn must be less than $\HAVC{\NodeR}{\thread{\NodeW}}$. This ensures that the write $\NodeW$ does not persist before $\NodeWEx$ and does not execute after $\NodeR$, allowing $\NodeW$ to potentially influence the value read by $\NodeR$ in certain program executions.
-     % \end{enumerate}
-\end{definition}
-
-
-
-% As introduced earlier, a \NameRace is a specific type of concurrency bug in NVM programs where data consistency can be compromised following a crash. This occurs when a write to persistent memory (PM) is affected by a prior read from a volatile cache line that has not yet been persisted. If this volatile data is used to modify another PM location, and this latter modification is persisted before the initial data, the system may reach an inconsistent state upon recovery.
-
-% Originally defined as \NamePMRaceRace by Chen, Zhangyu, et al. \cite{pmrace2022}, this definition captures the basic essence of the race condition, it is limited to specific thread interleavings observed during execution. To expand the detection to a broader range of possible interleavings, we redefine this race using the happens-before relationship. By doing so, we ensure that our definition encompasses all equivalent interleavings of the same execution that maintain the same causal dependencies among the program events.
-
-% This type of race was originally defined by Chen, Zhangyu, et al. \cite{pmrace2022} as \NamePMRaceRace.
-
-% While the original definition by Chen et al. captures the basic essence of the race condition, it is limited to specific thread interleavings observed during execution. To expand the detection to a broader range of possible interleavings, we redefine this race using the happens-before relationship. By doing so, we ensure that our definition encompasses all equivalent interleavings of the same execution that maintain the same causal dependencies among the program events.
-
-As introduced earlier, a \NameRace is a specific type of concurrency bug in NVM programs where data consistency can be compromised following a crash. This occurs when a write to persistent memory (PM) is affected by a prior read from a volatile cache line that has not yet been persisted. If this volatile data is used to modify another PM location, and this latter modification is persisted before the initial data, the system may reach an inconsistent state upon recovery.
-
-To formally define a \NameRace, we consider three key events in program execution: a read node $\NodeR \in \ReadNodes$, a write node $\NodeW \in \WriteNodes$, and a program-dependent write node $\NodeWEx \in \WriteNodes$, where the dependency $(\NodeWEx, \NodeR) \in \PDEdges$ is captured by the \PDGName.
-
-\begin{definition}[\NameRaceCaps]
- \label{def:race}
- A \NameRace is identified between a read node $\NodeR \in \ReadNodes$, a write node $\NodeW \in \WriteNodes$, and a program-dependent write node $\NodeWEx \in \WriteNodes$ where $(\NodeWEx, \NodeR) \in \PDEdges$. For this race to occur, the following conditions must be satisfied:
-
- % \begin{enumerate}[label=\roman*., left=0pt, labelindent=0pt, itemindent=0pt, align=left]
- \begin{enumerate}[label=\roman*., leftmargin=*]
-     \item Both $\NodeR$ and $\NodeW$ must access the same memory location denoted as $\VarX$, while $\NodeWEx$ must operate on a different cache line.
-     \item The vector clock $\PBVC{\NodeWEx}{\thread{\NodeR}, \VarX}$ is less than the index $\idx{\NodeR}$, ensuring that the read operation is not persisted before the earlier write operation.
-     \item The vector clock $\PBVC{\NodeWEx}{\thread{\NodeW}, \VarX}$ is less than the index $\idx{\NodeW}$, which in turn must be less than $\HAVC{\NodeR}{\thread{\NodeW}}$. This ensures that the write $\NodeW$ does not persist before $\NodeWEx$ and does not execute after $\NodeR$, allowing $\NodeW$ to potentially influence the value read by $\NodeR$ in certain program executions.
- \end{enumerate}
-\end{definition}
-
-
-\begin{definition}[\NameRaceCaps]
-    \label{def:race}
-    A \NameRace is identified between a read node $\NodeR \in \ReadNodes$, a write node $\NodeW \in \WriteNodes$, and a program-dependent write node $\NodeWEx \in \WriteNodes$ where $(\NodeWEx, \NodeR) \in \PDEdges$. For this race to occur, the following conditions must be satisfied:
-    
-    \begin{enumerate}[label=\roman*.]
-        \item Both $\NodeR$ and $\NodeW$ must access the same memory location denoted as $\VarX$, while $\NodeWEx$ must operate on a different cache line.
-        \item The vector clock $\PBVC{\NodeWEx}{\thread{\NodeR}, \VarX}$ is less than the index $\idx{\NodeR}$, ensuring that the read operation is not persisted before the earlier write operation.
-        \item The vector clock $\PBVC{\NodeWEx}{\thread{\NodeW}, \VarX}$ is less than the index $\idx{\NodeW}$, which in turn must be less than $\HAVC{\NodeR}{\thread{\NodeW}}$. This ensures that the write $\NodeW$ does not persist before $\NodeWEx$ and does not execute after $\NodeR$, allowing $\NodeW$ to potentially influence the value read by $\NodeR$ in certain program executions.
+        \item \label{race2:cond:1} $\var{\NodeR} = \var{\NodeW} \neq \var{\NodeWEx}$
+        \item \label{race2:cond:2} $\PD{\NodeW}{\NodeR}$
+        \item \label{race2:cond:3} $\idx{\NodeW} < \HAVC{\NodeR}{\thread{\NodeW}}$
+        \item \label{race2:cond:4} $\PBVC{\NodeWEx}{\thread{\NodeW},\var{\NodeW}} < \idx{\NodeW}$
+        \item \label{race2:cond:5} $\PBVC{\NodeWEx}{\thread{\NodeR},\var{\NodeR}} < \idx{\NodeR}$
     \end{enumerate}
 \end{definition}
 
-\begin{definition}[\NameRaceCaps]
-    \label{def:race}
-    A \NameRace is identified between a read node $\NodeR \in \ReadNodes$, a write node $\NodeW \in \WriteNodes$, and a program-dependent write node $\NodeWEx \in \WriteNodes$ where $(\NodeWEx, \NodeR) \in \PDEdges$. For this race to occur, both $\NodeR$ and $\NodeW$ must access the same memory location denoted as $\VarX$, while $\NodeWEx$ must operate on a different cache line. 
+To understand why these conditions align with our original definition, consider how the constraints are applied using vector clocks.
+Condition \ref{race2:cond:3} ensures that $\NodeW$ does not happen-after $\NodeR$ by requiring that the sequential execution order of $\NodeW$ within its thread, $\idx{\NodeW}$, is less than the earliest index in that thread that happens-after $\NodeR$.
+Conditions \ref{race2:cond:4} and \ref{race2:cond:5} ensure that the memory locations read by $\NodeR$ and/or written by $\NodeW$ do not persist before the write operation $\NodeWEx$.
 
-    Additionally, the following two constraints must be satisfied: 
-    the vector clock $\PBVC{\NodeWEx}{\thread{\NodeR}, \VarX}$ is less than the index $\idx{\NodeR}$, ensuring that the read operation is not persisted before the earlier write operation. Moreover, the vector clock $\PBVC{\NodeWEx}{\thread{\NodeW}, \VarX}$ must be less than the index $\idx{\NodeW}$, which in turn must be less than $\HAVC{\NodeR}{\thread{\NodeW}}$. This constraint guarantees that the write $\NodeW$ does not persist before $\NodeWEx$ and does not execute after $\NodeR$, allowing $\NodeW$ to potentially influence the value read by $\NodeR$ in certain program executions.
-\end{definition}
+Together, conditions \ref{race2:cond:3} and \ref{race2:cond:4} define a critical range relative to $\idx{\NodeW}$, represented by the following interval: $$\left( \PBVC{\NodeWEx}{\thread{\NodeW},\var{\NodeW}}, \HAVC{\NodeR}{\thread{\NodeW}} \right)$$
 
-\todo{False positives in the defintion}
-
-----------------
-
-To formally define a \NameRace, we rely on the notations and data structures established in \autoref{sec:datastructures}.
-
-A \NameRace is represented as follows:
-
-\begin{definition}[\NameRaceCaps]
-    \label{def:race}
-    A \NameRace is identified between a read node $\NodeR \in \ReadNodes$, a write node $\NodeW \in \WriteNodes$, and a program-dependent write node $\NodeWEx \in \WriteNodes$, where $(\NodeWEx, \NodeR) \in \PDEdges$.
-    
-    For this race to occur:
-    \begin{itemize}
-        \item Both $\NodeR$ and $\NodeW$ must access the same memory location, denote`d as $\VarX$.
-        \item $\NodeWEx$ must operate on a different cache line.
-        \item The following two constraints must be satisfied:
-    \end{itemize}
-    \begin{gather*}
-        \PBVC{\NodeWEx}{\thread{\NodeR}, \VarX} < \idx{\NodeR}\\
-        \PBVC{\NodeWEx}{\thread{\NodeW}, \VarX} < \idx{\NodeW} < \HAVC{\NodeR}{\thread{\NodeW}}
-    \end{gather*}
-\end{definition}
-
-The first constraint ensures that $\NodeR$ must not be persisted before $\NodeWEx$, and the second ensures that $\NodeW$ does not persist before $\NodeWEx$ and does not execute after $\NodeR$. These conditions enable the detection of scenarios where $\NodeW$ could influence the value read by $\NodeR$ in certain executions.
-
-This formal definition aligns with our intuitive understanding of the \NameRace. The bug arises because unpersisted data from a read operation is used in subsequent writes that get persisted earlier. This ordering can lead to inconsistencies if a crash occurs before the initial write to the first location is properly committed to PM.
-
-
-
-
-
-
-
-
-- recall to explanation in the intro?
-- formal definition based on the notations and HBG and DDG
-    - explain why this intuitively defines the race
-- redefinition using VCs
-- examples of the race in real applications?
-
-A \NameRace occurs when a write operation to persistent memory (PM) is influenced by a prior read operation from a non-persisted area of PM located on a different cache line. This scenario risks compromising the integrity of the PM state if the write operation becomes durable before the read areas are persisted.
-
-We formally define a \NameRace as follows:
-
-\begin{definition}[\NameRaceCaps]
-    \label{def:race}
-    % Option 1
-    % A \NameRace $( \NodeR, \NodeW, \NodeWEx ) \in \ReadNodes \times \WriteNodes \times \WriteNodes$ occurs if all the following are satisfied:
-    % $$
-    % \begin{aligned}
-    %     & \var{\NodeR} = \var{\NodeW} \neq \var{\NodeWEx} \\
-    %     & \thread{\NodeR} = \thread{\NodeWEx} \\
-    %     & \NodeWEx \text{ is program-dependent on } \NodeR \\
-    %     & \PBVC{\NodeWEx}{\thread{\NodeR}, \VarX} < \idx{\NodeR} \\
-    %     & \PBVC{\NodeWEx}{\thread{\NodeW}, \VarX} < \idx{\NodeW} < \HAVC{\NodeR}{\thread{\NodeW}}
-    % \end{aligned}
-    % $$
-    
-    % Option 2
-    % A \NameRace is defined to occur between a read node $\NodeR \in \ReadNodes$ and a write node $\NodeW \in \WriteNodes$ if both nodes access overlapping memory locations denoted as $\VarX$. Additionally, there exists another write node $\NodeWEx \in \WriteNodes$ that is program-dependent on $\NodeR$, operates on a different cache line, and satisfies the
-    % % vector clock % I don't want a new line in the middle of the constraint
-    % constraints $$\PBVC{\NodeWEx}{\thread{\NodeR}, \VarX} < \idx{\NodeR}$$ and $$\PBVC{\NodeWEx}{\thread{\NodeW}, \VarX} < \idx{\NodeW} < \HAVC{\NodeR}{\thread{\NodeW}}$$.
-
-    % Option 3
-    % A \NameRace is defined to occur between a read node $\NodeR \in \ReadNodes$ a write node $\NodeW \in \WriteNodes$ and a program-dependent $\NodeWEx \in \WriteNodes$ such that $(\NodeWEx, \NodeR) \in \PDEdges$, if both $\NodeR$ and $\NodeW$ access overlapping memory locations denoted as $\VarX$, and $\NodeWEx$ operates on a different cache line, and the following constrains are satisfied:
-    % $$\PBVC{\NodeWEx}{\thread{\NodeR}, \VarX} < \idx{\NodeR}$$
-    % $$\PBVC{\NodeWEx}{\thread{\NodeW}, \VarX} < \idx{\NodeW} < \HAVC{\NodeR}{\thread{\NodeW}}$$
-
-    % Option 4
-    A \NameRace is identified between a read node $\NodeR \in \ReadNodes$, a write node $\NodeW \in \WriteNodes$, and a program-dependent write node $\NodeWEx \in \WriteNodes$ where $(\NodeWEx, \NodeR) \in \PDEdges$.
-    
-    For this race to occur, both $\NodeR$ and $\NodeW$ must access the same memory location denoted as $\VarX$, while $\NodeWEx$ must operate on a different cache line.
-    Additionally, the following two constraints are satisfied:
-    \begin{gather*}
-        \PBVC{\NodeWEx}{\thread{\NodeR}, \VarX} < \idx{\NodeR}\\
-        \PBVC{\NodeWEx}{\thread{\NodeW}, \VarX} < \idx{\NodeW} < \HAVC{\NodeR}{\thread{\NodeW}}
-    \end{gather*}
-
-\end{definition}
-
-The first vector clock constraint ensures that $\NodeR$ must not be persisted before $\NodeWEx$. The second constraint ensures that $\NodeW$ does not persist before $\NodeWEx$ and does not execute after $\NodeR$, allowing $\NodeW$ to potentially influence the value read by $\NodeR$ in certain program executions.
-
-\autoref{fig:cprrange} presents an example illustrating the critical range defined by $\PBVC{}{}$ and $\HAVC{}{}$, within which potentially violating write event nodes reside.
+\autoref{fig:cprrange} illustrates this range, identifying where potentially violating write events may reside.
 
 \begin{figure}[H]
     \centering
@@ -541,11 +410,9 @@ The first vector clock constraint ensures that $\NodeR$ must not be persisted be
     \label{fig:cprrange}
 \end{figure}
 
-% TODO: missing info:
-%       1. r and w' are on the same thread in our analysis
-%           1.1. why don't we care about others???????????
-%       2. if they are, we can only look at the first one.
-% \todo{We need to explain that r and w' are on the same thread in our analysis and explain why.
+\todo{False positives in the defintion}
+\todo{examples of the race in real applications?}
+\todo{We need to explain that r and w' are on the same thread in our analysis and explain why.}
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
