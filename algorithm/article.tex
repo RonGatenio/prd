@@ -259,16 +259,19 @@ A program execution is composed of a sequence of events, each representing a spe
 In this context, an event node $\NodeV$ corresponds to an individual operation within the program. Each event node is associated with a memory address $\var{\NodeV} \in \Vars$ indicating the location accessed, a thread $\thread{\NodeV} \in \Threads$ indicating the executing thread, and an index $\idx{\NodeV} \in \IDs$ reflecting the sequential execution order of the event within its thread.
 
 The execution trace is then modeled using two directed acyclic graphs (DAGs) that capture the causal and data dependencies between these events: the \HBGName ($\HBG$) and the \PDGName ($\PDG$).
+After constructing the graphs using the trace, they are verified to be DAGs, ensuring the trace maintains causal consistency.
 
 \subsection{\HBGName}
-The \HBGName, denoted as $\HBG = (\Nodes, \HBEdges)$, models the causal relationships between events in the program execution. In this graph, nodes represent individual events, and directed edges represent happens-before relationships, indicating that one event causally precedes another.
+The \HBGName, denoted as $\HBG = (\Nodes, \HBEdges)$, is a directed acyclic graph (DAG) that models the causal relationships between events in the program execution. In this graph, nodes represent individual events, and directed edges represent happens-before relationships, indicating that one event causally precedes another.
 
 In our implementation, each thread is distinct, and edges are tagged as intra-thread or inter-thread. Intra-thread edges connect events within the same thread, reflecting the sequential execution order.
 Inter-thread edges connect events across different threads and are determined using the internal vector clock analysis of the TSan tool. These vector clocks are updated whenever a synchronization event occurs, such as acquiring or releasing locks, atomic operations, or any other inter-thread synchronization mechanism. This ensures that the inter-thread edges accurately capture the happens-before relationships established by these synchronization events.
 
+The \HBG is guaranteed to be a DAG as long as the trace satisfies causal consistency. This means that the happens-before relation is respected across all threads, ensuring that events cannot cyclically depend on each other. Cycles would violate causality, leading to inconsistencies in the program’s execution. In other words, each event in the execution must respect the partial ordering defined by the happens-before relation, ensuring that no event can precede itself, directly or indirectly.
+
 Additionally, each node in our $\HBG$ has a maximum of $\abs{\Threads}$ incoming and outgoing edges. Each node has one intra-thread edge to the next node in the same thread, and at most one inter-thread edge to any other thread. We limit inter-thread edges to one per thread because multiple edges would be redundant due to the transitive nature of the happens-before relation. Specifically, we retain only the edge linking to the earliest node in the destination thread that happens-after the current node, as this suffices to establish the necessary causal relationship.
 
-To optimize the detection of potential race conditions, we introduce \textit{intra-thread cache-line linked lists}, where nodes that access the same memory address are linked within their respective threads. For instance, if a node $\NodeV$ reads/writes/flushes a memory address $x$, it is linked to the next node in the thread that writes to $x$. This structure allows us to efficiently find potential race conditions by tracking the sequence of operations on the same memory location.
+To optimize the detection of potential race conditions, we introduce \textit{intra-thread cache-line linked lists}, where nodes that access the same memory address are linked within their respective threads. For instance, if a node $\NodeV$ reads, writes, or flushes a memory address $x$, it is linked to the next node in the thread that writes to $x$. This structure allows us to efficiently find potential race conditions by tracking the sequence of operations on the same memory location.
 
 \todo{Add a better drawing here that also shows the intra thread linked lists and the ddg}
 \autoref{fig:graphs} illustrates a sample \HBGName in black.
@@ -323,7 +326,7 @@ Now, let's assume there are multiple sequential write events $\NodeW_1, \NodeW_2
 % Here is the proof of the claim. You can write your proof steps here, and it will end with a Q.E.D. symbol.
 % \end{proof}
 
-This specification ensures that the number of dependency edges in $\PDG$ is limited to the number of read nodes, $\abs{\PDEdges} \leq \abs{\ReadNodes}$, simplifying the analysis and reducing computational complexity.
+This specification ensures that the number of dependency edges in $\PDG$, denoted as $\abs{\PDEdges}$, is bounded by the number of read nodes, denoted as $\abs{\ReadNodes}$, i.e., $\abs{\PDEdges} \leq \abs{\ReadNodes}$. This constraint simplifies the analysis and reduces computational complexity.
 
 \todo{should we acknowlage the fact that we don't detect inter-thread program dependencies? If so, how? After all, a dependency could be hidden within a volatile memory location and used again in another thread. If we traced everything, ofcourse the "first" dependency would be in the same thread.}
 
@@ -356,7 +359,14 @@ As introduced earlier, a \NameRace is a specific type of concurrency bug in NVM 
 
 Initially defined as \NamePMRaceRace by Chen, Zhangyu, et al. \cite{pmrace2022}, this race condition captures the core concept of the bug but is limited to specific thread interleavings observed during program execution. To expand the scope and capture a broader range of potential interleavings, we redefine this race using the happens-before relationship. This redefinition allows us to encompass all equivalent interleavings of the same execution that maintain the same causal dependencies among program events, thereby enhancing the robustness of race detection.
 
-To formally define \NameRace, we use the notation $\HBSign$ to denote the happens-before relation and $\PDSign$ to denote the program-dependence relation.
+To formally define \NameRace, we use the notation $\HBSign$ to denote the happens-before relation and $\PDSign$ to denote the program-dependence relation. Specifically, we use $\HB{\NodeE_1}{\NodeE_2}$ to indicate that event $\NodeE_1$ happens-before event $\NodeE_2$, and $\PD{\NodeE_2}{\NodeE_1}$ to indicate that event $\NodeE_2$ is program-dependent on event $\NodeE_1$.
+Note that although $\NodeE_1$ is sequentially earlier than $\NodeE_2$, the dependency arrow points in the opposite direction of their sequential order.
+
+% Furthermore, to express that the memory location modified by the first write operation may still be volatile at the time the second write operation is executed, we must ensure that no flush event (which would persist the data) occurs before the second write operation.
+% We will force such flush operation to not occur in any equivalent interlevings (defined by the happens-before relation) between the first write operation and the read operation.
+% Note that if such flush occurs after the first write operation or the read operation, it would imply that the memory location is persisted in PM.
+
+Furthermore, to ensure that the memory location modified by the first write operation remains volatile at the time the second write operation is executed, we impose a condition that no flush event (which would persist the data) occurs before the second write operation. Specifically, we enforce that no such flush operation occurs in any equivalent interleavings, as defined by the happens-before relation, between the first write operation or the read operation and the execution of the second write operation. If a flush were to occur after either the first write or the read operation, it would imply that the memory location has been persisted to PM, thus eliminating the possibility of a race condition.
 
 \begin{definition}[\NameRaceCaps]
     \label{def:race1}
@@ -365,19 +375,21 @@ To formally define \NameRace, we use the notation $\HBSign$ to denote the happen
 
     \begin{enumerate}[label=\Roman*., left=0pt, labelindent=0pt, itemindent=0pt, align=left, itemsep=1.5ex]
         \item \label{race1:cond:1} $\var{\NodeR} = \var{\NodeW} \neq \var{\NodeWEx}$
-        \item \label{race1:cond:2} $\PD{\NodeW}{\NodeR}$
+        \item \label{race1:cond:2} $\PD{\NodeWEx}{\NodeR}$
         \item \label{race1:cond:3} $\NotHB{\NodeR}{\NodeW}$
         \item \label{race1:cond:4} There does not exist a flush operation $\NodeF \in \FlushNodes$ such that $\HBThree{\NodeW}{\NodeF}{\NodeWEx}$ or $\HBThree{\NodeR}{\NodeF}{\NodeWEx}$
     \end{enumerate}
 \end{definition}
 
 In this formal definition, we outline the necessary conditions for a \NameRace to exist.
-Condition \ref{race1:cond:1} ensures that the read instruction $\NodeR$ and the write instruction $\NodeW$ access the same memory location, denoted as $\var{\NodeR} = \var{\NodeW}$, while the other write instruction $\NodeWEx$ modifies a different memory location, $\var{\NodeWEx}$. 
-Condition \ref{race1:cond:2} establishes that the write $\NodeW$ is program-dependent on the read $\NodeR$, meaning $\NodeW$ is influenced by the value read by $\NodeR$.
-Condition \ref{race1:cond:3} states that $\NodeR$ does not happen-before $\NodeW$, which means that $\NodeW$ could execute concurrently with $\NodeR$ or even happen-before it. In simpler terms, this condition ensures that $\NodeW$ does not happen-after $\NodeR$.
-Condition \ref{race1:cond:4} specifies that there must not exist a flush operation that occurs between $\NodeW$ and $\NodeWEx$, or between $\NodeR$ and $\NodeWEx$ in the happens-before relationship. This ensures that the data written by $\NodeWEx$ and/or read by $\NodeR$ may not have been persisted to memory yet and could still be volatile.
+condition \ref{race1:cond:1} ensures that the read instruction $\NodeR$ and the write instruction $\NodeW$ access the same memory location, denoted as $\var{\NodeR} = \var{\NodeW}$, while the other write instruction $\NodeWEx$ modifies a different memory location, $\var{\NodeWEx}$. 
+condition \ref{race1:cond:2} establishes that the write $\NodeW$ is program-dependent on the read $\NodeR$, meaning $\NodeW$ is influenced by the value read by $\NodeR$.
+condition \ref{race1:cond:3} states that $\NodeR$ does not happen-before $\NodeW$, which means that $\NodeW$ could execute concurrently with $\NodeR$ or even happen-before it. In other terms, this condition ensures that $\NodeW$ does not happen-after $\NodeR$.
+condition \ref{race1:cond:4} specifies that there must not exist a flush operation that occurs between $\NodeW$ and $\NodeWEx$, or between $\NodeR$ and $\NodeWEx$ in the happens-before relationship. This ensures that the data written by $\NodeWEx$ and/or read by $\NodeR$ may not have been persisted to memory yet and could still be volatile.
 
-To facilitate the practical detection of \NameRace conditions in our algorithm, which will be presented later, we rewrite the race using the previously defined causal vector clocks from \autoref{sec:vc}.
+To facilitate the practical detection of \NameRace conditions in our algorithm, presented later in this paper, we rewrite the race definition using the previously defined causal vector clocks from \autoref{sec:vc}.
+We redefine condition \ref{race1:cond:3} to state that $\NodeW$ does not happen-after $\NodeR$, using the \NameHAVC to express this relationship. This change leverages the perspective of the read operation $\NodeR$ (happens-after perspective) rather than the write operation $\NodeW$ (happens-before perspective), which will prove advantageous in the subsequent algorithm.
+Similarly, we redefine condition \ref{race1:cond:4} using the \NamePBVC to express that the memory locations involved in the first write $\NodeW$ and read $\NodeR$ operations have not been persisted before the second write operation $\NodeWEx$. We achieve this by splitting the original condition into two parts: one ensuring that $\NodeW$ does not persist before $\NodeWEx$, and the other ensuring that $\NodeR$ does not persist before $\NodeWEx$.
 
 \begin{definition}[\NameRaceCaps with Causal Vector Clocks]
     \label{def:race2}
@@ -386,7 +398,7 @@ To facilitate the practical detection of \NameRace conditions in our algorithm, 
  
     \begin{enumerate}[label=\Roman*., left=0pt, labelindent=0pt, itemindent=0pt, align=left, itemsep=1.5ex]
         \item \label{race2:cond:1} $\var{\NodeR} = \var{\NodeW} \neq \var{\NodeWEx}$
-        \item \label{race2:cond:2} $\PD{\NodeW}{\NodeR}$
+        \item \label{race2:cond:2} $\PD{\NodeWEx}{\NodeR}$
         \item \label{race2:cond:3} $\idx{\NodeW} < \HAVC{\NodeR}{\thread{\NodeW}}$
         \item \label{race2:cond:4} $\PBVC{\NodeWEx}{\thread{\NodeW},\var{\NodeW}} < \idx{\NodeW}$
         \item \label{race2:cond:5} $\PBVC{\NodeWEx}{\thread{\NodeR},\var{\NodeR}} < \idx{\NodeR}$
@@ -410,7 +422,7 @@ Together, conditions \ref{race2:cond:3} and \ref{race2:cond:4} define a critical
     \label{fig:cprrange}
 \end{figure}
 
-\todo{False positives in the defintion}
+\todo{False positives in the definition}
 \todo{examples of the race in real applications?}
 \todo{We need to explain that r and w' are on the same thread in our analysis and explain why.}
 
@@ -421,7 +433,6 @@ Together, conditions \ref{race2:cond:3} and \ref{race2:cond:4} define a critical
 \section{Algorithm}
 \label{sec:algorithm}
 This section presents the algorithm designed to detect {\NameRace}s. The algorithm is comprised of three main stages: Initially, as detailed in \ref{sec:havc}, we construct the \NameHAVC ($\HAVC{}{}$) for each node. Subsequently, in \ref{sec:pbvc}, we develop the \NamePBVC ($\PBVC{}{}$) for each node. Lastly, in \ref{sec:cprd}, we employ these vector clocks to systematically identify {\NameRace}s throughout the program events.
-
 After presenting the algorithm we will show some optimizations, correctness, and runtime complexity.
 
 % This section describes the algorithm used to detect {\NameRace}s. The algorithm is comprised of three main stages: in \ref{sec:havc} we construct the $\HAVC{}{}$ for each node, in \ref{sec:pbvc} we construct $\PBVC{}{}$ for each node, and in \ref{sec:cprd}, we identify {\NameRace}s based on the two functions.
@@ -433,11 +444,9 @@ After presenting the algorithm we will show some optimizations, correctness, and
 
 \subsection{{\NameHAVC}s Builder}
 \label{sec:havc}
-In \autoref{alg:havc}, we perform a post-order traversal of all nodes in the \HBGName ($\HBG$). This traversal order ensures that each node $\NodeV$ is processed only after all nodes that happen-after it—its descendants—are processed.
+In \autoref{alg:havc}, we perform a post-order traversal of all nodes in the \HBGName ($\HBG$). Since $\HBG$ is a directed acyclic graph (DAG), this traversal order ensures that each node $\NodeV$ is processed only after all nodes that happen-after it, i.e. its descendants, are processed.
 
-During this traversal, the vector clock of each node, $\havc{\NodeV}{}$, is updated to the component-wise minimum of its descendants'
-% children's?
-vector clocks. This update process ensures that the vector clock $\havc{\NodeV}{}$ precisely reflects the \NameHAVC $\HAVC{\NodeV}{}$ for $\NodeV$ by the time its processing is complete, capturing the earliest interaction times dictated by the causal relationships within the $\HBG$.
+During this traversal, the vector clock of each node, $\havc{\NodeV}{}$, is updated to the component-wise minimum of its descendants' vector clocks. This update process ensures that the vector clock $\havc{\NodeV}{}$ precisely reflects the \NameHAVC $\HAVC{\NodeV}{}$ for $\NodeV$ by the time its processing is complete, capturing the earliest interaction times dictated by the causal relationships within the $\HBG$.
 
 % TODO: Should we add this?
 \IfShowRuntimeComplexity
