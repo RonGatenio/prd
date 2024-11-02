@@ -65,7 +65,7 @@ def execute_benchmark(run_command_final, run_dir, trace_file) -> StatisticsColle
     return stats
 
 
-def analyze_prd(trace_file, races_file) -> StatisticsCollector:
+def analyze_prd(trace_file, races_file, code_tours_folder=None) -> StatisticsCollector:
     prd, stats = pycprd.prd_runner.run(trace_file)
     
     races_str, t = pycprd.prd_runner.races_to_str(prd)
@@ -74,6 +74,10 @@ def analyze_prd(trace_file, races_file) -> StatisticsCollector:
         f.write(races_str)
         
     stats.add_statistic('Duration', 'Races Print Evaluation [sec]', t)
+    
+    if code_tours_folder:
+        t = pycprd.prd_runner.races_generate_code_tours(prd, code_tours_folder=code_tours_folder)
+        stats.add_statistic('Duration', 'Races to Code Tours [sec]', t)
     
     return stats
 
@@ -107,6 +111,7 @@ def run_benchmark(benchmark_name, config, nkeys=None):
     races_file = os.path.join(output_dir, f"{benchmark_name}_{nkeys}_{nthreads}.races")
     stats_file = os.path.join(output_dir, f"{benchmark_name}_{nkeys}_{nthreads}.stats")
     stats_json_file = os.path.join(output_dir, f"{benchmark_name}_{nkeys}_{nthreads}.stats.json")
+    code_tours_folder = os.path.join(output_dir, f"{benchmark_name}_{nkeys}_{nthreads}.tours")
     binary_output = os.path.join(output_dir, f"{benchmark_name}.exe")
 
     stats.add_statistic('Benchmark Presets', 'Name', benchmark_name)
@@ -114,6 +119,7 @@ def run_benchmark(benchmark_name, config, nkeys=None):
     stats.add_statistic('Benchmark Output', 'Races file', races_file)
     stats.add_statistic('Benchmark Output', 'Stats file', stats_file)
     stats.add_statistic('Benchmark Output', 'Stats json', stats_json_file)
+    stats.add_statistic('Benchmark Output', 'Code Tours folder', code_tours_folder)
     stats.add_statistic('Benchmark Output', 'Executable', binary_output)
 
     try:
@@ -136,7 +142,7 @@ def run_benchmark(benchmark_name, config, nkeys=None):
         stats.merge(s)
 
         # Analyze
-        s = analyze_prd(trace_file, races_file)
+        s = analyze_prd(trace_file, races_file, code_tours_folder)
         stats.merge(s)
         
         # Save stats
