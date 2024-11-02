@@ -5,6 +5,7 @@ import networkx as nx
 from typing import Iterable
 from . import nodes
 from .hbg import HBG
+from .statistics_collector import StatisticsCollector
 
 
 class PDG:
@@ -22,6 +23,20 @@ class PDG:
         if read_node not in self._graph:
             return set()
         return self._graph.predecessors(read_node)
+    
+    def stats(self) -> StatisticsCollector:
+        s = StatisticsCollector("PDG")
+        
+        # read_nodes = [n for n in self._graph if n.itype == nodes.NodeType.READ]
+        # write_nodes = [n for n in self._graph if n.itype == nodes.NodeType.WRITE]
+        
+        s.add_statistic('Program Dependencies', 'Total', self._graph.number_of_edges())
+        # s.add_statistic('Program Dependencies', 'Average per Read', self._graph.number_of_edges())
+        # s.add_statistic('Program Dependencies', 'Average per Write', self._graph.number_of_edges())
+        
+        # TODO: per instruction, per thread
+        
+        return s
 
 
 class PDGBuilder:
