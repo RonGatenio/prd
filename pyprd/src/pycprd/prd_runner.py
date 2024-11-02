@@ -9,6 +9,12 @@ from .prd import PersistencyRaceDetector
 from .utils import timeit
 
 
+DEFAULT_STACK_TOPS = [
+        r"main::\$_\d+::operator\(\)\(int, int(, int)?\) const",
+        r'std::function<std::unique_ptr<std::__future_base::_Result_base, std::__future_base::_Result_base::_Deleter>',
+    ]
+
+
 def run(trace_file: str, use_mock_pdg=False, print_stats=False) -> Tuple[PersistencyRaceDetector, StatisticsCollector]:
     stats = StatisticsCollector('PRD')
     
@@ -30,7 +36,14 @@ def run(trace_file: str, use_mock_pdg=False, print_stats=False) -> Tuple[Persist
             pdg = generate_mock_pdg_v2(hbg)
         else:
             pdg = trace.build_pdg(hbg, True)
-            
+
+    with timeit('pdg stats'):
+        _stats = pdg.stats()
+
+    if print_stats:
+        print(_stats)
+    stats.merge(_stats)
+
     with timeit('cprd_time') as cprd_time:
         prd = PersistencyRaceDetector(hbg, pdg,
             ignore_inter_thread_edges     = False,
@@ -55,12 +68,16 @@ def run(trace_file: str, use_mock_pdg=False, print_stats=False) -> Tuple[Persist
 
 
 def races_to_str(prd: PersistencyRaceDetector) -> Tuple[str, float]:
-    tops = [
-        r"main::\$_\d+::operator\(\)\(int, int(, int)?\) const",
-        r'std::function<std::unique_ptr<std::__future_base::_Result_base, std::__future_base::_Result_base::_Deleter>',
-    ]
-    
     with timeit('Races to Str') as races_evaluation_time:
-        s = prd.races.to_str(callstack_top=tops, trace_lines=False)
+        s = prd.races.to_str(callstack_top=DEFAULT_STACK_TOPS, trace_lines=False)
         
     return s, races_evaluation_time.total
+
+
+def races_generate_code_tours(prd: PersistencyRaceDetector, code_tours_folder: str = None, group_by_info=True):
+    with timeit('Races to CodeTours') as races_evaluation_time:
+        tours = list(prd.races.to_code_tours(prd.hbg, callstack_top=DEFAULT_STACK_TOPS, group_by_info=group_by_info))
+        for tour in tours:
+            tour.to_file(code_tours_folder)
+        
+    return races_evaluation_time.total
