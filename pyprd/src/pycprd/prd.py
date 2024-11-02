@@ -2,8 +2,10 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import Dict, Generator, List, Set, Tuple
 import logging
+
+from .code_tour import CodeTour
 from .statistics_collector import StatisticsCollector
-from .nodes import AbstractNode, NodeType, ReadNode, WriteNode, FlushNode, EpochNode
+from .nodes import AbstractNode, InstructionNode, NodeType, ReadNode, WriteNode, FlushNode, EpochNode
 from .types import ThreadId, Cacheline
 from .trace_event_info import TraceEventInfo
 from .vector_clock import PersistencyVectorClock, ReversedVectorClock
@@ -21,7 +23,6 @@ class PersistencyRace:
     read_node: ReadNode
     write_node: WriteNode
     dependent_node: WriteNode
-    is_write_hb_read: bool|None = field(default=None, compare=False, repr=False)
     is_write_hb_dependent: bool|None = field(default=None, compare=False, repr=False)
     validate: bool = field(default=True, compare=False, repr=False)
 
@@ -41,6 +42,25 @@ class PersistencyRace:
     
     def is_intra(self):
         return not self.is_inter()
+    
+    def generate_paths(self, hbg: HBG) -> Generator[Tuple[List[InstructionNode], bool], None, None]:
+        import networkx as nx
+        
+        def is_my_flush_node(node: InstructionNode) -> bool:
+            return node.itype == NodeType.FLUSH and node.is_interval_contains(self.write_node)
+        
+        for path in nx.all_simple_paths(hbg.graph, self.write_node, self.read_node):
+            has_flush = any(map(is_my_flush_node, path))
+            path = [n for n in path if NodeType.is_instruction_type(n.itype)]
+            yield (path, has_flush)
+            
+    def generate_code_tours(self, hbg: HBG, callstack_top_regex: str  | list[str] | None = None) -> Generator[CodeTour, None, None]:
+        for i, (path, has_flush) in enumerate(self.generate_paths(hbg)):
+            has_flush = '-flush' if has_flush else ''
+            tour = CodeTour(f'race-tour-{i}{has_flush}')
+            for node in path:
+                tour.add_node(node, callstack_top_regex=callstack_top_regex)
+            yield tour
     
     def __str__(self) -> str:
         s = []
@@ -132,7 +152,17 @@ class PersistencyRaces:
     def race_nodes_by_read_info(self) -> Generator[Tuple[int, ReadNode, WriteNode, Set[WriteNode]], None, None]:
         return self.races_iterator(self._races_by_info)
     
-    def to_str(self, callstack_top: str | List[str] | None = None, group_by_info=True, trace_lines=False):
+    def to_code_tours(self, hbg: HBG, callstack_top: str | List[str] | None = None, group_by_info=True) -> Generator[CodeTour, None, None]:
+        races = self.race_nodes_by_read_info() if group_by_info else self.race_nodes_by_read_pc()
+        for i, read_node, dependent_node, write_nodes in races:
+            write_nodes: set
+            write_node = next(iter(write_nodes))
+            for tour in PersistencyRace(read_node, write_node, dependent_node).generate_code_tours(hbg, callstack_top_regex=callstack_top):
+                tour: CodeTour
+                tour.set_title(f'{i}-{tour.title}')
+                yield tour
+    
+    def to_str(self, callstack_top: str | List[str] | None = None, group_by_info=True, trace_lines=False) -> str:
         all_lines = []
         
         def node_to_str(node: ReadNode | WriteNode, indent: int = 0) -> str:
