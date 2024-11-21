@@ -53,7 +53,7 @@
         },
         "run": {
             "directory": "/app/benchmarks/memcached-pmem/runner",
-            "command": "python main.py -t {nthreads} -f {pm_file} -u {user} -n {nkeys}",
+            "command": "python3 main.py -t {nthreads} -f {pm_file} -u {user} -n {nkeys}",
             "default_args": {
                 "pm_file": "/tmp/pmem_memcached_data",
                 "user": "memcached-user",
