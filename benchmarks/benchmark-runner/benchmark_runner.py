@@ -130,12 +130,14 @@ def run_benchmark(benchmark_name, config, nkeys=None):
         # Execute
         stats.add_statistic('Benchmark Presets', 'nkeys', nkeys)
         stats.add_statistic('Benchmark Presets', 'nthreads', nthreads)
+        
+        run_args: dict = run_config.get("default_args", {})
 
-        run_args = {
+        run_args.update({
             "pm_file": pm_file,
             "nkeys": nkeys,
             "nthreads": nthreads,
-        }
+        })
         
         run_command_final = run_command_template.format(**run_args)
         s = execute_benchmark(run_command_final, run_dir, trace_file)

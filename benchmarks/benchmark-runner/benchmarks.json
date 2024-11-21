@@ -38,29 +38,30 @@
         "binary": "/app/benchmarks/FAST_FAIR/concurrent_pmdk/bin/btree_concurrent"
     },
     "MEMCACHED": {
-        "output_dir": "./output/MEMCACHED",
+        "output_dir": "/app/results/MEMCACHED",
         "compile": {
             "directory": "/app/benchmarks/memcached-pmem",
             "commands": [
-                "./autogen.sh",
-                "./configure",
-                "make"
-            ],
-            "artifacts": {
-                "binary": "/app/benchmarks/memcached-pmem/memcached",
-                "log": "/app/benchmarks/memcached-pmem/build.log"
-            }
+                "dos2unix *",
+                "dos2unix -f configure",
+                "autoreconf",
+                "CC=clang CXX=clang++ ./configure --enable-pslab",
+                "make",
+                "useradd memcached-user",
+                "pip install -r runner/requirements.txt"
+            ]
         },
         "run": {
-            "directory": "/app/benchmarks/memcached-pmem",
-            "command": "memcached -u root -m 64 -o pslab,pslab_file={trace_file}",
-            "default_args": {},
-            "artifacts": {
-                "trace": "/app/results/traces/memcached.trace"
+            "directory": "/app/benchmarks/memcached-pmem/runner",
+            "command": "python main.py -t {nthreads} -f {pm_file} -u {user} -n {nkeys}",
+            "default_args": {
+                "pm_file": "/tmp/pmem_memcached_data",
+                "user": "memcached-user",
+                "nkeys": 1000,
+                "nthreads": 4
             }
         },
-        "trace_file": "/app/results/traces/memcached.trace",
-        "results_file": "/app/results/races/memcached.races"
+        "binary": "/app/benchmarks/memcached-pmem/memcached"
     },
     "RECIPE": {
         "output_dir": "/app/results/RECIPE",
