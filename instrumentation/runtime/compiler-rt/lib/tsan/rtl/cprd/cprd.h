@@ -11,8 +11,8 @@
 namespace cprd {
 
 #define PM_POOL_CAND_MAX 128
-#define PENDING_READS_MAX 10000
-#define PENDING_READS_LIFE_MAX 100
+#define PENDING_READS_MAX 1000
+#define PENDING_READS_LIFE_MAX 30
 
 struct PMRegion {
   uptr begin;
