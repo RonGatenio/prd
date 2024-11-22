@@ -7,3 +7,7 @@
 [submodule "benchmarks/RECIPE"]
 	path = benchmarks/RECIPE
 	url = https://github.com/RonGatenio/RECIPE.git
+[submodule "benchmarks/memcached-pmem"]
+	path = benchmarks/memcached-pmem
+	url = https://github.com/RonGatenio/memcached-pmem.git
+	branch = prd
