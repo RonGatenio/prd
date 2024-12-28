@@ -37,8 +37,13 @@ class TraceParser:
         with open(filename, 'r') as f:
             return cls(f.readlines(), name)
 
-    def _parse_line(self, line, line_number, debug=False):
+    def _parse_line(self, line, line_number, debug=False, allow_keys=None):
         dbg_print = print if debug else lambda x: None
+        
+        line = line.removeprefix('<null>')
+        
+        if line.startswith(' ') or line.startswith('#') or line.startswith('[CPRD]'):
+            return
         
         parts = line.split(':')
         
@@ -64,6 +69,9 @@ class TraceParser:
             return
         
         tid = int(tid)
+        
+        if allow_keys is not None and key not in allow_keys:
+            return
 
         match key:
             case 'PD':
@@ -128,20 +136,21 @@ class TraceParser:
                 dbg_print(f'Invalid key {key} in line {line_number}')
                 return
 
-    def parse(self, debug=False, max_lines=None):
+    def parse(self, debug=False, max_lines=None, allow_keys=None):
         for i, line in enumerate(self._trace):
             if max_lines and i > max_lines:
                 break
 
-            self._parse_line(line, i+1, debug=debug)
+            self._parse_line(line, i+1, debug=debug, allow_keys=allow_keys)
 
         return self
 
-    def build_hbg(self, filter_volatile_nodes=False, debug=False, max_lines=None, make_daisy_chains=True) -> HBG:
-        self.parse(debug=debug, max_lines=max_lines)
+    def build_hbg(self, filter_volatile_nodes=False, debug=False, max_lines=None, make_daisy_chains=True, assert_dag=True, allow_keys=None) -> HBG:
+        self.parse(debug=debug, max_lines=max_lines, allow_keys=allow_keys)
 
         return self._hbg_builder.build(filter_volatile_nodes=filter_volatile_nodes,
-                                       pmem_range=self._pmem_range, make_daisy_chains=make_daisy_chains, ignore_ranges=self._ignore_ranges)
+                                       pmem_range=self._pmem_range, make_daisy_chains=make_daisy_chains, ignore_ranges=self._ignore_ranges,
+                                       assert_dag=assert_dag)
         
     def build_pdg(self, hbg: HBG, compare_to_mock=False) -> PDG:
         if not self._pdg_builder.total_dependencies:

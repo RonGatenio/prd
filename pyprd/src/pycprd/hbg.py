@@ -5,7 +5,7 @@ from enum import Enum
 import networkx as nx
 import math
 from . import nodes
-from .nodes import ReadNode, WriteNode
+from .nodes import ReadNode, WriteNode, InstructionNode
 from . import utils
 from . import config
 from .statistics_collector import StatisticsCollector
@@ -140,7 +140,8 @@ class HBG:
                  nodes_by_type: Dict[nodes.NodeType, Set[nodes.AbstractNode]],
                  nodes_location: Dict[nodes.AbstractNode, NodeLocation],
                  cacheline_size=config.DEFAULT_CACHELINE_SIZE,
-                 daisy_chains: DaisyChains = None):
+                 daisy_chains: DaisyChains = None,
+                 assert_dag=True):
 
         self._graph           = base_graph
         self._nodes           = nodes
@@ -153,17 +154,21 @@ class HBG:
         self._inter_graph = nx.subgraph_view(self._graph, filter_edge=lambda u, v: self._graph[u][v]['type'] == EdgeType.INTER_THREAD)
         self._intra_graph = nx.subgraph_view(self._graph, filter_edge=lambda u, v: self._graph[u][v]['type'] == EdgeType.INTRA_THREAD)
 
-        self._vars:                Dict[Tuple[int, int], Set[nodes.InstructionNode]] = defaultdict(set)
-        self._read_nodes_by_vars:  Dict[Tuple[int, int], Set[nodes.InstructionNode]] = defaultdict(set)
-        self._write_nodes_by_vars: Dict[Tuple[int, int], Set[nodes.InstructionNode]] = defaultdict(set)
-        self._vars_by_size:        Dict[int, Set[Tuple[int, int]]]                   = defaultdict(set)
-        self._cachelines:          Dict[int, Set[Tuple[int, int]]]                   = defaultdict(set)
+        self._vars:                Dict[Tuple[int, int], Set[InstructionNode]] = defaultdict(set)
+        self._read_nodes_by_vars:  Dict[Tuple[int, int], Set[InstructionNode]] = defaultdict(set)
+        self._write_nodes_by_vars: Dict[Tuple[int, int], Set[InstructionNode]] = defaultdict(set)
+        self._vars_by_size:        Dict[int, Set[Tuple[int, int]]]             = defaultdict(set)
+        self._cachelines:          Dict[int, Set[Tuple[int, int]]]             = defaultdict(set)
         
         self._pc_info = {n.pc: n.info for n in self.instruction_nodes}
 
         self._find_vars()
 
-        assert nx.is_directed_acyclic_graph(self._graph), 'HBG graph is not a DAG'
+        if assert_dag:
+            assert self.is_directed_acyclic_graph(), 'HBG graph is not a DAG'
+    
+    def is_directed_acyclic_graph(self):
+        return nx.is_directed_acyclic_graph(self._graph)
 
     def _find_vars(self):
         for n in self.read_write_nodes:
@@ -514,7 +519,7 @@ class HBGBuilder:
         assert src.tid != dst.tid, 'TIDs must be different'
         self._graph.add_edge(src, dst, type=EdgeType.INTER_THREAD)
 
-    def build(self, filter_volatile_nodes=True, pmem_range=None, make_daisy_chains=True, ignore_ranges=None) -> HBG:
+    def build(self, filter_volatile_nodes=True, pmem_range=None, make_daisy_chains=True, ignore_ranges=None, assert_dag=True) -> HBG:
         cacheline_size = None
 
         daisy_chains = None
@@ -540,4 +545,4 @@ class HBGBuilder:
         if not cacheline_size:
             cacheline_size = config.DEFAULT_CACHELINE_SIZE
 
-        return HBG(self._graph, self._nodes, self._nodes_by_thread, self._nodes_by_type, self._nodes_location, cacheline_size=cacheline_size, daisy_chains=daisy_chains)
+        return HBG(self._graph, self._nodes, self._nodes_by_thread, self._nodes_by_type, self._nodes_location, cacheline_size=cacheline_size, daisy_chains=daisy_chains, assert_dag=assert_dag)
