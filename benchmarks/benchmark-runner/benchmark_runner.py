@@ -82,7 +82,7 @@ def analyze_prd(trace_file, races_file, code_tours_folder=None) -> StatisticsCol
     return stats
 
 
-def run_benchmark(benchmark_name, config, nkeys=None):
+def run_benchmark(benchmark_name, config, nkeys=None, generate_code_tours=False):
     print(f'[*] Running Benchmark {benchmark_name}')
     stats = StatisticsCollector(f'Benchmark Execution {benchmark_name}')
     
@@ -111,7 +111,7 @@ def run_benchmark(benchmark_name, config, nkeys=None):
     races_file = os.path.join(output_dir, f"{benchmark_name}_{nkeys}_{nthreads}.races")
     stats_file = os.path.join(output_dir, f"{benchmark_name}_{nkeys}_{nthreads}.stats")
     stats_json_file = os.path.join(output_dir, f"{benchmark_name}_{nkeys}_{nthreads}.stats.json")
-    code_tours_folder = os.path.join(output_dir, f"{benchmark_name}_{nkeys}_{nthreads}.tours")
+    code_tours_folder = os.path.join(output_dir, f"{benchmark_name}_{nkeys}_{nthreads}.tours") if generate_code_tours else None
     binary_output = os.path.join(output_dir, f"{benchmark_name}.exe")
 
     stats.add_statistic('Benchmark Presets', 'Name', benchmark_name)
@@ -119,7 +119,8 @@ def run_benchmark(benchmark_name, config, nkeys=None):
     stats.add_statistic('Benchmark Output', 'Races file', races_file)
     stats.add_statistic('Benchmark Output', 'Stats file', stats_file)
     stats.add_statistic('Benchmark Output', 'Stats json', stats_json_file)
-    stats.add_statistic('Benchmark Output', 'Code Tours folder', code_tours_folder)
+    if code_tours_folder:
+        stats.add_statistic('Benchmark Output', 'Code Tours folder', code_tours_folder)
     stats.add_statistic('Benchmark Output', 'Executable', binary_output)
 
     try:
@@ -165,13 +166,14 @@ def main():
     parser.add_argument('benchmark', type=str, help='The name of the benchmark to run')
     parser.add_argument('--config', type=str, default=os.path.join(os.path.dirname(__file__), 'benchmarks.json'), help='Path to the configuration file')
     parser.add_argument('--nkeys', type=int, default=None, help='nKeys used in benchmark')
+    parser.add_argument('--codetour', action='store_true', default=False, help='generate code tours')
 
     args = parser.parse_args()
 
     with open(args.config, 'r') as file:
         config = json.load(file)
 
-    run_benchmark(args.benchmark, config, nkeys=args.nkeys)
+    run_benchmark(args.benchmark, config, nkeys=args.nkeys, generate_code_tours=args.codetour)
 
 if __name__ == "__main__":
     main()

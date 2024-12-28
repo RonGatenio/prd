@@ -45,8 +45,10 @@
                 "dos2unix *",
                 "dos2unix -f configure",
                 "autoreconf",
-                "CC=clang CXX=clang++ ./configure --enable-pslab",
-                "make",
+                "dos2unix /app/benchmarks/benchmark-runner/*.sh",
+                "chmod a+x /app/benchmarks/benchmark-runner/*.sh",
+                "CC=/app/benchmarks/benchmark-runner/clang-wrapper.sh CXX=/app/benchmarks/benchmark-runner/clang++-wrapper.sh ./configure --enable-pslab",
+                "ENABLE_PRD=true make",
                 "useradd memcached-user",
                 "pip install -r runner/requirements.txt"
             ]
