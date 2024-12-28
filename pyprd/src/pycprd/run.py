@@ -34,7 +34,7 @@ def main():
 
     args = parser.parse_args()
 
-    with timeit('open trace file'):
+    with timeit(f'open trace file "{args.trace}"'):
         trace = TraceParser.from_file(args.trace)
 
     with timeit('hbg build'):
