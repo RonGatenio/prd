@@ -113,14 +113,15 @@ static void UnrefClockBlock(ClockCache *c, u32 idx, uptr blocks) {
   ctx->clock_alloc.Free(c, idx);
 }
 
-ThreadClock::ThreadClock(unsigned tid, unsigned reused)
+ThreadClock::ThreadClock(unsigned tid, unsigned reused, bool prd_trace)
     : tid_(tid)
     , reused_(reused + 1)  // 0 has special meaning
     , last_acquire_()
     , global_acquire_()
     , cached_idx_()
     , cached_size_()
-    , cached_blocks_() {
+    , cached_blocks_()
+    , prd_trace(prd_trace) {
   CHECK_LT(tid, kMaxTidInClock);
   CHECK_EQ(reused_, ((u64)reused_ << kClkBits) >> kClkBits);
   nclk_ = tid_ + 1;
@@ -155,7 +156,8 @@ void ThreadClock::acquire(ClockCache *c, SyncClock *src) {
     if (tid != kInvalidTid) {
       if (clk_[tid] < dirty.epoch) {
 
-        if (tid_ != tid) {
+        if (prd_trace && tid_ != tid) {
+          TRACE_LOG("ThreadClock::acquire 1. ThreadClock is %p; thread is %d; last_acquire was %d; clk_ is %p; clk=[%d, %d, %d, %d, %d, %d, ...]", this, tid_, last_acquire_, clk_, clk_[0], clk_[1], clk_[2], clk_[3], clk_[4], clk_[5]);
           cprd::Cprd::s_get_instance().log_happens_before_edge(tid, dirty.epoch, tid_, clk_[tid_],  "ThreadClock::acquire 1");
         }
 
@@ -178,7 +180,8 @@ void ThreadClock::acquire(ClockCache *c, SyncClock *src) {
       u64 epoch = src_elem.epoch;
       if (*dst_pos < epoch) {
 
-        if (tid_ != tid) {
+        if (prd_trace && tid_ != tid) {
+          TRACE_LOG("ThreadClock::acquire 2. ThreadClock is %p; thread is %d; last_acquire was %d; clk_ is %p; clk=[%d, %d, %d, %d, %d, %d, ...]", this, tid_, last_acquire_, clk_, clk_[0], clk_[1], clk_[2], clk_[3], clk_[4], clk_[5]);
           cprd::Cprd::s_get_instance().log_happens_before_edge(tid, epoch, tid_, clk_[tid_],  "ThreadClock::acquire 2 (full)");
         }
 
@@ -227,7 +230,7 @@ void ThreadClock::releaseStoreAcquire(ClockCache *c, SyncClock *sc) {
   for (ClockElem &ce : *sc) {
     u64 tmp = clk_[i];
     if (clk_[i] < ce.epoch) {
-      if (clk_[i] != ce.epoch && tid_ != i)
+      if (prd_trace && clk_[i] != ce.epoch && tid_ != i)
       {
         cprd::Cprd::s_get_instance().log_happens_before_edge(i, ce.epoch, tid_, clk_[tid_],  "ThreadClock::releaseStoreAcquire");
       }
@@ -436,10 +439,18 @@ void ThreadClock::set(ClockCache *c, unsigned tid, u64 v) {
   DCHECK_LT(tid, kMaxTid);
   DCHECK_GE(v, clk_[tid]);
 
-  if (tid_ == tid) {
-    cprd::Cprd::s_get_instance().log_epoch_inc(tid_, clk_[tid_], v, "ThreadClock::set(ClockCache*, unsigned, u64)");
-  } else if (clk_[tid] != v) {
-    cprd::Cprd::s_get_instance().log_happens_before_edge(tid, v, tid_, clk_[tid_],  "ThreadClock::set(ClockCache*, unsigned, u64)");
+  if (prd_trace) {
+    if (tid_ == tid) {
+      TRACE_LOG("Adding an epoc inc. ThreadClock is %p; thread is %d; last_acquire was %d; clk_ is %p; clk=[%d, %d, %d, %d, %d, %d, ...]", this, tid_, last_acquire_, clk_, tid, clk_[0], clk_[1], clk_[2], clk_[3], clk_[4], clk_[5]);
+      cprd::Cprd::s_get_instance().log_epoch_inc(tid_, clk_[tid_], v, "ThreadClock::set(ClockCache*, unsigned, u64)");
+    } else if (clk_[tid] != v) {
+      // u64 prev = clk_[tid_];
+      // clk_[tid_] += 1;
+      // cprd::Cprd::s_get_instance().log_epoch_inc(tid_, prev, clk_[tid_], "ThreadClock::set(ClockCache*, unsigned, u64)");
+
+      TRACE_LOG("Adding a HB edge. ThreadClock is %p; thread is %d; last_acquire was %d; clk_ is %p; clk=[%d, %d, %d, %d, %d, %d, ...]", this, tid_, last_acquire_, clk_, tid, clk_[0], clk_[1], clk_[2], clk_[3], clk_[4], clk_[5]);
+      cprd::Cprd::s_get_instance().log_happens_before_edge(tid, v, tid_, clk_[tid_],  "ThreadClock::set(ClockCache*, unsigned, u64)");
+    }
   }
 
   clk_[tid] = v;

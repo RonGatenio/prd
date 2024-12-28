@@ -126,7 +126,7 @@ class ThreadClock {
  public:
   typedef DenseSlabAllocCache Cache;
 
-  explicit ThreadClock(unsigned tid, unsigned reused = 0);
+  explicit ThreadClock(unsigned tid, unsigned reused = 0, bool prd_trace = false);
 
   u64 get(unsigned tid) const;
   void set(ClockCache *c, unsigned tid, u64 v);
@@ -213,6 +213,8 @@ class ThreadClock {
   uptr nclk_;
   u64 clk_[kMaxTidInClock];  // Fixed size vector clock.
 
+  bool prd_trace;
+
   bool IsAlreadyAcquired(const SyncClock *src) const;
   bool HasAcquiredAfterRelease(const SyncClock *dst) const;
   void UpdateCurrentThread(ClockCache *c, SyncClock *dst) const;
@@ -226,7 +228,8 @@ ALWAYS_INLINE u64 ThreadClock::get(unsigned tid) const {
 ALWAYS_INLINE void ThreadClock::set(u64 v) {
   DCHECK_GE(v, clk_[tid_]);
 
-  if (clk_[tid_] != v) {
+  if (prd_trace && clk_[tid_] != v) {
+    // TRACE_LOG("Setting an epoc inc. ThreadClock is %p; thread is %d; last_acquire was %d; clk_ is %p; clk=[%d, %d, %d, %d, %d, %d, ...]", this, tid_, last_acquire_, clk_, clk_[0], clk_[1], clk_[2], clk_[3], clk_[4], clk_[5]);
     cprd::Cprd::s_get_instance().log_epoch_inc(tid_, clk_[tid_], v, "ThreadClock::set(u64)");
   }
 
@@ -234,7 +237,9 @@ ALWAYS_INLINE void ThreadClock::set(u64 v) {
 }
 
 ALWAYS_INLINE void ThreadClock::tick() {
-  cprd::Cprd::s_get_instance().log_epoch_inc(tid_, clk_[tid_], clk_[tid_]+1, "ThreadClock::tick()");
+  if (prd_trace) {
+    cprd::Cprd::s_get_instance().log_epoch_inc(tid_, clk_[tid_], clk_[tid_]+1, "ThreadClock::tick()");
+  }
   clk_[tid_]++;
 }
 

@@ -121,7 +121,7 @@ ThreadState::ThreadState(Context *ctx, int tid, int unique_id, u64 epoch,
   // they may be accessed before the ctor.
   // , ignore_reads_and_writes()
   // , ignore_interceptors()
-  , clock(tid, reuse_count)
+  , clock(tid, reuse_count, true)
 #if !SANITIZER_GO
   , jmp_bufs()
 #endif

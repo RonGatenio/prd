@@ -414,6 +414,7 @@ void Acquire(ThreadState *thr, uptr pc, uptr addr) {
 
 static void UpdateClockCallback(ThreadContextBase *tctx_base, void *arg) {
   ThreadState *thr = reinterpret_cast<ThreadState*>(arg);
+  TRACE_LOG("#%d: UpdateClockCallback\n", thr->tid);
   ThreadContext *tctx = static_cast<ThreadContext*>(tctx_base);
   u64 epoch = tctx->epoch1;
   if (tctx->status == ThreadStatusRunning) {
@@ -471,6 +472,7 @@ void ReleaseStore(ThreadState *thr, uptr pc, uptr addr) {
 #if !SANITIZER_GO
 static void UpdateSleepClockCallback(ThreadContextBase *tctx_base, void *arg) {
   ThreadState *thr = reinterpret_cast<ThreadState*>(arg);
+  TRACE_LOG("#%d: UpdateSleepClockCallback\n", thr->tid);
   ThreadContext *tctx = static_cast<ThreadContext*>(tctx_base);
   u64 epoch = tctx->epoch1;
   if (tctx->status == ThreadStatusRunning)
@@ -479,7 +481,7 @@ static void UpdateSleepClockCallback(ThreadContextBase *tctx_base, void *arg) {
 }
 
 void AfterSleep(ThreadState *thr, uptr pc) {
-  TRACE_LOG("#%d: AfterSleep %zx\n", thr->tid);
+  TRACE_LOG("#%d: AfterSleep %zx\n", thr->tid, pc);
   if (thr->ignore_sync)
     return;
   thr->last_sleep_stack_id = CurrentStackId(thr, pc);
