@@ -1,0 +1,2 @@
+fun:pmem_*=uninstrumented
+fun:pmem_*=functional

@@ -1,0 +1,87 @@
+{
+    "CCEH": {
+        "output_dir": "/app/results/CCEH",
+        "compile": {
+            "directory": "/app/benchmarks/CCEH/CCEH-PMDK",
+            "commands": [
+                "make -j"
+            ]
+        },
+        "run": {
+            "directory": "/app/benchmarks/CCEH",
+            "command": "./CCEH-PMDK/bin/multi_threaded_cceh {pm_file} {nkeys} {nthreads}",
+            "default_args": {
+                "pm_file": "/tmp/pmem_cceh_data",
+                "nkeys": 1000,
+                "nthreads": 4
+            }
+        },
+        "binary": "/app/benchmarks/CCEH/CCEH-PMDK/bin/multi_threaded_cceh"
+    },
+    "FAST_FAIR": {
+        "output_dir": "/app/results/FAST_FAIR",
+        "compile": {
+            "directory": "/app/benchmarks/FAST_FAIR/concurrent_pmdk",
+            "commands": [
+                "make -j"
+            ]
+        },
+        "run": {
+            "directory": "/app/benchmarks/FAST_FAIR",
+            "command": "./concurrent_pmdk/bin/btree_concurrent -n {nkeys} -t {nthreads} -i ./sample_input.txt -p {pm_file}",
+            "default_args": {
+                "pm_file": "/tmp/pmem_btree_data",
+                "nkeys": 1000,
+                "nthreads": 4
+            }
+        },
+        "binary": "/app/benchmarks/FAST_FAIR/concurrent_pmdk/bin/btree_concurrent"
+    },
+    "MEMCACHED": {
+        "output_dir": "/app/results/MEMCACHED",
+        "compile": {
+            "directory": "/app/benchmarks/memcached-pmem",
+            "commands": [
+                "dos2unix *",
+                "dos2unix -f configure",
+                "autoreconf",
+                "dos2unix /app/benchmarks/benchmark-runner/*.sh",
+                "chmod a+x /app/benchmarks/benchmark-runner/*.sh",
+                "CC=/app/benchmarks/benchmark-runner/clang-wrapper.sh CXX=/app/benchmarks/benchmark-runner/clang++-wrapper.sh ./configure --enable-pslab",
+                "ENABLE_PRD=true make",
+                "useradd memcached-user",
+                "pip install -r runner/requirements.txt"
+            ]
+        },
+        "run": {
+            "directory": "/app/benchmarks/memcached-pmem/runner",
+            "command": "python3 main.py -t {nthreads} -f {pm_file} -u {user} -n {nkeys}",
+            "default_args": {
+                "pm_file": "/tmp/pmem_memcached_data",
+                "user": "memcached-user",
+                "nkeys": 1000,
+                "nthreads": 4
+            }
+        },
+        "binary": "/app/benchmarks/memcached-pmem/memcached"
+    },
+    "RECIPE": {
+        "output_dir": "/app/results/RECIPE",
+        "compile": {
+            "directory": "/app/benchmarks/RECIPE/P-CLHT",
+            "commands": [
+                "mkdir build && cd build && cmake .. && make -j"
+            ]
+        },
+        "run": {
+            "directory": "/app/benchmarks/RECIPE/P-CLHT/build",
+            "command": "./pclht {pm_file} {nkeys} {nthreads}",
+            "default_args": {
+                "pm_file": "/tmp/pmem_pclht_data",
+                "nkeys": 10000,
+                "nthreads": 4
+            }
+        },
+        "binary": "/app/benchmarks/RECIPE/P-CLHT/build/pclht"
+    }
+}

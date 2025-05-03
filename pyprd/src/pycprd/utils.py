@@ -1,0 +1,66 @@
+import time
+import collections
+from dataclasses import dataclass
+from contextlib import contextmanager
+from .config import DEFAULT_CACHELINE_SIZE
+
+
+def get_cacheline_address(address: int, cacheline_size=DEFAULT_CACHELINE_SIZE) -> int:
+    mask = ((1 << 64) - 1) * cacheline_size
+    return address & mask
+
+
+def get_cacheline_interval(address: int, size: int, cacheline_size=DEFAULT_CACHELINE_SIZE) -> tuple[int, int]:
+    mask = ((1 << 64) - 1) * cacheline_size
+    start = address & mask
+    end = (address + size + cacheline_size - 1) & mask
+    return start, end
+
+
+def get_cacheline_addresses(address: int, size: int, cacheline_size=DEFAULT_CACHELINE_SIZE) -> int:
+    l = list(range(*get_cacheline_interval(address, size), cacheline_size))
+    assert len(l) == 1, f"got more than 1 cacheline ({len(l)})"
+    return l
+
+
+@contextmanager
+def timeit(name=None):
+    @dataclass
+    class Time:
+        total: float
+
+    t = Time(0)
+
+    s = time.time()
+    yield t
+    total = time.time() - s
+
+    t.total = total
+
+    if name:
+        print(f'[*] {name:60} {total:.3f} sec')
+
+
+# TODO: move to another place
+class DefaultDictByKey(collections.defaultdict):
+    def __missing__(self, key):
+        if self.default_factory is None:
+            raise KeyError(key)
+        if key not in self:
+            self[key] = self.default_factory(key)
+        return self[key]
+
+
+def dict_printer(d: dict):
+    pass
+
+
+def to_bytes(data):
+    # Check if the data is already a bytes object
+    if isinstance(data, bytes):
+        return data
+    # Check if the data is a string and needs conversion to bytes
+    elif isinstance(data, str):
+        return data.encode('utf-8')
+    else:
+        raise ValueError("Input must be an instance of str or bytes.")

@@ -1,0 +1,218 @@
+from abc import ABC
+from enum import Enum
+from typing import Any
+from . import utils
+
+
+class NodeType(str, Enum):
+    READ  = 'READ'
+    WRITE = 'WRITE'
+    FLUSH = 'FLUSH'
+    EPOCH = 'EPOCH'
+
+    def to_letter(self):
+        return self[0]
+
+    @classmethod
+    def is_instruction_type(cls, itype: 'NodeType'):
+        return itype in (cls.READ, cls.WRITE, cls.FLUSH)
+
+    @classmethod
+    def is_read_write_type(cls, itype: 'NodeType'):
+        return itype in (cls.READ, cls.WRITE)
+
+
+class AbstractNode(ABC):
+    def __init__(self, itype: NodeType, tid: int):
+        super().__init__()
+        self._itype = NodeType(itype)
+        self._tid = int(tid)
+        # self._tindex = int(tindex)
+
+    @property
+    def itype(self) -> NodeType:
+        """Return the instruction type"""
+        return self._itype
+
+    @property
+    def tid(self):
+        """Return the thread ID"""
+        return self._tid
+
+    def __repr__(self) -> str:
+        itype = self.itype
+        tid = self.tid
+        return f'{self.__class__.__name__}({itype=}, {tid=})'
+
+
+class EpochNode(AbstractNode):
+    def __init__(self, tid: int, epoch: int):
+        super().__init__(NodeType.EPOCH, tid)
+        self._epoch = epoch
+
+    @property
+    def epoch(self):
+        return self._epoch
+
+    def __hash__(self) -> int:
+        return hash((self.tid, self.epoch))
+
+    def __eq__(self, __o: object) -> bool:
+        if isinstance(__o, self.__class__):
+            return (__o.tid, __o.epoch) == (self.tid, self.epoch)
+        return False
+
+    def __repr__(self) -> str:
+        tid = self.tid
+        epoch = self.epoch
+        return f'{self.__class__.__name__}({tid=}, {epoch=})'
+
+
+class InstructionNode(AbstractNode):
+    def __init__(self, itype: NodeType, tid: int, pc: int, address: int, size: int,
+                 is_atomic = False, is_non_temporal = False,
+                 info: Any = None, trace_line_number: int = None,
+                 event_id: int = None):
+        super().__init__(itype, tid)
+        self._pc = pc
+        self._address = address
+        self._size = size
+        self._is_atomic = is_atomic
+        self._is_non_temporal = is_non_temporal
+        self._info = info
+        self._trace_line_number = trace_line_number
+        self._event_id = event_id
+
+        assert size, "Size can't be 0"
+
+    @property
+    def instruction(self):
+        return self.itype
+
+    @property
+    def pc(self):
+        return self._pc
+
+    @property
+    def address(self):
+        return self._address
+
+    @property
+    def size(self):
+        return self._size
+
+    @property
+    def interval(self):
+        return (self.address, self.address + self.size)
+    
+    @property
+    def is_atomic(self):
+        return self._is_atomic
+    
+    @property
+    def is_non_temporal(self):
+        return self._is_non_temporal
+
+    @property
+    def info(self):
+        return self._info
+    
+    @property
+    def trace_line_number(self):
+        return self._trace_line_number
+    
+    @property
+    def event_id(self):
+        return self._event_id
+    
+    def is_interval_overlap(self, other: 'InstructionNode') -> bool:
+        """
+        Return True if the instructions' variables overlap
+        """
+        i1 = self.interval
+        i2 = other.interval
+        return max(i1[0], i2[0]) < min(i1[1], i2[1])
+    
+    def is_interval_contains(self, other: 'InstructionNode') -> bool:
+        """
+        Return True if other's variable is contained in self's interval
+        """
+        i1 = self.interval
+        i2 = other.interval
+        return i1[0] <= i2[0] < i2[1] <= i1[1]
+
+    def get_cacheline_address(self, cacheline_size=utils.DEFAULT_CACHELINE_SIZE):
+        return utils.get_cacheline_address(self.address, cacheline_size=cacheline_size)
+
+    def get_cacheline_interval(self, cacheline_size=utils.DEFAULT_CACHELINE_SIZE):
+        return utils.get_cacheline_interval(self.address, self.size, cacheline_size=cacheline_size)
+    
+    def is_contained_in_cachline(self, cacheline_size=utils.DEFAULT_CACHELINE_SIZE) -> bool:
+        ci = self.get_cacheline_interval(cacheline_size=cacheline_size)
+        return ci[1] - ci[0] == cacheline_size
+
+    def __repr__(self) -> str:
+        tid = self.tid
+        instruction = self.instruction.name
+        pc = self.pc
+        address = self.address
+        size = self.size
+        atomic = self._is_atomic
+        nontemporal = self._is_non_temporal
+        info = self.info
+        traceline = self._trace_line_number
+        return f'{self.__class__.__name__}({tid=}, {instruction=}, {pc=:#x}, {address=:#x}, {size=}, {atomic=}, {nontemporal=}, {info=}, {traceline=})'
+    
+    @property
+    def str_itype(self) -> str:
+        return f'{self.itype.to_letter()}'
+    
+    @property
+    def str_info(self) -> str:
+        from .trace_event_info import TraceEventInfo
+
+        if not isinstance(self.info, TraceEventInfo):
+            raise Exception('invalid node info')
+        
+        event_type = self.str_itype
+        if self.is_non_temporal:
+            event_type += '-NT'
+        if self.is_atomic:
+            event_type = 'Atomic' + event_type
+        
+        info: TraceEventInfo = self.info
+        return f'T{self.tid} {event_type}({self.address:#x}, {self.size}) {info.symbol} (trace line {self.trace_line_number}) (cachline {self.get_cacheline_address():#x})'
+
+
+class WriteNode(InstructionNode):
+    def __init__(self, tid: int, pc: int, address: int, size: int, is_atomic = False, is_non_temporal = False, info: Any = None, trace_line_number: int = None, event_id: int = None):
+        super().__init__(NodeType.WRITE, tid, pc, address, size, is_atomic, is_non_temporal, info, trace_line_number, event_id=event_id)
+
+
+class ReadNode(InstructionNode):
+    def __init__(self, tid: int, pc: int, address: int, size: int, is_atomic = False, is_non_temporal = False, info: Any = None, trace_line_number: int = None, event_id: int = None):
+        super().__init__(NodeType.READ, tid, pc, address, size, is_atomic, is_non_temporal, info, trace_line_number, event_id=event_id)
+
+
+class FlushNode(InstructionNode):
+    def __init__(self, tid: int, pc: int, address: int, size: int, is_atomic = False, is_non_temporal = False, info: Any = None, trace_line_number: int = None, event_id: int = None):
+        super().__init__(NodeType.FLUSH, tid, pc, address, size, is_atomic, is_non_temporal, info, trace_line_number, event_id=event_id)
+
+
+def create_instruction_node(itype: NodeType,
+                            tid: int,
+                            pc: int,
+                            address: int,
+                            size: int,
+                            is_atomic: bool = False,
+                            is_non_temporal: bool = False,
+                            info: Any = None,
+                            trace_line_number: int = None,
+                            event_id: int = None) -> InstructionNode:
+    cls = {
+        NodeType.READ:  ReadNode,
+        NodeType.WRITE: WriteNode,
+        NodeType.FLUSH: FlushNode,
+    }[itype]
+
+    return cls(tid, pc, address, size, is_atomic, is_non_temporal, info, trace_line_number, event_id=event_id)
